@@ -42,14 +42,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Start PlaybackService
+        // Start PlaybackService via standard startService.
+        // MediaSessionService automatically transitions to foreground when media playback begins.
         try {
             val serviceIntent = Intent(this, PlaybackService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(serviceIntent)
-            } else {
-                startService(serviceIntent)
-            }
+            startService(serviceIntent)
         } catch (e: Exception) {
             e.printStackTrace()
         }

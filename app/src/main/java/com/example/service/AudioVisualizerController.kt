@@ -1,8 +1,11 @@
 package com.example.service
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.util.Log
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -47,6 +50,13 @@ class AudioVisualizerController(
             return
         }
 
+        // Verify RECORD_AUDIO permission before instantiating native Visualizer.
+        // Without this permission, AudioFlinger logs -3/initCheck errors.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            startSimulationMode()
+            return
+        }
+
         try {
             val vis = Visualizer(audioSessionId).apply {
                 captureSize = Visualizer.getCaptureSizeRange()[0].coerceAtLeast(128)
@@ -80,8 +90,8 @@ class AudioVisualizerController(
             }
             visualizer = vis
             stopSimulationMode()
-        } catch (e: Exception) {
-            Log.w("AudioVisualizer", "Native visualizer unavailable (${e.message}), using fallback mode")
+        } catch (t: Throwable) {
+            Log.w("AudioVisualizer", "Native visualizer unavailable (${t.message}), using fallback mode")
             startSimulationMode()
         }
     }
@@ -166,7 +176,7 @@ class AudioVisualizerController(
         try {
             visualizer?.enabled = false
             visualizer?.release()
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         visualizer = null
     }
 }
