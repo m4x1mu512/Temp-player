@@ -28,18 +28,24 @@ jobs:
       - name: Generate debug keystore
         run: |
           mkdir -p ~/.android
-          keytool -genkey -v \
-            -keystore ~/.android/debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+            cp debug.keystore ~/.android/debug.keystore
+          else
+            keytool -genkey -v \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            cp ~/.android/debug.keystore ./debug.keystore
+          fi
 
       - name: Build Debug APK with Gradle
-        run: gradle assembleDebug
+        run: ./gradlew assembleDebug || gradle assembleDebug
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4

@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
 import com.example.ui.components.EqualizerDialog
+import com.example.ui.components.MiniPlayer
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.viewmodel.MainViewModel
 
@@ -68,6 +69,7 @@ import com.example.ui.viewmodel.MainViewModel
 fun SettingsScreen(
     viewModel: MainViewModel,
     onNavigateBack: () -> Unit,
+    onNavigateToPlayer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
@@ -84,6 +86,10 @@ fun SettingsScreen(
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
 
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
+    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
+    val duration by viewModel.duration.collectAsStateWithLifecycle()
 
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
@@ -116,6 +122,18 @@ fun SettingsScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
+            )
+        },
+        bottomBar = {
+            MiniPlayer(
+                currentTrack = currentTrack,
+                isPlaying = isPlaying,
+                position = position,
+                duration = duration,
+                onTogglePlayPause = { viewModel.togglePlayPause() },
+                onNextTrack = { viewModel.nextTrack() },
+                onPreviousTrack = { viewModel.previousTrack() },
+                onClick = onNavigateToPlayer
             )
         }
     ) { paddingValues ->

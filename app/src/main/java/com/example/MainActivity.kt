@@ -132,7 +132,8 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable("settings") {
             SettingsScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPlayer = { navController.navigate("player") }
             )
         }
     }

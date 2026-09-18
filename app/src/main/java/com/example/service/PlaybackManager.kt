@@ -89,6 +89,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
     private var positionProgressJob: Job? = null
     private var sleepCountDownTimer: CountDownTimer? = null
+    private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
     init {
         serviceScope.launch {
@@ -147,6 +148,18 @@ class PlaybackManager private constructor(private val context: Context) {
                                 }
                             }
                         }
+
+                        val currentSessionId = player.audioSessionId
+                        if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
+                            currentAudioSessionId = currentSessionId
+                            visualizerController.attachToAudioSession(currentSessionId)
+                            serviceScope.launch {
+                                val savedLevels = settingsDataStore.eqLevelsFlow.first()
+                                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
+                                _equalizerBands.value = equalizerController.getBands()
+                                equalizerController.applyPreset(_equalizerPreset.value)
+                            }
+                        }
                     }
                     Player.STATE_ENDED -> {
                         handleTrackEnded()
@@ -164,6 +177,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
         // Setup audio session id
         val sessionId = player.audioSessionId
+        currentAudioSessionId = sessionId
         visualizerController.attachToAudioSession(sessionId)
         serviceScope.launch {
             val savedLevels = settingsDataStore.eqLevelsFlow.first()

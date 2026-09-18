@@ -1,9 +1,11 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,7 +13,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -65,6 +68,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +81,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +102,8 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.NeonTurquoise
 import com.example.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,59 +139,130 @@ fun PlayerScreen(
 
     var isUserScrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
-    var totalDrag by remember { mutableFloatStateOf(0f) }
+    var dragDistanceX by remember { mutableFloatStateOf(0f) }
+    var dragDistanceY by remember { mutableFloatStateOf(0f) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val dragOffsetY = remember { Animatable(0f) }
+    val localDensity = LocalDensity.current
+    val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
 
     Scaffold(
         modifier = modifier
             .fillMaxSize()
+            .graphicsLayer {
+                val offset = dragOffsetY.value.coerceAtLeast(0f)
+                translationY = offset
+                val fraction = (offset / 700f).coerceIn(0f, 1f)
+                alpha = 1f - (fraction * 0.35f)
+                val scale = 1f - (fraction * 0.05f)
+                scaleX = scale
+                scaleY = scale
+            }
             .testTag("player_screen"),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = "Сейчас играет",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragStart = {
+                                dragDistanceY = 0f
+                            },
+                            onDragEnd = {
+                                if (dragOffsetY.value > dismissThresholdPx) {
+                                    coroutineScope.launch {
+                                        dragOffsetY.animateTo(2500f, tween(180))
+                                        onNavigateBack()
+                                    }
+                                } else {
+                                    coroutineScope.launch {
+                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                    }
+                                }
+                                dragDistanceY = 0f
+                            },
+                            onDragCancel = {
+                                coroutineScope.launch {
+                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                }
+                                dragDistanceY = 0f
+                            },
+                            onDrag = { _, dragAmount ->
+                                dragDistanceY += dragAmount.y
+                                if (dragAmount.y > 0 || dragOffsetY.value > 0f) {
+                                    coroutineScope.launch {
+                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                    }
+                                }
+                            }
+                        )
+                    }
+            ) {
+                // Drag handle bar for swipe-down to dismiss
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 42.dp, height = 4.5.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f))
                     )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("player_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { showSleepTimerDialog = true },
-                        modifier = Modifier.testTag("player_sleep_timer_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bedtime,
-                            contentDescription = "Таймер сна",
-                            tint = if (sleepTimerMode != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                }
 
-                    IconButton(
-                        onClick = { showEqualizerDialog = true },
-                        modifier = Modifier.testTag("player_equalizer_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "Эквалайзер",
-                            tint = MaterialTheme.colorScheme.onSurface
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = "Сейчас играет",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag("player_collapse_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Свернуть плеер",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(30.dp)
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { showSleepTimerDialog = true },
+                            modifier = Modifier.testTag("player_sleep_timer_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bedtime,
+                                contentDescription = "Таймер сна",
+                                tint = if (sleepTimerMode != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { showEqualizerDialog = true },
+                            modifier = Modifier.testTag("player_equalizer_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "Эквалайзер",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    )
                 )
-            )
+            }
         }
     ) { paddingValues ->
         if (currentTrack == null) {
@@ -210,19 +288,47 @@ fun PlayerScreen(
                     .padding(horizontal = 24.dp)
                     .verticalScroll(rememberScrollState())
                     .pointerInput(Unit) {
-                        detectHorizontalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onDragEnd = {
-                                if (totalDrag < -100f) {
-                                    viewModel.nextTrack()
-                                } else if (totalDrag > 100f) {
-                                    viewModel.previousTrack()
-                                }
-                                totalDrag = 0f
+                        detectDragGestures(
+                            onDragStart = {
+                                dragDistanceX = 0f
+                                dragDistanceY = 0f
                             },
-                            onDragCancel = { totalDrag = 0f },
-                            onHorizontalDrag = { _, dragAmount ->
-                                totalDrag += dragAmount
+                            onDragEnd = {
+                                if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
+                                    coroutineScope.launch {
+                                        dragOffsetY.animateTo(2500f, tween(180))
+                                        onNavigateBack()
+                                    }
+                                } else {
+                                    coroutineScope.launch {
+                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                    }
+                                    if (abs(dragDistanceX) > abs(dragDistanceY)) {
+                                        if (dragDistanceX < -80f) {
+                                            viewModel.nextTrack()
+                                        } else if (dragDistanceX > 80f) {
+                                            viewModel.previousTrack()
+                                        }
+                                    }
+                                }
+                                dragDistanceX = 0f
+                                dragDistanceY = 0f
+                            },
+                            onDragCancel = {
+                                coroutineScope.launch {
+                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                }
+                                dragDistanceX = 0f
+                                dragDistanceY = 0f
+                            },
+                            onDrag = { _, dragAmount ->
+                                dragDistanceX += dragAmount.x
+                                dragDistanceY += dragAmount.y
+                                if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
+                                    coroutineScope.launch {
+                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                    }
+                                }
                             }
                         )
                     },
@@ -251,8 +357,8 @@ fun PlayerScreen(
                 )
 
                 // Interactive parallax tilt & offset based on user horizontal swipe
-                val parallaxRotationY = (totalDrag / 25f).coerceIn(-18f, 18f)
-                val parallaxTranslationX = (totalDrag / 3.5f).coerceIn(-60f, 60f)
+                val parallaxRotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
+                val parallaxTranslationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
 
                 // Large, prominent Artwork with ambient backlight and parallax tilt
                 Box(
