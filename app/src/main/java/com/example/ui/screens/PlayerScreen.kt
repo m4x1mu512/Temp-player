@@ -16,10 +16,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -281,397 +283,418 @@ fun PlayerScreen(
         } else {
             val track = currentTrack!!
 
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 24.dp)
-                    .verticalScroll(rememberScrollState())
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = {
-                                dragDistanceX = 0f
-                                dragDistanceY = 0f
-                            },
-                            onDragEnd = {
-                                if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.animateTo(2500f, tween(180))
-                                        onNavigateBack()
+            ) {
+                val availableHeight = maxHeight
+                val isCompact = availableHeight < 640.dp
+                val isMedium = availableHeight in 640.dp..760.dp
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = if (isCompact) 16.dp else 24.dp)
+                        .padding(bottom = if (isCompact) 6.dp else 12.dp)
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    dragDistanceX = 0f
+                                    dragDistanceY = 0f
+                                },
+                                onDragEnd = {
+                                    if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
+                                        coroutineScope.launch {
+                                            dragOffsetY.animateTo(2500f, tween(180))
+                                            onNavigateBack()
+                                        }
+                                    } else {
+                                        coroutineScope.launch {
+                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                        }
+                                        if (abs(dragDistanceX) > abs(dragDistanceY)) {
+                                            if (dragDistanceX < -80f) {
+                                                viewModel.nextTrack()
+                                            } else if (dragDistanceX > 80f) {
+                                                viewModel.previousTrack()
+                                            }
+                                        }
                                     }
-                                } else {
+                                    dragDistanceX = 0f
+                                    dragDistanceY = 0f
+                                },
+                                onDragCancel = {
                                     coroutineScope.launch {
                                         dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
                                     }
-                                    if (abs(dragDistanceX) > abs(dragDistanceY)) {
-                                        if (dragDistanceX < -80f) {
-                                            viewModel.nextTrack()
-                                        } else if (dragDistanceX > 80f) {
-                                            viewModel.previousTrack()
+                                    dragDistanceX = 0f
+                                    dragDistanceY = 0f
+                                },
+                                onDrag = { _, dragAmount ->
+                                    dragDistanceX += dragAmount.x
+                                    dragDistanceY += dragAmount.y
+                                    if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
+                                        coroutineScope.launch {
+                                            dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
                                         }
                                     }
                                 }
-                                dragDistanceX = 0f
-                                dragDistanceY = 0f
-                            },
-                            onDragCancel = {
-                                coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
-                                }
-                                dragDistanceX = 0f
-                                dragDistanceY = 0f
-                            },
-                            onDrag = { _, dragAmount ->
-                                dragDistanceX += dragAmount.x
-                                dragDistanceY += dragAmount.y
-                                if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                            )
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Subtle continuous pulsing animation when music is actively playing
+                    val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
+                    val pulseScale by infiniteTransition.animateFloat(
+                        initialValue = 1.0f,
+                        targetValue = if (isPlaying) 1.035f else 1.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+                            repeatMode = AnimRepeatMode.Reverse
+                        ),
+                        label = "pulse_scale"
+                    )
+
+                    // Smooth scale transition when playing vs paused
+                    val playbackStateScale by animateFloatAsState(
+                        targetValue = if (isPlaying) 1.0f else 0.94f,
+                        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+                        label = "playback_state_scale"
+                    )
+
+                    // Interactive parallax tilt & offset based on user horizontal swipe
+                    val parallaxRotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
+                    val parallaxTranslationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
+
+                    // Responsive Album Art that flexibly scales to available height
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(vertical = if (isCompact) 2.dp else 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        BoxWithConstraints(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val artSize = minOf(maxWidth * 0.90f, maxHeight * 0.96f).coerceAtLeast(100.dp)
+
+                            Box(
+                                modifier = Modifier
+                                    .size(artSize)
+                                    .graphicsLayer {
+                                        scaleX = pulseScale * playbackStateScale
+                                        scaleY = pulseScale * playbackStateScale
+                                        rotationY = parallaxRotationY
+                                        translationX = parallaxTranslationX
+                                        cameraDistance = 14f * density
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Ambient colorful glow behind the artwork
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize(0.94f)
+                                        .shadow(
+                                            elevation = if (isPlaying) 28.dp else 10.dp,
+                                            shape = RoundedCornerShape(28.dp),
+                                            spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
+                                            ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
+                                        )
+                                )
+
+                                // Album Art container with rounded corners
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(26.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (track.albumArtUri != null) {
+                                        AsyncImage(
+                                            model = track.albumArtUri,
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            error = painterResource(id = R.drawable.ic_default_art),
+                                            placeholder = painterResource(id = R.drawable.ic_default_art),
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        AsyncImage(
+                                            model = R.drawable.ic_default_art,
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
                                     }
                                 }
                             }
-                        )
-                    },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
 
-                // Subtle continuous pulsing animation when music is actively playing
-                val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
-                val pulseScale by infiniteTransition.animateFloat(
-                    initialValue = 1.0f,
-                    targetValue = if (isPlaying) 1.035f else 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-                        repeatMode = AnimRepeatMode.Reverse
-                    ),
-                    label = "pulse_scale"
-                )
-
-                // Smooth scale transition when playing vs paused
-                val playbackStateScale by animateFloatAsState(
-                    targetValue = if (isPlaying) 1.0f else 0.94f,
-                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
-                    label = "playback_state_scale"
-                )
-
-                // Interactive parallax tilt & offset based on user horizontal swipe
-                val parallaxRotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
-                val parallaxTranslationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
-
-                // Large, prominent Artwork with ambient backlight and parallax tilt
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .aspectRatio(1f)
-                        .graphicsLayer {
-                            scaleX = pulseScale * playbackStateScale
-                            scaleY = pulseScale * playbackStateScale
-                            rotationY = parallaxRotationY
-                            translationX = parallaxTranslationX
-                            cameraDistance = 14f * density
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Ambient colorful glow behind the artwork
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize(0.94f)
-                            .shadow(
-                                elevation = if (isPlaying) 32.dp else 12.dp,
-                                shape = RoundedCornerShape(32.dp),
-                                spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                                ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
-                            )
-                    )
-
-                    // Album Art container with high elevation & rounded corners
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(30.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (track.albumArtUri != null) {
-                            AsyncImage(
-                                model = track.albumArtUri,
-                                contentDescription = "Обложка трека",
-                                contentScale = ContentScale.Crop,
-                                error = painterResource(id = R.drawable.ic_default_art),
-                                placeholder = painterResource(id = R.drawable.ic_default_art),
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            AsyncImage(
-                                model = R.drawable.ic_default_art,
-                                contentDescription = "Обложка трека",
-                                contentScale = ContentScale.Crop,
+                    // Visualizer Canvas View (scaled to fit screen height)
+                    if (visualizerEnabled) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(if (isCompact) 28.dp else if (isMedium) 38.dp else 48.dp)
+                                .padding(vertical = 1.dp)
+                        ) {
+                            AudioVisualizerView(
+                                fftData = visualizerData,
+                                mode = visualizerMode,
+                                isPlaying = isPlaying,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Visualizer Canvas View
-                if (visualizerEnabled) {
-                    Box(
+                    // Track Title and Artist
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(70.dp)
-                            .padding(vertical = 4.dp)
+                            .padding(horizontal = 8.dp, vertical = if (isCompact) 1.dp else 3.dp)
                     ) {
-                        AudioVisualizerView(
-                            fftData = visualizerData,
-                            mode = visualizerMode,
-                            isPlaying = isPlaying,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // Track Title and Artist
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (track.album.isNotBlank() && track.album != "Неизвестный альбом") {
                         Text(
-                            text = track.album,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = track.title,
+                            style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = track.artist,
+                            style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (track.album.isNotBlank() && track.album != "Неизвестный альбом" && !isCompact) {
+                            Text(
+                                text = track.album,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Progress Slider & Timestamps
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
-                    val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
-
-                    Slider(
-                        value = sliderVal,
-                        onValueChange = {
-                            isUserScrubbing = true
-                            scrubPosition = it
-                        },
-                        onValueChangeFinished = {
-                            viewModel.seekTo(scrubPosition.toLong())
-                            isUserScrubbing = false
-                        },
-                        valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                        ),
+                    // Progress Slider & Timestamps
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("player_progress_slider")
-                    )
+                            .padding(vertical = if (isCompact) 0.dp else 2.dp)
+                    ) {
+                        val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
+                        val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
 
+                        Slider(
+                            value = sliderVal,
+                            onValueChange = {
+                                isUserScrubbing = true
+                                scrubPosition = it
+                            },
+                            onValueChangeFinished = {
+                                viewModel.seekTo(scrubPosition.toLong())
+                                isUserScrubbing = false
+                            },
+                            valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
+                            colors = SliderDefaults.colors(
+                                thumbColor = MaterialTheme.colorScheme.primary,
+                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("player_progress_slider")
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatTime(currentPos),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = formatTime(duration),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Secondary controls: Shuffle, Favorite, Add to Playlist, Repeat
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = if (isCompact) 0.dp else 2.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = formatTime(currentPos),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formatTime(duration),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                        // Shuffle
+                        IconButton(
+                            onClick = { viewModel.toggleShuffle() },
+                            modifier = Modifier.testTag("player_shuffle_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "Перемешать",
+                                tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                        // Favorite
+                        IconButton(
+                            onClick = { viewModel.toggleFavorite(track.id) },
+                            modifier = Modifier.testTag("player_favorite_button")
+                        ) {
+                            Icon(
+                                imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = "Избранное",
+                                tint = if (track.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
-                // Secondary controls: Shuffle, Favorite, Add to Playlist, Repeat
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Shuffle
-                    IconButton(
-                        onClick = { viewModel.toggleShuffle() },
-                        modifier = Modifier.testTag("player_shuffle_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Shuffle,
-                            contentDescription = "Перемешать",
-                            tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Favorite
-                    IconButton(
-                        onClick = { viewModel.toggleFavorite(track.id) },
-                        modifier = Modifier.testTag("player_favorite_button")
-                    ) {
-                        Icon(
-                            imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = "Избранное",
-                            tint = if (track.isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Add to Playlist
-                    IconButton(
-                        onClick = { showAddToPlaylistDialog = true },
-                        modifier = Modifier.testTag("player_add_playlist_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlaylistAdd,
-                            contentDescription = "Добавить в плейлист",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    // Repeat Mode (OFF, ALL, ONE)
-                    IconButton(
-                        onClick = { viewModel.toggleRepeat() },
-                        modifier = Modifier.testTag("player_repeat_button")
-                    ) {
-                        when (repeatMode) {
-                            RepeatMode.OFF -> Icon(
-                                imageVector = Icons.Default.Repeat,
-                                contentDescription = "Повтор выключен",
+                        // Add to Playlist
+                        IconButton(
+                            onClick = { showAddToPlaylistDialog = true },
+                            modifier = Modifier.testTag("player_add_playlist_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlaylistAdd,
+                                contentDescription = "Добавить в плейлист",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            RepeatMode.ALL -> Icon(
-                                imageVector = Icons.Default.Repeat,
-                                contentDescription = "Повтор всех",
-                                tint = MaterialTheme.colorScheme.primary
+                        }
+
+                        // Repeat Mode (OFF, ALL, ONE)
+                        IconButton(
+                            onClick = { viewModel.toggleRepeat() },
+                            modifier = Modifier.testTag("player_repeat_button")
+                        ) {
+                            when (repeatMode) {
+                                RepeatMode.OFF -> Icon(
+                                    imageVector = Icons.Default.Repeat,
+                                    contentDescription = "Повтор выключен",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                RepeatMode.ALL -> Icon(
+                                    imageVector = Icons.Default.Repeat,
+                                    contentDescription = "Повтор всех",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                RepeatMode.ONE -> Icon(
+                                    imageVector = Icons.Default.RepeatOne,
+                                    contentDescription = "Повтор одного трека",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    // Primary Playback Controls: -10s, Prev, Play/Pause, Next, +10s
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = if (isCompact) 2.dp else 6.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Replay 10s
+                        IconButton(
+                            onClick = { viewModel.seekBackward10s() },
+                            modifier = Modifier
+                                .size(if (isCompact) 40.dp else 46.dp)
+                                .testTag("player_seek_back_10")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Replay10,
+                                contentDescription = "Перемотка назад на 10 сек",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(if (isCompact) 24.dp else 26.dp)
                             )
-                            RepeatMode.ONE -> Icon(
-                                imageVector = Icons.Default.RepeatOne,
-                                contentDescription = "Повтор одного трека",
-                                tint = MaterialTheme.colorScheme.primary
+                        }
+
+                        // Previous Track
+                        IconButton(
+                            onClick = { viewModel.previousTrack() },
+                            modifier = Modifier
+                                .size(if (isCompact) 46.dp else 52.dp)
+                                .testTag("player_prev_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SkipPrevious,
+                                contentDescription = "Предыдущий трек",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(if (isCompact) 30.dp else 34.dp)
+                            )
+                        }
+
+                        // Main Play/Pause Button
+                        FilledIconButton(
+                            onClick = { viewModel.togglePlayPause() },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier
+                                .size(if (isCompact) 58.dp else 66.dp)
+                                .shadow(if (isCompact) 8.dp else 12.dp, CircleShape, spotColor = NeonCyan)
+                                .testTag("player_play_pause_button")
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
+                                modifier = Modifier.size(if (isCompact) 32.dp else 36.dp)
+                            )
+                        }
+
+                        // Next Track
+                        IconButton(
+                            onClick = { viewModel.nextTrack() },
+                            modifier = Modifier
+                                .size(if (isCompact) 46.dp else 52.dp)
+                                .testTag("player_next_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SkipNext,
+                                contentDescription = "Следующий трек",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(if (isCompact) 30.dp else 34.dp)
+                            )
+                        }
+
+                        // Forward 10s
+                        IconButton(
+                            onClick = { viewModel.seekForward10s() },
+                            modifier = Modifier
+                                .size(if (isCompact) 40.dp else 46.dp)
+                                .testTag("player_seek_forward_10")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Forward10,
+                                contentDescription = "Перемотка вперед на 10 сек",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(if (isCompact) 24.dp else 26.dp)
                             )
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Primary Playback Controls: -10s, Prev, Play/Pause, Next, +10s
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Replay 10s
-                    IconButton(
-                        onClick = { viewModel.seekBackward10s() },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("player_seek_back_10")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Replay10,
-                            contentDescription = "Перемотка назад на 10 сек",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-
-                    // Previous Track
-                    IconButton(
-                        onClick = { viewModel.previousTrack() },
-                        modifier = Modifier
-                            .size(54.dp)
-                            .testTag("player_prev_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipPrevious,
-                            contentDescription = "Предыдущий трек",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-
-                    // Main Play/Pause Button
-                    FilledIconButton(
-                        onClick = { viewModel.togglePlayPause() },
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        modifier = Modifier
-                            .size(72.dp)
-                            .shadow(12.dp, CircleShape, spotColor = NeonCyan)
-                            .testTag("player_play_pause_button")
-                    ) {
-                        Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                            modifier = Modifier.size(38.dp)
-                        )
-                    }
-
-                    // Next Track
-                    IconButton(
-                        onClick = { viewModel.nextTrack() },
-                        modifier = Modifier
-                            .size(54.dp)
-                            .testTag("player_next_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SkipNext,
-                            contentDescription = "Следующий трек",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-
-                    // Forward 10s
-                    IconButton(
-                        onClick = { viewModel.seekForward10s() },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("player_seek_forward_10")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Forward10,
-                            contentDescription = "Перемотка вперед на 10 сек",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
