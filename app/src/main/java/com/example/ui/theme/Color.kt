@@ -33,4 +33,5 @@ val NeonCyan = Color(0xFF00F0FF)
 val NeonTurquoise = Color(0xFF00F5D4)
 val NeonPurple = Color(0xFF9D4EDD)
 val NeonPink = Color(0xFFFF007F)
+val FavoriteRed = Color(0xFFFF334B)
 

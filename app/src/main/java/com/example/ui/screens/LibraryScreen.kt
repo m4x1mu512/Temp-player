@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -224,11 +225,20 @@ fun LibraryScreen(
             )
         },
         bottomBar = {
+            val isCurrentTrackFavorite = remember(favoriteTracks, currentTrack?.id) {
+                val currentId = currentTrack?.id
+                if (currentId != null) {
+                    favoriteTracks.any { it.id == currentId }
+                } else false
+            }
+
             MiniPlayer(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
                 position = position,
                 duration = duration,
+                isFavorite = isCurrentTrackFavorite,
+                onToggleFavorite = { currentTrack?.let { viewModel.toggleFavorite(it.id) } },
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNextTrack = { viewModel.nextTrack() },
                 onPreviousTrack = { viewModel.previousTrack() },
@@ -241,18 +251,11 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search field
+            // Search field - shows only "Поиск"
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
-                placeholder = { Text("Поиск трека, артиста или альбома...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Поиск",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
+                placeholder = { Text("Поиск") },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
@@ -725,7 +728,7 @@ private fun PlaylistsSection(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.secondary),
+                                .background(FavoriteRed),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
