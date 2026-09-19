@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -25,11 +26,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
@@ -51,13 +54,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,7 +80,9 @@ import com.example.data.model.Track
 import com.example.ui.components.AddToPlaylistDialog
 import com.example.ui.components.CreatePlaylistDialog
 import com.example.ui.components.EmptyState
+import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
+import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
 import com.example.ui.viewmodel.MainViewModel
 
@@ -95,6 +96,7 @@ fun LibraryScreen(
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val folderGroups by viewModel.folderGroups.collectAsStateWithLifecycle()
@@ -105,6 +107,12 @@ fun LibraryScreen(
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
+
+    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
+    val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
+    val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
+    val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
+    val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
@@ -119,10 +127,35 @@ fun LibraryScreen(
     var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
     var trackForPlaylistDialog by remember { mutableStateOf<Track?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var moreMenuExpanded by remember { mutableStateOf(false) }
+    var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
 
     // Selected folder / artist / album filter drilldown
     var selectedGroupTitle by remember { mutableStateOf<String?>(null) }
     var selectedGroupTracks by remember { mutableStateOf<List<Track>?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
+    // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
+    val pageCount = 6
+    val pagerState = rememberPagerState(
+        initialPage = if (selectedTab in 0 until pageCount) selectedTab else 0,
+        pageCount = { pageCount }
+    )
+
+    LaunchedEffect(pagerState.currentPage) {
+        if (selectedTab != pagerState.currentPage) {
+            viewModel.onTabSelected(pagerState.currentPage)
+            selectedGroupTitle = null
+            selectedGroupTracks = null
+        }
+    }
+
+    LaunchedEffect(selectedTab) {
+        if (pagerState.currentPage != selectedTab && selectedTab in 0 until pageCount) {
+            pagerState.animateScrollToPage(selectedTab)
+        }
+    }
 
     LaunchedEffect(scanMessage) {
         scanMessage?.let {
@@ -142,87 +175,216 @@ fun LibraryScreen(
         modifier = modifier.testTag("library_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "Темп",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+            // 7 top bar icons: 6 tabs + 1 more menu
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 1. Список воспроизведения (Queue)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_queue_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QueueMusic,
+                        contentDescription = "Список воспроизведения",
+                        tint = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 2. Папки (Folders)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_folders_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = "Папки",
+                        tint = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 3. Плейлисты (Playlists)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_playlists_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Плейлисты",
+                        tint = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 4. Альбомы (Albums)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(3) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_albums_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Album,
+                        contentDescription = "Альбомы",
+                        tint = if (pagerState.currentPage == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 5. Исполнители (Artists)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(4) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_artists_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Исполнители",
+                        tint = if (pagerState.currentPage == 4) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 6. Поиск (Search)
+                IconButton(
+                    onClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(5) }
+                        selectedGroupTitle = null
+                        selectedGroupTracks = null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("nav_search_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Поиск",
+                        tint = if (pagerState.currentPage == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // 7. Три точки (Menu)
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(
+                        onClick = { moreMenuExpanded = true },
+                        modifier = Modifier.testTag("nav_more_button")
+                    ) {
                         if (isScanning) {
-                            Spacer(modifier = Modifier.width(12.dp))
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.scanMusic() },
-                        modifier = Modifier.testTag("scan_library_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Обновить медиатеку",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Sort button
-                    Box {
-                        IconButton(
-                            onClick = { sortMenuExpanded = true },
-                            modifier = Modifier.testTag("sort_menu_button")
-                        ) {
+                        } else {
                             Icon(
-                                imageVector = Icons.Default.Sort,
-                                contentDescription = "Сортировка",
-                                tint = MaterialTheme.colorScheme.onSurface
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Меню",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        DropdownMenu(
-                            expanded = sortMenuExpanded,
-                            onDismissRequest = { sortMenuExpanded = false }
-                        ) {
-                            SortOrder.values().forEach { order ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = order.displayName,
-                                            fontWeight = if (order == sortOrder) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (order == sortOrder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.onSortOrderChanged(order)
-                                        sortMenuExpanded = false
-                                    }
-                                )
-                            }
-                        }
                     }
 
-                    IconButton(
-                        onClick = onNavigateToSettings,
-                        modifier = Modifier.testTag("settings_button")
+                    DropdownMenu(
+                        expanded = moreMenuExpanded,
+                        onDismissRequest = { moreMenuExpanded = false }
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Настройки",
-                            tint = MaterialTheme.colorScheme.onSurface
+                        DropdownMenuItem(
+                            text = { Text("Эквалайзер") },
+                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                            onClick = {
+                                moreMenuExpanded = false
+                                showEqualizerDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Таймер сна") },
+                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null) },
+                            onClick = {
+                                moreMenuExpanded = false
+                                showSleepTimerDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Сканировать") },
+                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                            onClick = {
+                                moreMenuExpanded = false
+                                viewModel.scanMusic()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Сортировка") },
+                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null) },
+                            onClick = {
+                                moreMenuExpanded = false
+                                sortMenuExpanded = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Настройки") },
+                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            onClick = {
+                                moreMenuExpanded = false
+                                onNavigateToSettings()
+                            }
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+
+                    DropdownMenu(
+                        expanded = sortMenuExpanded,
+                        onDismissRequest = { sortMenuExpanded = false }
+                    ) {
+                        SortOrder.values().forEach { order ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = order.displayName,
+                                        fontWeight = if (order == sortOrder) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (order == sortOrder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.onSortOrderChanged(order)
+                                    sortMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         },
         bottomBar = {
             val isCurrentTrackFavorite = remember(favoriteTracks, currentTrack?.id) {
@@ -251,82 +413,7 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search field - shows only "Поиск"
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
-                placeholder = { Text("Поиск") },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Очистить")
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-                    .testTag("search_input")
-            )
-
-            // Tabs: Треки, Папки, Исполнители, Альбомы, Плейлисты
-            val tabs = listOf("Треки", "Папки", "Исполнители", "Альбомы", "Плейлисты")
-            val pagerState = rememberPagerState(initialPage = selectedTab, pageCount = { tabs.size })
-            val coroutineScope = rememberCoroutineScope()
-
-            LaunchedEffect(pagerState.currentPage) {
-                if (selectedTab != pagerState.currentPage) {
-                    viewModel.onTabSelected(pagerState.currentPage)
-                    selectedGroupTitle = null
-                    selectedGroupTracks = null
-                }
-            }
-
-            LaunchedEffect(selectedTab) {
-                if (pagerState.currentPage != selectedTab) {
-                    pagerState.animateScrollToPage(selectedTab)
-                }
-            }
-
-            ScrollableTabRow(
-                selectedTabIndex = pagerState.currentPage,
-                edgePadding = 16.dp,
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.primary,
-                divider = {}
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(index)
-                            }
-                            selectedGroupTitle = null
-                            selectedGroupTracks = null
-                        },
-                        text = {
-                            Text(
-                                text = title,
-                                fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        modifier = Modifier.testTag("tab_$index")
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Tab Content with horizontal swipe between tabs
+            // Tab Content with horizontal swipe between screens
             Box(modifier = Modifier.fillMaxSize()) {
                 if (rawTracks.isEmpty() && !isScanning) {
                     EmptyState(
@@ -342,132 +429,197 @@ fun LibraryScreen(
                     ) { page ->
                         when (page) {
                             0 -> {
-                                // "Треки"
-                            if (displayedTracks.isEmpty()) {
-                                EmptyState(
-                                    title = "Ничего не найдено",
-                                    message = "По запросу «$searchQuery» треков не обнаружено",
-                                    actionButtonText = null,
-                                    onActionClick = null
+                                // 1. "Список воспроизведения" (Queue of tracks from current folder/album/artist/playlist)
+                                val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+                                if (queueToDisplay.isEmpty()) {
+                                    EmptyState(
+                                        title = "Список воспроизведения пуст",
+                                        message = "Выберите трек из папки, альбома, плейлиста или исполнителя",
+                                        actionButtonText = null,
+                                        onActionClick = null
+                                    )
+                                } else {
+                                    LazyColumn(
+                                        contentPadding = PaddingValues(bottom = 80.dp),
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        items(queueToDisplay, key = { it.id }) { track ->
+                                            TrackListItem(
+                                                track = track,
+                                                isCurrent = currentTrack?.id == track.id,
+                                                isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                onClick = {
+                                                    viewModel.playTrack(
+                                                        track = track,
+                                                        queue = queueToDisplay
+                                                    )
+                                                },
+                                                onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                                onAddToPlaylist = { trackForPlaylistDialog = track }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            1 -> {
+                                // 2. "Папки"
+                                GroupedListSection(
+                                    groups = folderGroups,
+                                    icon = Icons.Default.Folder,
+                                    currentTrack = currentTrack,
+                                    isPlaying = isPlaying,
+                                    selectedTitle = selectedGroupTitle,
+                                    onSelectGroup = { title, tracks ->
+                                        selectedGroupTitle = title
+                                        selectedGroupTracks = tracks
+                                    },
+                                    onBackFromGroup = {
+                                        selectedGroupTitle = null
+                                        selectedGroupTracks = null
+                                    },
+                                    onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                    onAddToPlaylist = { trackForPlaylistDialog = it }
                                 )
-                            } else {
-                                LazyColumn(
-                                    contentPadding = PaddingValues(bottom = 80.dp),
-                                    modifier = Modifier.fillMaxSize()
-                                ) {
-                                    items(displayedTracks, key = { it.id }) { track ->
-                                        TrackListItem(
-                                            track = track,
-                                            isCurrent = currentTrack?.id == track.id,
-                                            isPlaying = isPlaying && currentTrack?.id == track.id,
-                                            onClick = {
-                                                viewModel.playTrack(
-                                                    track = track,
-                                                    queue = displayedTracks
-                                                )
-                                            },
-                                            onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                            onAddToPlaylist = { trackForPlaylistDialog = track }
+                            }
+
+                            2 -> {
+                                // 3. "Плейлисты"
+                                PlaylistsSection(
+                                    allTracks = rawTracks,
+                                    favorites = favoriteTracks,
+                                    playlists = playlists,
+                                    currentTrack = currentTrack,
+                                    isPlaying = isPlaying,
+                                    selectedTitle = selectedGroupTitle,
+                                    onSelectGroup = { title, tracks ->
+                                        selectedGroupTitle = title
+                                        selectedGroupTracks = tracks
+                                    },
+                                    onBackFromGroup = {
+                                        selectedGroupTitle = null
+                                        selectedGroupTracks = null
+                                    },
+                                    onCreatePlaylist = { showCreatePlaylistDialog = true },
+                                    onRenamePlaylist = { playlistToRename = it },
+                                    onDeletePlaylist = { viewModel.deletePlaylist(it.id) },
+                                    onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                    onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    getPlaylistTracks = { viewModel.getPlaylistTracks(it) }
+                                )
+                            }
+
+                            3 -> {
+                                // 4. "Альбомы"
+                                GroupedListSection(
+                                    groups = albumGroups,
+                                    icon = Icons.Default.Album,
+                                    currentTrack = currentTrack,
+                                    isPlaying = isPlaying,
+                                    selectedTitle = selectedGroupTitle,
+                                    onSelectGroup = { title, tracks ->
+                                        selectedGroupTitle = title
+                                        selectedGroupTracks = tracks
+                                    },
+                                    onBackFromGroup = {
+                                        selectedGroupTitle = null
+                                        selectedGroupTracks = null
+                                    },
+                                    onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                    onAddToPlaylist = { trackForPlaylistDialog = it }
+                                )
+                            }
+
+                            4 -> {
+                                // 5. "Исполнители"
+                                GroupedListSection(
+                                    groups = artistGroups,
+                                    icon = Icons.Default.Person,
+                                    currentTrack = currentTrack,
+                                    isPlaying = isPlaying,
+                                    selectedTitle = selectedGroupTitle,
+                                    onSelectGroup = { title, tracks ->
+                                        selectedGroupTitle = title
+                                        selectedGroupTracks = tracks
+                                    },
+                                    onBackFromGroup = {
+                                        selectedGroupTitle = null
+                                        selectedGroupTracks = null
+                                    },
+                                    onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                    onAddToPlaylist = { trackForPlaylistDialog = it }
+                                )
+                            }
+
+                            5 -> {
+                                // 6. "Поиск"
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    OutlinedTextField(
+                                        value = searchQuery,
+                                        onValueChange = { viewModel.onSearchQueryChanged(it) },
+                                        placeholder = { Text("Поиск по названию, артисту или альбому") },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Search, contentDescription = null)
+                                        },
+                                        trailingIcon = {
+                                            if (searchQuery.isNotEmpty()) {
+                                                IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                                                    Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                                                }
+                                            }
+                                        },
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                        ),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            .testTag("search_input")
+                                    )
+
+                                    if (displayedTracks.isEmpty()) {
+                                        EmptyState(
+                                            title = if (searchQuery.isBlank()) "Введите поисковый запрос" else "Ничего не найдено",
+                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено",
+                                            actionButtonText = null,
+                                            onActionClick = null
                                         )
+                                    } else {
+                                        LazyColumn(
+                                            contentPadding = PaddingValues(bottom = 80.dp),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(displayedTracks, key = { it.id }) { track ->
+                                                TrackListItem(
+                                                    track = track,
+                                                    isCurrent = currentTrack?.id == track.id,
+                                                    isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                    onClick = {
+                                                        viewModel.playTrack(
+                                                            track = track,
+                                                            queue = displayedTracks
+                                                        )
+                                                    },
+                                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                                    onAddToPlaylist = { trackForPlaylistDialog = track }
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-
-                        1 -> {
-                            // "Папки"
-                            GroupedListSection(
-                                groups = folderGroups,
-                                icon = Icons.Default.Folder,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                selectedTitle = selectedGroupTitle,
-                                onSelectGroup = { title, tracks ->
-                                    selectedGroupTitle = title
-                                    selectedGroupTracks = tracks
-                                },
-                                onBackFromGroup = {
-                                    selectedGroupTitle = null
-                                    selectedGroupTracks = null
-                                },
-                                onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                onAddToPlaylist = { trackForPlaylistDialog = it }
-                            )
-                        }
-
-                        2 -> {
-                            // "Исполнители"
-                            GroupedListSection(
-                                groups = artistGroups,
-                                icon = Icons.Default.Person,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                selectedTitle = selectedGroupTitle,
-                                onSelectGroup = { title, tracks ->
-                                    selectedGroupTitle = title
-                                    selectedGroupTracks = tracks
-                                },
-                                onBackFromGroup = {
-                                    selectedGroupTitle = null
-                                    selectedGroupTracks = null
-                                },
-                                onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                onAddToPlaylist = { trackForPlaylistDialog = it }
-                            )
-                        }
-
-                        3 -> {
-                            // "Альбомы"
-                            GroupedListSection(
-                                groups = albumGroups,
-                                icon = Icons.Default.Album,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                selectedTitle = selectedGroupTitle,
-                                onSelectGroup = { title, tracks ->
-                                    selectedGroupTitle = title
-                                    selectedGroupTracks = tracks
-                                },
-                                onBackFromGroup = {
-                                    selectedGroupTitle = null
-                                    selectedGroupTracks = null
-                                },
-                                onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                onAddToPlaylist = { trackForPlaylistDialog = it }
-                            )
-                        }
-
-                        4 -> {
-                            // "Плейлисты"
-                            PlaylistsSection(
-                                favorites = favoriteTracks,
-                                playlists = playlists,
-                                currentTrack = currentTrack,
-                                isPlaying = isPlaying,
-                                selectedTitle = selectedGroupTitle,
-                                onSelectGroup = { title, tracks ->
-                                    selectedGroupTitle = title
-                                    selectedGroupTracks = tracks
-                                },
-                                onBackFromGroup = {
-                                    selectedGroupTitle = null
-                                    selectedGroupTracks = null
-                                },
-                                onCreatePlaylist = { showCreatePlaylistDialog = true },
-                                onRenamePlaylist = { playlistToRename = it },
-                                onDeletePlaylist = { viewModel.deletePlaylist(it.id) },
-                                onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                onAddToPlaylist = { trackForPlaylistDialog = it },
-                                getPlaylistTracks = { viewModel.getPlaylistTracks(it) }
-                            )
-                        }
                     }
                 }
-            }
             }
         }
     }
@@ -509,6 +661,34 @@ fun LibraryScreen(
                 showCreatePlaylistDialog = true
             },
             onDismiss = { trackForPlaylistDialog = null }
+        )
+    }
+
+    if (showEqualizerDialog) {
+        EqualizerDialog(
+            isEnabled = isEqualizerEnabled,
+            bands = equalizerBands,
+            currentPreset = equalizerPreset,
+            onEnableChanged = { viewModel.setEqualizerEnabled(it) },
+            onPresetSelected = { viewModel.setEqualizerPreset(it) },
+            onBandLevelChanged = { band, level -> viewModel.setEqualizerBandLevel(band, level) },
+            onDismiss = { showEqualizerDialog = false }
+        )
+    }
+
+    if (showSleepTimerDialog) {
+        SleepTimerDialog(
+            currentMode = sleepTimerMode,
+            remainingMillis = sleepTimerRemainingMillis,
+            onSetTimer = {
+                viewModel.setSleepTimer(it)
+                showSleepTimerDialog = false
+            },
+            onCancelTimer = {
+                viewModel.cancelSleepTimer()
+                showSleepTimerDialog = false
+            },
+            onDismiss = { showSleepTimerDialog = false }
         )
     }
 }
@@ -626,6 +806,7 @@ private fun GroupedListSection(
 
 @Composable
 private fun PlaylistsSection(
+    allTracks: List<Track>,
     favorites: List<Track>,
     playlists: List<Playlist>,
     currentTrack: Track?,
@@ -642,16 +823,18 @@ private fun PlaylistsSection(
     getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>
 ) {
     if (selectedTitle != null) {
-        // Show selected playlist / favorites
-        val tracks = if (selectedTitle == "Избранное") {
-            favorites
-        } else {
-            val pl = playlists.find { it.name == selectedTitle }
-            if (pl != null) {
-                val flow = getPlaylistTracks(pl.id)
-                val list by flow.collectAsStateWithLifecycle()
-                list
-            } else emptyList()
+        // Show selected playlist / favorites / all tracks
+        val tracks = when (selectedTitle) {
+            "Все треки" -> allTracks
+            "Избранное" -> favorites
+            else -> {
+                val pl = playlists.find { it.name == selectedTitle }
+                if (pl != null) {
+                    val flow = getPlaylistTracks(pl.id)
+                    val list by flow.collectAsStateWithLifecycle()
+                    list
+                } else emptyList()
+            }
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
@@ -708,7 +891,56 @@ private fun PlaylistsSection(
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            // Favorites card
+            // 1) All tracks card ("Все треки")
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .clickable { onSelectGroup("Все треки", allTracks) }
+                        .testTag("all_tracks_card")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Все треки",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Треков: ${allTracks.size}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2) Favorites card ("Избранное")
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -719,6 +951,7 @@ private fun PlaylistsSection(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
                         .clickable { onSelectGroup("Избранное", favorites) }
+                        .testTag("favorites_card")
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -756,7 +989,20 @@ private fun PlaylistsSection(
                 }
             }
 
-            // Create new playlist button
+            // 3) Section Header: "Ваши плейлисты"
+            item {
+                Text(
+                    text = "Ваши плейлисты",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                )
+            }
+
+            // 4) Button: "Создать плейлист"
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
@@ -788,7 +1034,7 @@ private fun PlaylistsSection(
                         Spacer(modifier = Modifier.width(16.dp))
 
                         Text(
-                            text = "Создать новый плейлист",
+                            text = "Создать плейлист",
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary

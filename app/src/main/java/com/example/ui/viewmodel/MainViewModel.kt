@@ -119,6 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Playback States from Manager
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
+    val currentQueue: StateFlow<List<Track>> = playbackManager.queue
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
     val playbackPosition: StateFlow<Long> = playbackManager.playbackPosition
     val duration: StateFlow<Long> = playbackManager.duration
