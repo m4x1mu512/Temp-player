@@ -57,10 +57,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
-            // Заменяет значки статус-бара при смене темы приложения.
-            StatusBarIconsByTheme(themeMode = themeMode)
-
             MyApplicationTheme(themeMode = themeMode) {
+                StatusBarIconsByCurrentTheme()
+
                 var hasAudioPermission by remember {
                     mutableStateOf(checkAudioPermission())
                 }
@@ -100,36 +99,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/*
- * ВАЖНО:
- * Этот вариант предполагает, что themeMode имеет тип String
- * и содержит одно из значений: "light", "dark", "system".
- *
- * Если у тебя ThemeMode — enum или другой тип, напиши код этого класса /
- * enum, и я адаптирую одну строку isDarkTheme.
- */
 @Composable
-fun StatusBarIconsByTheme(themeMode: String) {
+fun StatusBarIconsByCurrentTheme() {
     val view = LocalView.current
 
-    // Для режима "system" ориентируемся на тему, заданную в настройках телефона.
-    val isDarkTheme = when (themeMode.lowercase()) {
-        "dark" -> true
-        "light" -> false
-        else -> isSystemInDarkTheme()
-    }
+    /*
+     * true  = тёмная тема приложения -> белые значки.
+     * false = светлая тема приложения -> чёрные значки.
+     */
+    val isDarkTheme = isSystemInDarkTheme()
 
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as? MainActivity)?.window ?: return@SideEffect
+            val activity = view.context as? MainActivity
+                ?: return@SideEffect
 
-            WindowCompat.getInsetsController(window, view).apply {
-                /*
-                 * true  = тёмные/чёрные значки — для светлого интерфейса.
-                 * false = светлые/белые значки — для тёмного интерфейса.
-                 */
-                isAppearanceLightStatusBars = !isDarkTheme
-            }
+            WindowCompat.getInsetsController(
+                activity.window,
+                view
+            ).isAppearanceLightStatusBars = !isDarkTheme
         }
     }
 }
