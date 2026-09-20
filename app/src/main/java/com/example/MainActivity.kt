@@ -13,15 +13,19 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -39,24 +43,22 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
+        super.onCreate(savedInstanceState)
 
-    enableEdgeToEdge(
-        statusBarStyle = SystemBarStyle.light(
-            scrim = Color.TRANSPARENT,
-            darkScrim = Color.TRANSPARENT
-        )
-    )
+        enableEdgeToEdge()
 
-    try {
-        val serviceIntent = Intent(this, PlaybackService::class.java)
-        startService(serviceIntent)
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
+        try {
+            val serviceIntent = Intent(this, PlaybackService::class.java)
+            startService(serviceIntent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
-    setContent {
+        setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+
+            // Заменяет значки статус-бара при смене темы приложения.
+            StatusBarIconsByTheme(themeMode = themeMode)
 
             MyApplicationTheme(themeMode = themeMode) {
                 var hasAudioPermission by remember {
@@ -90,7 +92,45 @@ class MainActivity : ComponentActivity() {
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+
+        return ContextCompat.checkSelfPermission(
+            this,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+}
+
+/*
+ * ВАЖНО:
+ * Этот вариант предполагает, что themeMode имеет тип String
+ * и содержит одно из значений: "light", "dark", "system".
+ *
+ * Если у тебя ThemeMode — enum или другой тип, напиши код этого класса /
+ * enum, и я адаптирую одну строку isDarkTheme.
+ */
+@Composable
+fun StatusBarIconsByTheme(themeMode: String) {
+    val view = LocalView.current
+
+    // Для режима "system" ориентируемся на тему, заданную в настройках телефона.
+    val isDarkTheme = when (themeMode.lowercase()) {
+        "dark" -> true
+        "light" -> false
+        else -> isSystemInDarkTheme()
+    }
+
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? MainActivity)?.window ?: return@SideEffect
+
+            WindowCompat.getInsetsController(window, view).apply {
+                /*
+                 * true  = тёмные/чёрные значки — для светлого интерфейса.
+                 * false = светлые/белые значки — для тёмного интерфейса.
+                 */
+                isAppearanceLightStatusBars = !isDarkTheme
+            }
+        }
     }
 }
 
@@ -104,37 +144,51 @@ fun AppNavigation(viewModel: MainViewModel) {
         modifier = Modifier.fillMaxSize(),
         enterTransition = {
             slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Up,
+                towards = AnimatedContentTransitionScope.SlideDirection.Up,
                 animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
+            ) + fadeIn(
+                animationSpec = tween(300)
+            )
         },
         exitTransition = {
             slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Down,
+                towards = AnimatedContentTransitionScope.SlideDirection.Down,
                 animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
+            ) + fadeOut(
+                animationSpec = tween(300)
+            )
         }
     ) {
         composable("library") {
             LibraryScreen(
                 viewModel = viewModel,
-                onNavigateToPlayer = { navController.navigate("player") },
-                onNavigateToSettings = { navController.navigate("settings") }
+                onNavigateToPlayer = {
+                    navController.navigate("player")
+                },
+                onNavigateToSettings = {
+                    navController.navigate("settings")
+                }
             )
         }
 
         composable("player") {
             PlayerScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable("settings") {
             SettingsScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToPlayer = { navController.navigate("player") }
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToPlayer = {
+                    navController.navigate("player")
+                }
             )
         }
     }
