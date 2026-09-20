@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Brightness4
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
@@ -53,10 +55,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.CrashLogger
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
 import com.example.ui.components.EqualizerDialog
@@ -94,6 +98,7 @@ fun SettingsScreen(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Scaffold(
         modifier = modifier
@@ -340,6 +345,29 @@ fun SettingsScreen(
                         subtitle = "Восстановить настройки по умолчанию",
                         onClick = { showResetDialog = true },
                         testTag = "settings_reset_button"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Diagnostics and Logs Section
+            SettingsSectionHeader(title = "Диагностика и отчёты", icon = Icons.Default.BugReport)
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Column {
+                    SettingsActionItem(
+                        icon = Icons.Default.Description,
+                        title = "Выгрузить логи приложения (txt)",
+                        subtitle = "Сохранить файл app_logs.txt для выявления багов и падений",
+                        onClick = { CrashLogger.exportLogs(context) },
+                        testTag = "settings_export_logs_button"
                     )
                 }
             }
