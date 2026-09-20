@@ -39,19 +39,23 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+    super.onCreate(savedInstanceState)
 
-        // Start PlaybackService via standard startService.
-        // MediaSessionService automatically transitions to foreground when media playback begins.
-        try {
-            val serviceIntent = Intent(this, PlaybackService::class.java)
-            startService(serviceIntent)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    enableEdgeToEdge(
+        statusBarStyle = SystemBarStyle.light(
+            scrim = Color.TRANSPARENT,
+            darkScrim = Color.TRANSPARENT
+        )
+    )
 
-        setContent {
+    try {
+        val serviceIntent = Intent(this, PlaybackService::class.java)
+        startService(serviceIntent)
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
             MyApplicationTheme(themeMode = themeMode) {
