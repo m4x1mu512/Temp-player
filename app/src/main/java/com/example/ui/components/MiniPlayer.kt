@@ -6,7 +6,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -38,16 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -60,7 +50,6 @@ import com.example.R
 import com.example.data.model.Track
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.formatTime
-import kotlin.math.abs
 
 @Composable
 fun MiniPlayer(
@@ -83,8 +72,6 @@ fun MiniPlayer(
     ) {
         if (currentTrack == null) return@AnimatedVisibility
 
-        var dragDistanceX by remember { mutableFloatStateOf(0f) }
-        var dragDistanceY by remember { mutableFloatStateOf(0f) }
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -96,37 +83,6 @@ fun MiniPlayer(
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = modifier
                 .fillMaxWidth()
-                .clickable { onClick() }
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = {
-                            dragDistanceX = 0f
-                            dragDistanceY = 0f
-                        },
-                        onDragEnd = {
-                            if (abs(dragDistanceY) > abs(dragDistanceX) && dragDistanceY < -40f) {
-                                // Swipe up opens the expanded player window
-                                onClick()
-                            } else if (abs(dragDistanceX) > abs(dragDistanceY)) {
-                                if (dragDistanceX < -80f) {
-                                    onNextTrack()
-                                } else if (dragDistanceX > 80f) {
-                                    onPreviousTrack()
-                                }
-                            }
-                            dragDistanceX = 0f
-                            dragDistanceY = 0f
-                        },
-                        onDragCancel = {
-                            dragDistanceX = 0f
-                            dragDistanceY = 0f
-                        },
-                        onDrag = { _, dragAmount ->
-                            dragDistanceX += dragAmount.x
-                            dragDistanceY += dragAmount.y
-                        }
-                    )
-                }
                 .testTag("mini_player")
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -150,64 +106,72 @@ fun MiniPlayer(
                             .fillMaxWidth()
                             .padding(horizontal = 24.dp, vertical = 8.dp)
                     ) {
-                        // Album art
-                        Box(
+                        // Clickable info section: Album art + Title/Artist opens full player
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .size(52.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .clickable { onClick() }
                         ) {
-                            if (currentTrack.albumArtUri != null) {
-                                AsyncImage(
-                                    model = currentTrack.albumArtUri,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    error = painterResource(id = R.drawable.ic_default_art),
-                                    placeholder = painterResource(id = R.drawable.ic_default_art),
-                                    modifier = Modifier.size(52.dp)
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = R.drawable.ic_default_art,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(52.dp)
-                                )
+                            // Album art
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (currentTrack.albumArtUri != null) {
+                                    AsyncImage(
+                                        model = currentTrack.albumArtUri,
+                                        contentDescription = "Обложка трека",
+                                        contentScale = ContentScale.Crop,
+                                        error = painterResource(id = R.drawable.ic_default_art),
+                                        placeholder = painterResource(id = R.drawable.ic_default_art),
+                                        modifier = Modifier.size(52.dp)
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = R.drawable.ic_default_art,
+                                        contentDescription = "Обложка трека",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(52.dp)
+                                    )
+                                }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(14.dp))
 
-                        // Title & Artist with Album
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = currentTrack.title,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Title & Artist with Album
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center
+                            ) {
                                 Text(
-                                    text = currentTrack.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    text = currentTrack.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                if (currentTrack.album.isNotBlank() && currentTrack.album != "Неизвестный альбом") {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = " • ${currentTrack.album}",
+                                        text = currentTrack.artist,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    if (currentTrack.album.isNotBlank() && currentTrack.album != "Неизвестный альбом") {
+                                        Text(
+                                            text = " • ${currentTrack.album}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -216,7 +180,9 @@ fun MiniPlayer(
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .clickable { onClick() }
                         ) {
                             Text(
                                 text = "${formatTime(position)} / ${formatTime(duration)}",
@@ -302,55 +268,63 @@ fun MiniPlayer(
                             .fillMaxWidth()
                             .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
-                        // Album art (taller: 56.dp)
-                        Box(
+                        // Clickable info section: Album art + Title/Artist opens full player
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
+                                .weight(1f)
+                                .clickable { onClick() }
                         ) {
-                            if (currentTrack.albumArtUri != null) {
-                                AsyncImage(
-                                    model = currentTrack.albumArtUri,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    error = painterResource(id = R.drawable.ic_default_art),
-                                    placeholder = painterResource(id = R.drawable.ic_default_art),
-                                    modifier = Modifier.size(56.dp)
+                            // Album art (taller: 56.dp)
+                            Box(
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (currentTrack.albumArtUri != null) {
+                                    AsyncImage(
+                                        model = currentTrack.albumArtUri,
+                                        contentDescription = "Обложка трека",
+                                        contentScale = ContentScale.Crop,
+                                        error = painterResource(id = R.drawable.ic_default_art),
+                                        placeholder = painterResource(id = R.drawable.ic_default_art),
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = R.drawable.ic_default_art,
+                                        contentDescription = "Обложка трека",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(56.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            // Title & Artist
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = currentTrack.title,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                            } else {
-                                AsyncImage(
-                                    model = R.drawable.ic_default_art,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(56.dp)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = currentTrack.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        // Title & Artist
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = currentTrack.title,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = currentTrack.artist,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))
