@@ -3,6 +3,7 @@ package com.example
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -51,6 +52,9 @@ class MainActivity : ComponentActivity() {
             e.printStackTrace()
         }
 
+        // Process incoming intent if app was launched via file manager
+        handleIncomingIntent(intent)
+
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
 
@@ -59,13 +63,17 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(checkAudioPermission())
                 }
 
+                val hasExternalIntent = remember {
+                    intent?.action == Intent.ACTION_VIEW || intent?.action == Intent.ACTION_SEND
+                }
+
                 LaunchedEffect(hasAudioPermission) {
                     if (hasAudioPermission) {
                         viewModel.scanMusic()
                     }
                 }
 
-                if (!hasAudioPermission) {
+                if (!hasAudioPermission && !hasExternalIntent) {
                     PermissionScreen(
                         onPermissionGranted = {
                             hasAudioPermission = true
@@ -77,6 +85,41 @@ class MainActivity : ComponentActivity() {
                     AppNavigation(viewModel = viewModel)
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(incomingIntent: Intent?) {
+        if (incomingIntent == null) return
+        val action = incomingIntent.action ?: return
+        val uri: Uri? = when (action) {
+            Intent.ACTION_VIEW -> incomingIntent.data
+            Intent.ACTION_SEND -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    incomingIntent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    incomingIntent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
+            }
+            else -> null
+        }
+
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {
+                // Not all URIs support persistable permissions; standard granted intent URI permission is active
+            }
+            viewModel.handleExternalAudioUri(uri)
         }
     }
 
@@ -93,6 +136,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
+
+    LaunchedEffect(Unit) {
+        viewModel.navigateToPlayerEvent.collect {
+            if (navController.currentDestination?.route != "player") {
+                navController.navigate("player") {
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
 
     NavHost(
         navController = navController,

@@ -16,6 +16,12 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE id = :id LIMIT 1")
     suspend fun getTrackById(id: Long): TrackEntity?
 
+    @Query("SELECT * FROM tracks WHERE uriString = :uriString LIMIT 1")
+    suspend fun getTrackByUri(uriString: String): TrackEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrack(track: TrackEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTracks(tracks: List<TrackEntity>)
 

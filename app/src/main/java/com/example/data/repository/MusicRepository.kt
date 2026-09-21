@@ -6,6 +6,8 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.OpenableColumns
+import kotlin.math.absoluteValue
 import com.example.data.local.AppDatabase
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.PlaylistEntity
@@ -242,5 +244,134 @@ class MusicRepository(
 
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) = withContext(Dispatchers.IO) {
         playlistDao.removeTrackFromPlaylist(playlistId, trackId)
+    }
+
+    suspend fun getOrCreateTrackFromUri(uri: Uri): Track = withContext(Dispatchers.IO) {
+        val uriStr = uri.toString()
+
+        // 1. Check if already present in Room database by URI
+        val existingEntity = trackDao.getTrackByUri(uriStr)
+        if (existingEntity != null) {
+            val favCount = database.openHelper.readableDatabase.compileStatement(
+                "SELECT COUNT(*) FROM favorites WHERE trackId = ${existingEntity.id}"
+            ).simpleQueryForLong()
+            return@withContext existingEntity.toTrack(isFavorite = favCount > 0)
+        }
+
+        // 2. If it's a MediaStore content uri, check by parsed ID
+        val mediaStoreId = try {
+            if (uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY) {
+                ContentUris.parseId(uri)
+            } else null
+        } catch (_: Exception) {
+            null
+        }
+
+        if (mediaStoreId != null) {
+            val trackById = trackDao.getTrackById(mediaStoreId)
+            if (trackById != null) {
+                val favCount = database.openHelper.readableDatabase.compileStatement(
+                    "SELECT COUNT(*) FROM favorites WHERE trackId = ${trackById.id}"
+                ).simpleQueryForLong()
+                return@withContext trackById.toTrack(isFavorite = favCount > 0)
+            }
+        }
+
+        // 3. Extract audio metadata using MediaMetadataRetriever
+        var title: String? = null
+        var artist: String? = null
+        var album: String? = null
+        var duration = 0L
+        var albumArtUriString: String? = null
+
+        try {
+            MediaMetadataRetriever().use { mmr ->
+                mmr.setDataSource(context, uri)
+                val metaTitle = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                val metaArtist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                val metaAlbum = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                val metaDuration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+
+                if (!metaTitle.isNullOrBlank() && metaTitle != "<unknown>") title = metaTitle
+                if (!metaArtist.isNullOrBlank() && metaArtist != "<unknown>") artist = metaArtist
+                if (!metaAlbum.isNullOrBlank() && metaAlbum != "<unknown>") album = metaAlbum
+                if (metaDuration != null && metaDuration > 0) duration = metaDuration
+
+                val pictureBytes = mmr.embeddedPicture
+                if (pictureBytes != null && pictureBytes.isNotEmpty()) {
+                    try {
+                        val artDir = File(context.cacheDir, "external_arts").apply { mkdirs() }
+                        val safeHash = uriStr.hashCode().absoluteValue
+                        val artFile = File(artDir, "art_${safeHash}.jpg")
+                        artFile.writeBytes(pictureBytes)
+                        albumArtUriString = Uri.fromFile(artFile).toString()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // 4. Fallback title from OpenableColumns
+        if (title.isNullOrBlank()) {
+            try {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(OpenableColumns.DISPLAY_NAME),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val col = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (col != -1) {
+                            val displayName = cursor.getString(col)
+                            if (!displayName.isNullOrBlank()) {
+                                title = displayName.substringBeforeLast(".")
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 5. Fallback title from last path segment
+        if (title.isNullOrBlank()) {
+            val segment = uri.lastPathSegment?.substringAfterLast("/")
+            title = if (!segment.isNullOrBlank()) segment.substringBeforeLast(".") else "Аудиозапись"
+        }
+
+        if (artist.isNullOrBlank()) {
+            artist = "Внешний файл"
+        }
+        if (album.isNullOrBlank()) {
+            album = "Файловый менеджер"
+        }
+
+        val generatedId = mediaStoreId ?: ((uriStr.hashCode().toLong() and 0x3FFFFFFFFFFFFFFFL) or (1L shl 60))
+
+        val newEntity = TrackEntity(
+            id = generatedId,
+            title = title!!,
+            artist = artist!!,
+            album = album!!,
+            duration = duration,
+            uriString = uriStr,
+            albumArtUriString = albumArtUriString,
+            size = 0L,
+            dateAdded = System.currentTimeMillis() / 1000,
+            folderName = "Файловый менеджер",
+            path = uri.path ?: ""
+        )
+
+        try {
+            trackDao.insertTrack(newEntity)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        newEntity.toTrack(isFavorite = false)
     }
 }

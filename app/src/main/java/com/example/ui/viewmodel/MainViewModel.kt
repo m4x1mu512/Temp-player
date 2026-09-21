@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.EqualizerBand
@@ -13,9 +14,12 @@ import com.example.data.model.ThemeMode
 import com.example.data.model.Track
 import com.example.data.model.VisualizerMode
 import com.example.service.PlaybackManager
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -28,6 +32,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsDataStore = playbackManager.settingsDataStore
 
     // Search and Filter State
+    private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val navigateToPlayerEvent: SharedFlow<Unit> = _navigateToPlayerEvent.asSharedFlow()
+
+    fun requestNavigateToPlayer() {
+        _navigateToPlayerEvent.tryEmit(Unit)
+    }
+
+    fun handleExternalAudioUri(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val track = repository.getOrCreateTrackFromUri(uri)
+                playTrack(track = track, queue = listOf(track), index = 0)
+                _navigateToPlayerEvent.tryEmit(Unit)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
