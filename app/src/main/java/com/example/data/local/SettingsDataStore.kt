@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.model.EqualizerPreset
+import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
@@ -34,6 +35,21 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         private val KEY_EQ_PRESET = stringPreferencesKey("eq_preset")
         private val KEY_EQ_LEVELS = stringPreferencesKey("eq_levels")
+        private val KEY_MINI_PLAYER_BG_MODE = stringPreferencesKey("mini_player_bg_mode")
+        private val KEY_MINI_PLAYER_CUSTOM_COLOR = longPreferencesKey("mini_player_custom_color")
+    }
+
+    val miniPlayerBgModeFlow: Flow<MiniPlayerBgMode> = context.dataStore.data.map { preferences ->
+        val name = preferences[KEY_MINI_PLAYER_BG_MODE] ?: MiniPlayerBgMode.ALBUM_ART.name
+        try {
+            MiniPlayerBgMode.valueOf(name)
+        } catch (_: Exception) {
+            MiniPlayerBgMode.ALBUM_ART
+        }
+    }
+
+    val miniPlayerCustomColorFlow: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MINI_PLAYER_CUSTOM_COLOR] ?: 0xFF1E1F24L
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -169,6 +185,18 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setEqualizerLevels(levels: List<Int>) {
         context.dataStore.edit { preferences ->
             preferences[KEY_EQ_LEVELS] = levels.joinToString(",")
+        }
+    }
+
+    suspend fun setMiniPlayerBgMode(mode: MiniPlayerBgMode) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MINI_PLAYER_BG_MODE] = mode.name
+        }
+    }
+
+    suspend fun setMiniPlayerCustomColor(color: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MINI_PLAYER_CUSTOM_COLOR] = color
         }
     }
 

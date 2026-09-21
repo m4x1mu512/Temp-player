@@ -80,3 +80,11 @@ enum class EqualizerPreset(val displayName: String) {
     CLASSICAL("Классика"),
     CUSTOM("Пользовательский")
 }
+
+enum class MiniPlayerBgMode(val displayName: String) {
+    ALBUM_ART("В тонах обложки"),
+    LIGHT("Светлый однотонный"),
+    DARK("Тёмный однотонный"),
+    SYSTEM("По умолчанию"),
+    CUSTOM("Свой оттенок")
+}

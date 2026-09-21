@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
@@ -42,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -61,6 +66,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.CrashLogger
+import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
 import com.example.ui.components.EqualizerDialog
@@ -84,6 +90,9 @@ fun SettingsScreen(
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
+
+    val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
+    val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
@@ -138,7 +147,9 @@ fun SettingsScreen(
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNextTrack = { viewModel.nextTrack() },
                 onPreviousTrack = { viewModel.previousTrack() },
-                onClick = onNavigateToPlayer
+                onClick = onNavigateToPlayer,
+                bgMode = miniPlayerBgMode,
+                customColor = miniPlayerCustomColor
             )
         }
     ) { paddingValues ->
@@ -182,6 +193,281 @@ fun SettingsScreen(
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Mini-Player Background Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_mini_player_bg_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Цвет фона мини-плеера",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Выберите стиль оформления компактного плеера",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART,
+                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.ALBUM_ART) },
+                            label = { Text("В тонах обложки") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Palette,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.testTag("mini_player_bg_album_art"),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+
+                        FilterChip(
+                            selected = miniPlayerBgMode == MiniPlayerBgMode.LIGHT,
+                            onClick = {
+                                viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.LIGHT)
+                                viewModel.setMiniPlayerCustomColor(0xFFFFFFFFL)
+                            },
+                            label = { Text("Светлый") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Brightness4,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.testTag("mini_player_bg_light"),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = miniPlayerBgMode == MiniPlayerBgMode.DARK,
+                            onClick = {
+                                viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.DARK)
+                                viewModel.setMiniPlayerCustomColor(0xFF17171AL)
+                            },
+                            label = { Text("Тёмный") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Bedtime,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.testTag("mini_player_bg_dark"),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+
+                        FilterChip(
+                            selected = miniPlayerBgMode == MiniPlayerBgMode.SYSTEM,
+                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.SYSTEM) },
+                            label = { Text("По умолчанию") },
+                            modifier = Modifier.testTag("mini_player_bg_system"),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+
+                        FilterChip(
+                            selected = miniPlayerBgMode == MiniPlayerBgMode.CUSTOM,
+                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.CUSTOM) },
+                            label = { Text("Палитра") },
+                            modifier = Modifier.testTag("mini_player_bg_custom"),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    when (miniPlayerBgMode) {
+                        MiniPlayerBgMode.ALBUM_ART -> {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Palette,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Адаптивные тона обложки",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Фон, акценты и элементы управления мини-плеера динамически окрашиваются в основные тона обложки текущего трека",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK, MiniPlayerBgMode.CUSTOM -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                val paletteTitle = when (miniPlayerBgMode) {
+                                    MiniPlayerBgMode.LIGHT -> "Светлые однотонные оттенки:"
+                                    MiniPlayerBgMode.DARK -> "Тёмные однотонные оттенки:"
+                                    else -> "Выбор оттенка фона:"
+                                }
+                                Text(
+                                    text = paletteTitle,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                val swatches = when (miniPlayerBgMode) {
+                                    MiniPlayerBgMode.LIGHT -> listOf(
+                                        0xFFFFFFFFL to "Белоснежный",
+                                        0xFFF5F5F7L to "Холодный серый",
+                                        0xFFFAF6F0L to "Тёплый крем",
+                                        0xFFEBF4F6L to "Ледяной голубой",
+                                        0xFFEBF5EAL to "Мятная свежесть",
+                                        0xFFF4EDF8L to "Светлая лаванда"
+                                    )
+                                    MiniPlayerBgMode.DARK -> listOf(
+                                        0xFF17171AL to "Глубокий оникс",
+                                        0xFF1F2026L to "Графитовый",
+                                        0xFF141D2CL to "Ночной синий",
+                                        0xFF0E221BL to "Тёмный изумруд",
+                                        0xFF27131BL to "Винный бордо",
+                                        0xFF20132DL to "Тёмный аметист"
+                                    )
+                                    else -> listOf(
+                                        0xFFFFFFFFL to "Белый",
+                                        0xFFFAF6F0L to "Крем",
+                                        0xFFEBF4F6L to "Голубой",
+                                        0xFF17171AL to "Оникс",
+                                        0xFF1F2026L to "Графит",
+                                        0xFF141D2CL to "Синий",
+                                        0xFF0E221BL to "Изумруд",
+                                        0xFF27131BL to "Бордо"
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    swatches.forEach { (colorValue, name) ->
+                                        val isSelected = miniPlayerCustomColor == colorValue
+                                        val color = Color(colorValue)
+                                        val isLightColor = (0.299f * color.red + 0.587f * color.green + 0.114f * color.blue) > 0.55f
+
+                                        Box(
+                                            modifier = Modifier
+                                                .size(38.dp)
+                                                .clip(CircleShape)
+                                                .background(color)
+                                                .clickable {
+                                                    viewModel.setMiniPlayerCustomColor(colorValue)
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Surface(
+                                                modifier = Modifier.size(38.dp),
+                                                shape = CircleShape,
+                                                color = Color.Transparent,
+                                                border = BorderStroke(
+                                                    width = if (isSelected) 2.5.dp else 1.dp,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0x22888888)
+                                                )
+                                            ) {
+                                                if (isSelected) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Check,
+                                                            contentDescription = name,
+                                                            tint = if (isLightColor) Color(0xFF1A1A1E) else Color.White,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        MiniPlayerBgMode.SYSTEM -> {
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Tune,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Мини-плеер использует стандартную цветовую гамму системной темы приложения",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }

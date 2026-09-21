@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -47,9 +49,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Track
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.formatTime
+import com.example.ui.util.rememberMiniPlayerColors
 
 @Composable
 fun MiniPlayer(
@@ -63,7 +67,9 @@ fun MiniPlayer(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isFavorite: Boolean = false,
-    onToggleFavorite: (() -> Unit)? = null
+    onToggleFavorite: (() -> Unit)? = null,
+    bgMode: MiniPlayerBgMode = MiniPlayerBgMode.ALBUM_ART,
+    customColor: Long = 0L
 ) {
     AnimatedVisibility(
         visible = currentTrack != null,
@@ -74,12 +80,18 @@ fun MiniPlayer(
 
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val colorScheme = rememberMiniPlayerColors(
+            bgMode = bgMode,
+            albumArtUri = currentTrack.albumArtUri,
+            customColorLong = customColor
+        )
 
         Card(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = colorScheme.backgroundColor
             ),
+            border = if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF)),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = modifier
                 .fillMaxWidth()
@@ -94,8 +106,8 @@ fun MiniPlayer(
                         .fillMaxWidth()
                         .height(3.dp)
                         .testTag("mini_player_progress"),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                    color = colorScheme.accentColor,
+                    trackColor = colorScheme.progressTrackColor
                 )
 
                 if (isLandscape) {
@@ -118,7 +130,7 @@ fun MiniPlayer(
                                 modifier = Modifier
                                     .size(52.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (currentTrack.albumArtUri != null) {
@@ -151,6 +163,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
+                                    color = colorScheme.onSurfaceColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -159,7 +172,7 @@ fun MiniPlayer(
                                     Text(
                                         text = currentTrack.artist,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = colorScheme.accentColor,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -167,7 +180,7 @@ fun MiniPlayer(
                                         Text(
                                             text = " • ${currentTrack.album}",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            color = colorScheme.onSurfaceVariantColor,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -179,7 +192,7 @@ fun MiniPlayer(
                         // Time badge in landscape
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            color = colorScheme.onSurfaceColor.copy(alpha = 0.08f),
                             modifier = Modifier
                                 .padding(horizontal = 8.dp)
                                 .clickable { onClick() }
@@ -187,7 +200,7 @@ fun MiniPlayer(
                             Text(
                                 text = "${formatTime(position)} / ${formatTime(duration)}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = colorScheme.onSurfaceVariantColor,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -203,7 +216,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
-                                    tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (isFavorite) FavoriteRed else colorScheme.onSurfaceVariantColor,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -223,7 +236,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -231,8 +244,8 @@ fun MiniPlayer(
                             FilledIconButton(
                                 onClick = onTogglePlayPause,
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = colorScheme.accentColor,
+                                    contentColor = colorScheme.onAccentColor
                                 ),
                                 modifier = Modifier
                                     .size(46.dp)
@@ -254,7 +267,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -280,7 +293,7 @@ fun MiniPlayer(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (currentTrack.albumArtUri != null) {
@@ -313,6 +326,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
+                                    color = colorScheme.onSurfaceColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -320,7 +334,7 @@ fun MiniPlayer(
                                 Text(
                                     text = currentTrack.artist,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = colorScheme.onSurfaceVariantColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -344,7 +358,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -353,8 +367,8 @@ fun MiniPlayer(
                             FilledIconButton(
                                 onClick = onTogglePlayPause,
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                    containerColor = colorScheme.accentColor,
+                                    contentColor = colorScheme.onAccentColor
                                 ),
                                 modifier = Modifier
                                     .size(48.dp)
@@ -377,7 +391,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }

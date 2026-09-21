@@ -113,6 +113,8 @@ fun LibraryScreen(
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
     val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
+    val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
+    val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
@@ -404,7 +406,9 @@ fun LibraryScreen(
                 onTogglePlayPause = { viewModel.togglePlayPause() },
                 onNextTrack = { viewModel.nextTrack() },
                 onPreviousTrack = { viewModel.previousTrack() },
-                onClick = onNavigateToPlayer
+                onClick = onNavigateToPlayer,
+                bgMode = miniPlayerBgMode,
+                customColor = miniPlayerCustomColor
             )
         }
     ) { paddingValues ->

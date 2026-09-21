@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
+import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Playlist
 import com.example.data.model.RepeatMode
 import com.example.data.model.SortOrder
@@ -162,6 +163,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 1.0f
+    )
+
+    val miniPlayerBgMode: StateFlow<MiniPlayerBgMode> = settingsDataStore.miniPlayerBgModeFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = MiniPlayerBgMode.ALBUM_ART
+    )
+
+    val miniPlayerCustomColor: StateFlow<Long> = settingsDataStore.miniPlayerCustomColorFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0xFF1E1F24L
     )
 
     fun onSearchQueryChanged(query: String) {
@@ -346,6 +359,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             settingsDataStore.setVisualizerSensitivity(sensitivity)
             playbackManager.visualizerController.updateConfig(visualizerBands.value, sensitivity)
+        }
+    }
+
+    fun setMiniPlayerBgMode(mode: MiniPlayerBgMode) {
+        viewModelScope.launch {
+            settingsDataStore.setMiniPlayerBgMode(mode)
+        }
+    }
+
+    fun setMiniPlayerCustomColor(color: Long) {
+        viewModelScope.launch {
+            settingsDataStore.setMiniPlayerCustomColor(color)
         }
     }
 
