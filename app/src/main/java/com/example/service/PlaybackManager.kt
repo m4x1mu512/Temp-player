@@ -3,6 +3,7 @@ package com.example.service
 import android.content.Context
 import android.net.Uri
 import android.os.CountDownTimer
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -105,89 +106,97 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private data class PendingPlay(val track: Track, val startPaused: Boolean)
+    private var pendingPlayTrack: PendingPlay? = null
+
     @OptIn(UnstableApi::class)
-    fun initializePlayer(): ExoPlayer {
-        if (exoPlayer != null) return exoPlayer!!
-
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-            .build()
-
-        val player = ExoPlayer.Builder(context)
-            .setAudioAttributes(audioAttributes, true)
-            .setHandleAudioBecomingNoisy(true)
-            .setWakeMode(C.WAKE_MODE_LOCAL)
-            .build()
-
-        player.addListener(object : Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
-                visualizerController.onPlaybackStateChanged(isPlaying)
-                if (isPlaying) {
-                    startPositionTracking()
-                } else {
-                    stopPositionTracking()
-                    saveCurrentState()
-                }
+    private val playerListener = object : Player.Listener {
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            _isPlaying.value = isPlaying
+            visualizerController.onPlaybackStateChanged(isPlaying)
+            if (isPlaying) {
+                startPositionTracking()
+            } else {
+                stopPositionTracking()
+                saveCurrentState()
             }
+        }
 
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                when (playbackState) {
-                    Player.STATE_READY -> {
-                        val realDuration = player.duration
-                        if (realDuration > 0) {
-                            _duration.value = realDuration
-                            // Synchronize real duration with database & current track
-                            _currentTrack.value?.let { track ->
-                                if (track.duration != realDuration) {
-                                    _currentTrack.value = track.copy(duration = realDuration)
-                                    serviceScope.launch {
-                                        repository.updateTrackDuration(track.id, realDuration)
-                                    }
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            val player = exoPlayer ?: return
+            when (playbackState) {
+                Player.STATE_READY -> {
+                    val realDuration = player.duration
+                    if (realDuration > 0) {
+                        _duration.value = realDuration
+                        // Synchronize real duration with database & current track
+                        _currentTrack.value?.let { track ->
+                            if (track.duration != realDuration) {
+                                _currentTrack.value = track.copy(duration = realDuration)
+                                serviceScope.launch {
+                                    repository.updateTrackDuration(track.id, realDuration)
                                 }
                             }
                         }
+                    }
 
-                        val currentSessionId = player.audioSessionId
-                        if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
-                            currentAudioSessionId = currentSessionId
-                            visualizerController.attachToAudioSession(currentSessionId)
-                            serviceScope.launch {
-                                val savedLevels = settingsDataStore.eqLevelsFlow.first()
-                                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
-                                _equalizerBands.value = equalizerController.getBands()
-                                equalizerController.applyPreset(_equalizerPreset.value)
-                            }
+                    val currentSessionId = player.audioSessionId
+                    if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
+                        currentAudioSessionId = currentSessionId
+                        visualizerController.attachToAudioSession(currentSessionId)
+                        serviceScope.launch {
+                            val savedLevels = settingsDataStore.eqLevelsFlow.first()
+                            equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
+                            _equalizerBands.value = equalizerController.getBands()
+                            equalizerController.applyPreset(_equalizerPreset.value)
                         }
                     }
-                    Player.STATE_ENDED -> {
-                        handleTrackEnded()
-                    }
-                    else -> {}
                 }
+                Player.STATE_ENDED -> {
+                    handleTrackEnded()
+                }
+                else -> {}
             }
-
-            override fun onPlayerError(error: PlaybackException) {
-                _errorMessage.value = "Не удалось воспроизвести файл: ${error.localizedMessage ?: "ошибка декодирования"}"
-                _isPlaying.value = false
-                visualizerController.onPlaybackStateChanged(false)
-            }
-        })
-
-        // Setup audio session id
-        val sessionId = player.audioSessionId
-        currentAudioSessionId = sessionId
-        visualizerController.attachToAudioSession(sessionId)
-        serviceScope.launch {
-            val savedLevels = settingsDataStore.eqLevelsFlow.first()
-            equalizerController.attachToAudioSession(sessionId, savedLevels, _isEqualizerEnabled.value)
-            _equalizerBands.value = equalizerController.getBands()
-            equalizerController.applyPreset(_equalizerPreset.value)
         }
 
+        override fun onPlayerError(error: PlaybackException) {
+            _errorMessage.value = "Не удалось воспроизвести файл: ${error.localizedMessage ?: "ошибка декодирования"}"
+            _isPlaying.value = false
+            visualizerController.onPlaybackStateChanged(false)
+        }
+    }
+
+    @OptIn(UnstableApi::class)
+    fun attachPlayer(player: ExoPlayer) {
+        if (exoPlayer === player) return
         exoPlayer = player
-        return player
+        player.addListener(playerListener)
+
+        val currentSessionId = player.audioSessionId
+        if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
+            currentAudioSessionId = currentSessionId
+            visualizerController.attachToAudioSession(currentSessionId)
+            serviceScope.launch {
+                val savedLevels = settingsDataStore.eqLevelsFlow.first()
+                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
+                _equalizerBands.value = equalizerController.getBands()
+                equalizerController.applyPreset(_equalizerPreset.value)
+            }
+        }
+
+        pendingPlayTrack?.let { pending ->
+            pendingPlayTrack = null
+            executePlay(player, pending.track, pending.startPaused)
+        }
+    }
+
+    fun detachPlayer() {
+        stopPositionTracking()
+        cancelSleepTimer()
+        exoPlayer?.removeListener(playerListener)
+        exoPlayer = null
+        visualizerController.release()
+        equalizerController.release()
     }
 
     private fun handleTrackEnded() {
@@ -222,8 +231,6 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun playTrack(track: Track, newQueue: List<Track>? = null, startIndex: Int = -1, startPaused: Boolean = false) {
-        val player = exoPlayer ?: initializePlayer()
-
         if (newQueue != null && newQueue.isNotEmpty()) {
             _queue.value = newQueue
             _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
@@ -238,6 +245,15 @@ class PlaybackManager private constructor(private val context: Context) {
         _duration.value = track.duration
         _playbackPosition.value = 0
 
+        val player = exoPlayer
+        if (player == null) {
+            pendingPlayTrack = PendingPlay(track, startPaused)
+            return
+        }
+        executePlay(player, track, startPaused)
+    }
+
+    private fun executePlay(player: ExoPlayer, track: Track, startPaused: Boolean) {
         val mediaMetadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artist)
@@ -272,8 +288,8 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun togglePlayPause() {
-        val player = exoPlayer ?: initializePlayer()
-        if (player.isPlaying) {
+        val player = exoPlayer
+        if (player != null && player.isPlaying) {
             pause()
         } else {
             play()
@@ -281,7 +297,8 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun play() {
-        val player = exoPlayer ?: initializePlayer()
+        Log.d("TempPlayer", "play")
+        val player = exoPlayer ?: return
         if (player.playbackState == Player.STATE_IDLE && _currentTrack.value != null) {
             playTrack(_currentTrack.value!!, startPaused = false)
         } else {
@@ -291,8 +308,18 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun pause() {
+        Log.d("TempPlayer", "pause")
         exoPlayer?.pause()
         _isPlaying.value = false
+        stopPositionTracking()
+        saveCurrentState()
+    }
+
+    fun stop() {
+        Log.d("TempPlayer", "stop")
+        exoPlayer?.stop()
+        _isPlaying.value = false
+        stopPositionTracking()
         saveCurrentState()
     }
 
@@ -316,6 +343,7 @@ class PlaybackManager private constructor(private val context: Context) {
      * "Если трек не воспроизводится, при переключении на другой трек, этот другой трек не должен включаться сам."
      */
     fun nextTrack(autoPlayIfPaused: Boolean = false) {
+        Log.d("TempPlayer", "next")
         val q = _queue.value
         if (q.isEmpty()) return
         val currentIdx = _queueIndex.value
@@ -335,6 +363,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun previousTrack(autoPlayIfPaused: Boolean = false) {
+        Log.d("TempPlayer", "previous")
         val q = _queue.value
         if (q.isEmpty()) return
         val currentIdx = _queueIndex.value
@@ -465,15 +494,6 @@ class PlaybackManager private constructor(private val context: Context) {
         serviceScope.launch {
             settingsDataStore.savePlaybackState(track.id, pos)
         }
-    }
-
-    fun release() {
-        stopPositionTracking()
-        cancelSleepTimer()
-        visualizerController.release()
-        equalizerController.release()
-        exoPlayer?.release()
-        exoPlayer = null
     }
 
     companion object {

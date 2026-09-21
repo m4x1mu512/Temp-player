@@ -207,6 +207,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.togglePlayPause()
     }
 
+    fun play() {
+        playbackManager.play()
+    }
+
+    fun pause() {
+        playbackManager.pause()
+    }
+
+    fun stop() {
+        playbackManager.stop()
+    }
+
     fun nextTrack() {
         playbackManager.nextTrack()
     }
