@@ -211,12 +211,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Цвет фона мини-плеера",
+                        text = "Цвет фона плеера (мини и полный экран)",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Выберите стиль оформления компактного плеера",
+                        text = "Стиль оформления плеера в свёрнутом и развёрнутом состоянии",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -341,14 +341,14 @@ fun SettingsScreen(
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text(
-                                            text = "Адаптивные тона обложки",
+                                            text = "Адаптивный градиент обложки",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "Фон, акценты и элементы управления мини-плеера динамически окрашиваются в основные тона обложки текущего трека",
+                                            text = "Фон мини-плеера и полноэкранного плеера плавно заливается градиентом в тонах обложки альбома текущего трека с атмосферными акцентами",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

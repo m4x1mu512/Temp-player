@@ -89,7 +89,7 @@ fun MiniPlayer(
         Card(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = colorScheme.backgroundColor
+                containerColor = if (colorScheme.isGradient) Color.Transparent else colorScheme.backgroundColor
             ),
             border = if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF)),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
@@ -97,7 +97,18 @@ fun MiniPlayer(
                 .fillMaxWidth()
                 .testTag("mini_player")
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (colorScheme.isGradient && colorScheme.miniPlayerBrush != null) {
+                            Modifier.background(colorScheme.miniPlayerBrush)
+                        } else {
+                            Modifier.background(colorScheme.backgroundColor)
+                        }
+                    )
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                 // Progress line
                 val progress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
                 LinearProgressIndicator(
@@ -400,6 +411,7 @@ fun MiniPlayer(
                 }
             }
         }
+    }
     }
 }
 

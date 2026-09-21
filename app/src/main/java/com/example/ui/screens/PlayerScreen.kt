@@ -70,6 +70,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import com.example.ui.util.rememberPlayerColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -167,20 +170,72 @@ fun PlayerScreen(
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
 
-    Scaffold(
-        modifier = modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                val offset = dragOffsetY.value.coerceAtLeast(0f)
-                translationY = offset
-                val fraction = (offset / 700f).coerceIn(0f, 1f)
-                alpha = 1f - (fraction * 0.35f)
-                val scale = 1f - (fraction * 0.05f)
-                scaleX = scale
-                scaleY = scale
-            }
-            .testTag("player_screen"),
-        topBar = {
+    val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
+    val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
+
+    val colorScheme = rememberPlayerColors(
+        bgMode = miniPlayerBgMode,
+        albumArtUri = currentTrack?.albumArtUri,
+        customColorLong = miniPlayerCustomColor
+    )
+
+    val playerMaterialColorScheme = remember(colorScheme) {
+        if (colorScheme.isDark) {
+            darkColorScheme(
+                surface = colorScheme.backgroundColor,
+                onSurface = colorScheme.onSurfaceColor,
+                onSurfaceVariant = colorScheme.onSurfaceVariantColor,
+                primary = colorScheme.accentColor,
+                onPrimary = colorScheme.onAccentColor,
+                primaryContainer = colorScheme.accentColor.copy(alpha = 0.25f),
+                onPrimaryContainer = colorScheme.accentColor,
+                background = Color.Transparent,
+                onBackground = colorScheme.onSurfaceColor,
+                surfaceVariant = colorScheme.progressTrackColor,
+                outline = colorScheme.onSurfaceVariantColor.copy(alpha = 0.35f)
+            )
+        } else {
+            lightColorScheme(
+                surface = colorScheme.backgroundColor,
+                onSurface = colorScheme.onSurfaceColor,
+                onSurfaceVariant = colorScheme.onSurfaceVariantColor,
+                primary = colorScheme.accentColor,
+                onPrimary = colorScheme.onAccentColor,
+                primaryContainer = colorScheme.accentColor.copy(alpha = 0.15f),
+                onPrimaryContainer = colorScheme.accentColor,
+                background = Color.Transparent,
+                onBackground = colorScheme.onSurfaceColor,
+                surfaceVariant = colorScheme.progressTrackColor,
+                outline = colorScheme.onSurfaceVariantColor.copy(alpha = 0.35f)
+            )
+        }
+    }
+
+    MaterialTheme(colorScheme = playerMaterialColorScheme) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .then(
+                    if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
+                        Modifier.background(colorScheme.backgroundBrush)
+                    } else {
+                        Modifier.background(colorScheme.backgroundColor)
+                    }
+                )
+                .graphicsLayer {
+                    val offset = dragOffsetY.value.coerceAtLeast(0f)
+                    translationY = offset
+                    val fraction = (offset / 700f).coerceIn(0f, 1f)
+                    alpha = 1f - (fraction * 0.35f)
+                    val scale = 1f - (fraction * 0.05f)
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .testTag("player_screen")
+        ) {
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1101,6 +1156,7 @@ fun PlayerScreen(
             }
         }
     }
+    }
 
     // Modal Dialogs
     if (showEqualizerDialog) {
@@ -1150,5 +1206,6 @@ fun PlayerScreen(
             },
             onDismiss = { showCreatePlaylistDialog = false }
         )
+    }
     }
 }
