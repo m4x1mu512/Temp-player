@@ -154,7 +154,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val equalizerBands: StateFlow<List<EqualizerBand>> = playbackManager.equalizerBands
     val equalizerPreset: StateFlow<EqualizerPreset> = playbackManager.equalizerPreset
     val isEqualizerEnabled: StateFlow<Boolean> = playbackManager.isEqualizerEnabled
-    val visualizerData: StateFlow<FloatArray> = playbackManager.visualizerController.rawFftData
+    val visualizerData: StateFlow<FloatArray> = playbackManager.visualizerData
+    val visualizerWaveform: StateFlow<FloatArray> = playbackManager.visualizerWaveform
+    val audioAmplitude: StateFlow<Float> = playbackManager.audioAmplitude
     val errorMessage: StateFlow<String?> = playbackManager.errorMessage
 
     // Settings Flows
@@ -198,6 +200,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0xFF1E1F24L
+    )
+
+    val autoRotate: StateFlow<Boolean> = settingsDataStore.autoRotateFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
     )
 
     fun onSearchQueryChanged(query: String) {
@@ -371,6 +379,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun cycleVisualizerMode() {
+        val modes = VisualizerMode.values()
+        val currentIndex = modes.indexOf(visualizerMode.value)
+        val nextMode = modes[(currentIndex + 1) % modes.size]
+        setVisualizerMode(nextMode)
+    }
+
+    fun onAudioPermissionGranted() {
+        playbackManager.onAudioPermissionGranted()
+    }
+
     fun setVisualizerBands(bands: Int) {
         viewModelScope.launch {
             settingsDataStore.setVisualizerBands(bands)
@@ -394,6 +413,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setMiniPlayerCustomColor(color: Long) {
         viewModelScope.launch {
             settingsDataStore.setMiniPlayerCustomColor(color)
+        }
+    }
+
+    fun setAutoRotate(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setAutoRotate(enabled)
         }
     }
 

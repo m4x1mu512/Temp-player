@@ -37,6 +37,11 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_EQ_LEVELS = stringPreferencesKey("eq_levels")
         private val KEY_MINI_PLAYER_BG_MODE = stringPreferencesKey("mini_player_bg_mode")
         private val KEY_MINI_PLAYER_CUSTOM_COLOR = longPreferencesKey("mini_player_custom_color")
+        private val KEY_AUTO_ROTATE = booleanPreferencesKey("auto_rotate")
+    }
+
+    val autoRotateFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_AUTO_ROTATE] ?: true
     }
 
     val miniPlayerBgModeFlow: Flow<MiniPlayerBgMode> = context.dataStore.data.map { preferences ->
@@ -66,11 +71,11 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val visualizerModeFlow: Flow<VisualizerMode> = context.dataStore.data.map { preferences ->
-        val name = preferences[KEY_VISUALIZER_MODE] ?: VisualizerMode.SPECTRUM.name
+        val name = preferences[KEY_VISUALIZER_MODE] ?: VisualizerMode.AMPLITUDE.name
         try {
             VisualizerMode.valueOf(name)
         } catch (_: Exception) {
-            VisualizerMode.SPECTRUM
+            VisualizerMode.AMPLITUDE
         }
     }
 
@@ -197,6 +202,12 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setMiniPlayerCustomColor(color: Long) {
         context.dataStore.edit { preferences ->
             preferences[KEY_MINI_PLAYER_CUSTOM_COLOR] = color
+        }
+    }
+
+    suspend fun setAutoRotate(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_AUTO_ROTATE] = enabled
         }
     }
 

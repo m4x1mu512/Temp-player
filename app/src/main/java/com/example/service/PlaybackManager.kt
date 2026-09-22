@@ -1,6 +1,7 @@
 package com.example.service
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.CountDownTimer
 import android.util.Log
@@ -88,6 +89,14 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    val visualizerData: StateFlow<FloatArray> get() = visualizerController.rawFftData
+    val visualizerWaveform: StateFlow<FloatArray> get() = visualizerController.waveformData
+    val audioAmplitude: StateFlow<Float> get() = visualizerController.amplitude
+
+    fun onAudioPermissionGranted() {
+        visualizerController.onPermissionGranted()
+    }
+
     private var positionProgressJob: Job? = null
     private var sleepCountDownTimer: CountDownTimer? = null
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
@@ -166,6 +175,15 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    fun startServiceIfNeeded() {
+        try {
+            val intent = Intent(context, PlaybackService::class.java)
+            context.startService(intent)
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Failed to start PlaybackService", e)
+        }
+    }
+
     @OptIn(UnstableApi::class)
     fun attachPlayer(player: ExoPlayer) {
         if (exoPlayer === player) return
@@ -184,9 +202,23 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
-        pendingPlayTrack?.let { pending ->
+        val pending = pendingPlayTrack
+        if (pending != null) {
             pendingPlayTrack = null
+            val resumePos = _playbackPosition.value
             executePlay(player, pending.track, pending.startPaused)
+            if (resumePos > 0) {
+                player.seekTo(resumePos)
+            }
+        } else {
+            val current = _currentTrack.value
+            if (current != null) {
+                // Restore current track into the newly attached player instance
+                executePlay(player, current, startPaused = true)
+                if (_playbackPosition.value > 0) {
+                    player.seekTo(_playbackPosition.value)
+                }
+            }
         }
     }
 
@@ -197,6 +229,7 @@ class PlaybackManager private constructor(private val context: Context) {
         exoPlayer = null
         visualizerController.release()
         equalizerController.release()
+        _isPlaying.value = false
     }
 
     private fun handleTrackEnded() {
@@ -248,6 +281,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val player = exoPlayer
         if (player == null) {
             pendingPlayTrack = PendingPlay(track, startPaused)
+            startServiceIfNeeded()
             return
         }
         executePlay(player, track, startPaused)
@@ -289,7 +323,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun togglePlayPause() {
         val player = exoPlayer
-        if (player != null && player.isPlaying) {
+        if (player != null && (player.isPlaying || player.playWhenReady)) {
             pause()
         } else {
             play()
@@ -298,9 +332,31 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun play() {
         Log.d("TempPlayer", "play")
-        val player = exoPlayer ?: return
-        if (player.playbackState == Player.STATE_IDLE && _currentTrack.value != null) {
-            playTrack(_currentTrack.value!!, startPaused = false)
+        val player = exoPlayer
+        val track = _currentTrack.value
+        if (player == null) {
+            if (track != null) {
+                pendingPlayTrack = PendingPlay(track, startPaused = false)
+            }
+            startServiceIfNeeded()
+            return
+        }
+        if ((player.playbackState == Player.STATE_IDLE || player.playerError != null) && track != null) {
+            val resumePos = _playbackPosition.value
+            executePlay(player, track, startPaused = false)
+            if (resumePos > 0) {
+                player.seekTo(resumePos)
+            }
+        } else if (player.playbackState == Player.STATE_ENDED) {
+            player.seekTo(0)
+            player.play()
+            _isPlaying.value = true
+        } else if (player.currentMediaItem == null && track != null) {
+            val resumePos = _playbackPosition.value
+            executePlay(player, track, startPaused = false)
+            if (resumePos > 0) {
+                player.seekTo(resumePos)
+            }
         } else {
             player.play()
             _isPlaying.value = true
@@ -324,10 +380,9 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun seekTo(positionMs: Long) {
-        val player = exoPlayer ?: return
         val clamped = positionMs.coerceIn(0, _duration.value.coerceAtLeast(0))
-        player.seekTo(clamped)
         _playbackPosition.value = clamped
+        exoPlayer?.seekTo(clamped)
     }
 
     fun seekForward10s() {

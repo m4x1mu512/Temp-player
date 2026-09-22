@@ -49,6 +49,7 @@ enum class SortOrder(val displayName: String) {
 }
 
 enum class VisualizerMode(val displayName: String) {
+    AMPLITUDE("Амплитуда"),
     SPECTRUM("Спектр"),
     WAVE("Волна"),
     CIRCLE("Круг")

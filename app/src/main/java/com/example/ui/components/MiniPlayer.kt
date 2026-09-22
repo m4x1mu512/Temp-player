@@ -69,7 +69,8 @@ fun MiniPlayer(
     isFavorite: Boolean = false,
     onToggleFavorite: (() -> Unit)? = null,
     bgMode: MiniPlayerBgMode = MiniPlayerBgMode.ALBUM_ART,
-    customColor: Long = 0L
+    customColor: Long = 0L,
+    autoRotate: Boolean = true
 ) {
     AnimatedVisibility(
         visible = currentTrack != null,
@@ -79,7 +80,7 @@ fun MiniPlayer(
         if (currentTrack == null) return@AnimatedVisibility
 
         val configuration = LocalConfiguration.current
-        val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
             albumArtUri = currentTrack.albumArtUri,

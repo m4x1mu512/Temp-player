@@ -30,6 +30,7 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPink
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.NeonTurquoise
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -39,6 +40,8 @@ fun AudioVisualizerView(
     mode: VisualizerMode,
     isPlaying: Boolean,
     modifier: Modifier = Modifier,
+    waveformData: FloatArray = fftData,
+    amplitude: Float = 0f,
     neonColorStart: Color = NeonCyan,
     neonColorMiddle: Color = NeonTurquoise,
     neonColorEnd: Color = NeonPurple
@@ -54,8 +57,21 @@ fun AudioVisualizerView(
         label = "pulseGlow"
     )
 
+    val dynamicPulse = if (isPlaying) pulseGlow + (amplitude * 0.25f) else 1.0f
+
     Box(modifier = modifier.testTag("audio_visualizer_view")) {
         when (mode) {
+            VisualizerMode.AMPLITUDE -> {
+                AmplitudeVisualizer(
+                    waveformData = waveformData,
+                    amplitude = amplitude,
+                    isPlaying = isPlaying,
+                    colorStart = neonColorStart,
+                    colorMiddle = neonColorMiddle,
+                    colorEnd = neonColorEnd,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             VisualizerMode.SPECTRUM -> {
                 SpectrumVisualizer(
                     data = fftData,
@@ -68,7 +84,7 @@ fun AudioVisualizerView(
             }
             VisualizerMode.WAVE -> {
                 WaveVisualizer(
-                    data = fftData,
+                    data = waveformData,
                     isPlaying = isPlaying,
                     colorStart = neonColorStart,
                     colorMiddle = neonColorMiddle,
@@ -80,11 +96,108 @@ fun AudioVisualizerView(
                 CircleVisualizer(
                     data = fftData,
                     isPlaying = isPlaying,
-                    pulse = pulseGlow,
+                    pulse = dynamicPulse,
                     colorStart = neonColorStart,
                     colorMiddle = neonColorMiddle,
                     colorEnd = neonColorEnd,
                     modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AmplitudeVisualizer(
+    waveformData: FloatArray,
+    amplitude: Float,
+    isPlaying: Boolean,
+    colorStart: Color,
+    colorMiddle: Color,
+    colorEnd: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val midY = height / 2f
+        val barCount = waveformData.size.coerceIn(16, 48)
+
+        val totalSpacing = width * 0.25f
+        val barWidth = ((width - totalSpacing) / barCount).coerceAtLeast(3f)
+        val spacing = totalSpacing / (barCount - 1).coerceAtLeast(1)
+
+        // Center pulsating amplitude halo responding to live amplitude
+        if (isPlaying && amplitude > 0.04f) {
+            val bloomRadius = (height * 0.5f) * (0.6f + amplitude * 0.8f)
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        colorMiddle.copy(alpha = (0.28f * amplitude).coerceIn(0.04f, 0.45f)),
+                        colorStart.copy(alpha = (0.12f * amplitude).coerceIn(0.02f, 0.22f)),
+                        Color.Transparent
+                    ),
+                    center = Offset(width / 2f, midY),
+                    radius = bloomRadius
+                ),
+                radius = bloomRadius,
+                center = Offset(width / 2f, midY)
+            )
+        }
+
+        // Horizontal center baseline glow
+        drawLine(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    colorMiddle.copy(alpha = if (isPlaying) 0.35f else 0.12f),
+                    colorStart.copy(alpha = if (isPlaying) 0.55f else 0.2f),
+                    colorMiddle.copy(alpha = if (isPlaying) 0.35f else 0.12f),
+                    Color.Transparent
+                )
+            ),
+            start = Offset(0f, midY),
+            end = Offset(width, midY),
+            strokeWidth = 2f
+        )
+
+        // Symmetrical dynamic amplitude bars mirrored across center axis
+        val brush = Brush.verticalGradient(
+            colors = listOf(colorStart, colorMiddle, colorEnd),
+            startY = 0f,
+            endY = height
+        )
+
+        for (i in 0 until barCount) {
+            val raw = if (i < waveformData.size) waveformData[i] else 0.05f
+            val centerDist = abs(i - (barCount - 1) / 2f) / ((barCount - 1) / 2f)
+            val bellCurve = 1.0f - (centerDist * 0.35f)
+            val v = if (isPlaying) (raw * bellCurve).coerceIn(0.05f, 1.0f) else 0.04f
+
+            val barHalfHeight = ((midY * 0.88f) * v).coerceAtLeast(3f)
+            val left = i * (barWidth + spacing)
+            val top = midY - barHalfHeight
+            val barHeight = barHalfHeight * 2f
+
+            drawRoundRect(
+                brush = brush,
+                topLeft = Offset(left, top),
+                size = Size(barWidth, barHeight),
+                cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
+            )
+
+            // Neon glowing caps at top and bottom for strong amplitude spikes
+            if (isPlaying && v > 0.18f) {
+                val capRadius = barWidth * 0.65f
+                drawCircle(
+                    color = colorStart,
+                    radius = capRadius,
+                    center = Offset(left + barWidth / 2, top + barWidth / 2)
+                )
+                drawCircle(
+                    color = colorEnd,
+                    radius = capRadius,
+                    center = Offset(left + barWidth / 2, top + barHeight - barWidth / 2)
                 )
             }
         }

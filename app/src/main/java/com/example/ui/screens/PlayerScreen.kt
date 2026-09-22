@@ -1,5 +1,11 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.core.content.ContextCompat
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -47,11 +53,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Repeat
-import android.app.Activity
-import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -74,6 +77,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import com.example.ui.util.rememberPlayerColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -133,11 +137,14 @@ fun PlayerScreen(
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
 
     val visualizerData by viewModel.visualizerData.collectAsStateWithLifecycle()
+    val visualizerWaveform by viewModel.visualizerWaveform.collectAsStateWithLifecycle()
+    val audioAmplitude by viewModel.audioAmplitude.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
+    val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
@@ -169,6 +176,26 @@ fun PlayerScreen(
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
+
+    var hasRecordAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val recordAudioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasRecordAudioPermission = isGranted
+        if (isGranted) {
+            viewModel.onAudioPermissionGranted()
+        }
+    }
+
+    LaunchedEffect(visualizerEnabled) {
+        if (visualizerEnabled && !hasRecordAudioPermission) {
+            recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -312,27 +339,6 @@ fun PlayerScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = {
-                                val activity = context as? Activity
-                                if (activity != null) {
-                                    val isLand = activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                                    activity.requestedOrientation = if (isLand) {
-                                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                    } else {
-                                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                    }
-                                }
-                            },
-                            modifier = Modifier.testTag("player_orientation_toggle")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ScreenRotation,
-                                contentDescription = "Повернуть экран",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        IconButton(
                             onClick = { showSleepTimerDialog = true },
                             modifier = Modifier.testTag("player_sleep_timer_button")
                         ) {
@@ -340,6 +346,17 @@ fun PlayerScreen(
                                 imageVector = Icons.Default.Bedtime,
                                 contentDescription = "Таймер сна",
                                 tint = if (sleepTimerMode != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.cycleVisualizerMode() },
+                            modifier = Modifier.testTag("player_visualizer_mode_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = "Режим визуализатора: ${visualizerMode.displayName}",
+                                tint = if (visualizerEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -386,7 +403,7 @@ fun PlayerScreen(
                 val isCompact = availableHeight < 640.dp
                 val isMedium = availableHeight in 640.dp..760.dp
                 val configuration = LocalConfiguration.current
-                val isLandscape = maxWidth > maxHeight || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val isLandscape = autoRotate && (maxWidth > maxHeight || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
 
                 // Subtle continuous pulsing animation when music is actively playing
                 val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
@@ -399,6 +416,7 @@ fun PlayerScreen(
                     ),
                     label = "pulse_scale"
                 )
+                val dynamicAmpPulse = if (isPlaying) 1.0f + (audioAmplitude * 0.045f) else 1.0f
 
                 // Smooth scale transition when playing vs paused
                 val playbackStateScale by animateFloatAsState(
@@ -444,8 +462,8 @@ fun PlayerScreen(
                                         modifier = Modifier
                                             .size(artSize)
                                             .graphicsLayer {
-                                                scaleX = pulseScale * playbackStateScale
-                                                scaleY = pulseScale * playbackStateScale
+                                                scaleX = pulseScale * dynamicAmpPulse * playbackStateScale
+                                                scaleY = pulseScale * dynamicAmpPulse * playbackStateScale
                                                 rotationY = parallaxRotationY
                                                 translationX = parallaxTranslationX
                                                 cameraDistance = 14f * density
@@ -497,9 +515,14 @@ fun PlayerScreen(
                                         .fillMaxWidth(0.92f)
                                         .height(34.dp)
                                         .padding(top = 4.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { viewModel.cycleVisualizerMode() }
+                                        .testTag("player_visualizer_container_landscape")
                                 ) {
                                     AudioVisualizerView(
                                         fftData = visualizerData,
+                                        waveformData = visualizerWaveform,
+                                        amplitude = audioAmplitude,
                                         mode = visualizerMode,
                                         isPlaying = isPlaying,
                                         modifier = Modifier.fillMaxSize()
@@ -831,8 +854,8 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .size(artSize)
                                     .graphicsLayer {
-                                        scaleX = pulseScale * playbackStateScale
-                                        scaleY = pulseScale * playbackStateScale
+                                        scaleX = pulseScale * dynamicAmpPulse * playbackStateScale
+                                        scaleY = pulseScale * dynamicAmpPulse * playbackStateScale
                                         rotationY = parallaxRotationY
                                         translationX = parallaxTranslationX
                                         cameraDistance = 14f * density
@@ -888,9 +911,14 @@ fun PlayerScreen(
                                 .fillMaxWidth()
                                 .height(if (isCompact) 28.dp else if (isMedium) 38.dp else 48.dp)
                                 .padding(vertical = 1.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.cycleVisualizerMode() }
+                                .testTag("player_visualizer_container_portrait")
                         ) {
                             AudioVisualizerView(
                                 fftData = visualizerData,
+                                waveformData = visualizerWaveform,
+                                amplitude = audioAmplitude,
                                 mode = visualizerMode,
                                 isPlaying = isPlaying,
                                 modifier = Modifier.fillMaxSize()

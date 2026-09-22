@@ -115,6 +115,7 @@ fun LibraryScreen(
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
+    val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
@@ -408,7 +409,8 @@ fun LibraryScreen(
                 onPreviousTrack = { viewModel.previousTrack() },
                 onClick = onNavigateToPlayer,
                 bgMode = miniPlayerBgMode,
-                customColor = miniPlayerCustomColor
+                customColor = miniPlayerCustomColor,
+                autoRotate = autoRotate
             )
         }
     ) { paddingValues ->

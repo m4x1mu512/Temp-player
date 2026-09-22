@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,5 +35,21 @@ class ExampleRobolectricTest {
 
     val longTrack = track.copy(duration = 3665000L) // 1:01:05
     assertEquals("1:01:05", longTrack.formattedDuration())
+  }
+
+  @Test
+  fun `test auto rotate setting toggle`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val settings = com.example.data.local.SettingsDataStore(context)
+    val initial = settings.autoRotateFlow.first()
+    assertEquals(true, initial)
+
+    settings.setAutoRotate(false)
+    val afterDisable = settings.autoRotateFlow.first()
+    assertEquals(false, afterDisable)
+
+    settings.setAutoRotate(true)
+    val afterEnable = settings.autoRotateFlow.first()
+    assertEquals(true, afterEnable)
   }
 }
