@@ -68,7 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.CrashLogger
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.ThemeMode
-import com.example.data.model.VisualizerMode
 import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.SleepTimerDialog
@@ -84,9 +83,6 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
-    val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
-    val visualizerBands by viewModel.visualizerBands.collectAsStateWithLifecycle()
-    val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
@@ -525,90 +521,33 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
+                    .testTag("settings_visualizer_card")
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "Включить визуализацию",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Анимация волн и спектра при воспроизведении",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = visualizerEnabled,
-                            onCheckedChange = { viewModel.setVisualizerEnabled(it) },
-                            modifier = Modifier.testTag("visualizer_toggle_switch")
-                        )
-                    }
-
-                    if (visualizerEnabled) {
-                        Spacer(modifier = Modifier.height(16.dp))
-
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                         Text(
-                            text = "Режим отображения",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
+                            text = "Визуализатор звука",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            VisualizerMode.values().forEach { mode ->
-                                FilterChip(
-                                    selected = visualizerMode == mode,
-                                    onClick = { viewModel.setVisualizerMode(mode) },
-                                    label = { Text(mode.displayName) },
-                                    modifier = Modifier.testTag("vis_mode_${mode.name.lowercase()}"),
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Sensitivity
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "Чувствительность",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                text = String.format("%.1fx", visualizerSensitivity),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-
-                        Slider(
-                            value = visualizerSensitivity,
-                            onValueChange = { viewModel.setVisualizerSensitivity(it) },
-                            valueRange = 0.5f..2.5f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (visualizerEnabled) "Включен (переключение эффектов нажатием на сам визуализатор)" else "Отключен",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Switch(
+                        checked = visualizerEnabled,
+                        onCheckedChange = { viewModel.setVisualizerEnabled(it) },
+                        modifier = Modifier.testTag("visualizer_toggle_switch")
+                    )
                 }
             }
 

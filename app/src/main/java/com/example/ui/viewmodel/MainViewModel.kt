@@ -380,9 +380,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cycleVisualizerMode() {
-        val modes = VisualizerMode.values()
+        val modes = listOf(VisualizerMode.AMPLITUDE, VisualizerMode.SPECTRUM, VisualizerMode.WAVE)
         val currentIndex = modes.indexOf(visualizerMode.value)
-        val nextMode = modes[(currentIndex + 1) % modes.size]
+        val nextMode = if (currentIndex >= 0) {
+            modes[(currentIndex + 1) % modes.size]
+        } else {
+            VisualizerMode.AMPLITUDE
+        }
         setVisualizerMode(nextMode)
     }
 

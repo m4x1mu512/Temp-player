@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+@OptIn(UnstableApi::class)
 class PlaybackManager private constructor(private val context: Context) {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -43,7 +44,7 @@ class PlaybackManager private constructor(private val context: Context) {
     var exoPlayer: ExoPlayer? = null
         private set
 
-    val visualizerController = AudioVisualizerController(context, serviceScope)
+    val visualizerController = AudioVisualizerController(serviceScope)
     val equalizerController = EqualizerController()
 
     // Playback States

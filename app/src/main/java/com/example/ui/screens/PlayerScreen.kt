@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -71,11 +73,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import com.example.ui.util.rememberPlayerColors
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -177,24 +181,11 @@ fun PlayerScreen(
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
 
-    var hasRecordAudioPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val recordAudioLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasRecordAudioPermission = isGranted
-        if (isGranted) {
-            viewModel.onAudioPermissionGranted()
-        }
-    }
-
-    LaunchedEffect(visualizerEnabled) {
-        if (visualizerEnabled && !hasRecordAudioPermission) {
-            recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
+    var showVisualizerModeHint by remember { mutableStateOf(false) }
+    LaunchedEffect(visualizerMode) {
+        showVisualizerModeHint = true
+        delay(1200)
+        showVisualizerModeHint = false
     }
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
@@ -511,6 +502,7 @@ fun PlayerScreen(
 
                             if (visualizerEnabled) {
                                 Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
                                         .fillMaxWidth(0.92f)
                                         .height(34.dp)
@@ -527,6 +519,25 @@ fun PlayerScreen(
                                         isPlaying = isPlaying,
                                         modifier = Modifier.fillMaxSize()
                                     )
+
+                                    androidx.compose.animation.AnimatedVisibility(
+                                        visible = showVisualizerModeHint,
+                                        enter = fadeIn(),
+                                        exit = fadeOut()
+                                    ) {
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                text = visualizerMode.displayName,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.inverseOnSurface,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -907,6 +918,7 @@ fun PlayerScreen(
                     // Visualizer Canvas View (scaled to fit screen height)
                     if (visualizerEnabled) {
                         Box(
+                            contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(if (isCompact) 28.dp else if (isMedium) 38.dp else 48.dp)
@@ -923,6 +935,25 @@ fun PlayerScreen(
                                 isPlaying = isPlaying,
                                 modifier = Modifier.fillMaxSize()
                             )
+
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = showVisualizerModeHint,
+                                enter = fadeIn(),
+                                exit = fadeOut()
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.85f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = visualizerMode.displayName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.inverseOnSurface,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
