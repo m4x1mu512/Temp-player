@@ -208,6 +208,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = true
     )
 
+    val replayGainEnabled: StateFlow<Boolean> = playbackManager.isReplayGainEnabled
+
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }
@@ -426,6 +428,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setReplayGainEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            playbackManager.setReplayGainEnabled(enabled)
+        }
+    }
+
     fun resetSettings() {
         viewModelScope.launch {
             settingsDataStore.resetSettings()
@@ -433,6 +441,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             playbackManager.setRepeatMode(RepeatMode.OFF)
             playbackManager.setEqualizerPreset(EqualizerPreset.FLAT)
             playbackManager.setEqualizerEnabled(true)
+            playbackManager.setReplayGainEnabled(true)
             playbackManager.visualizerController.updateConfig(32, 1.0f)
         }
     }

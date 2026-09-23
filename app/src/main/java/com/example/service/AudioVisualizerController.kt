@@ -49,6 +49,8 @@ class AudioVisualizerController(
     private var lastEmitTime = 0L
     private var decayJob: Job? = null
 
+    var onRmsCalculated: ((Float) -> Unit)? = null
+
     val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
         override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
             currentChannelCount = channelCount.coerceAtLeast(1)
@@ -133,6 +135,7 @@ class AudioVisualizerController(
 
             // 1. Amplitude (RMS + peak hybrid)
             val rms = sqrt(sumSquares / targetSamples).toFloat()
+            onRmsCalculated?.invoke(rms)
             val instantAmp = ((rms * 0.65f + peakSample * 0.35f) * sensitivity * 1.8f).coerceIn(0f, 1f)
             smoothedAmplitude = smoothedAmplitude * 0.6f + instantAmp * 0.4f
             _amplitude.value = smoothedAmplitude

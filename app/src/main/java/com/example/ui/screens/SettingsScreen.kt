@@ -90,6 +90,7 @@ fun SettingsScreen(
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
+    val replayGainEnabled by viewModel.replayGainEnabled.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
@@ -555,6 +556,42 @@ fun SettingsScreen(
 
             // Audio & Playback Section
             SettingsSectionHeader(title = "Звук и воспроизведение", icon = Icons.Default.Tune)
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_replay_gain_card")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text(
+                            text = "Нормализация громкости (ReplayGain)",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (replayGainEnabled) "Включена (автоматическое выравнивание громкости тихих и громких треков)" else "Отключена",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = replayGainEnabled,
+                        onCheckedChange = { viewModel.setReplayGainEnabled(it) },
+                        modifier = Modifier.testTag("replay_gain_toggle_switch")
+                    )
+                }
+            }
 
             Card(
                 shape = RoundedCornerShape(20.dp),

@@ -10,6 +10,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -46,6 +47,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
     val visualizerController = AudioVisualizerController(serviceScope)
     val equalizerController = EqualizerController()
+    val replayGainController = ReplayGainController(context)
 
     // Playback States
     private val _currentTrack = MutableStateFlow<Track?>(null)
@@ -87,6 +89,9 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _isEqualizerEnabled = MutableStateFlow(true)
     val isEqualizerEnabled: StateFlow<Boolean> = _isEqualizerEnabled.asStateFlow()
 
+    private val _isReplayGainEnabled = MutableStateFlow(true)
+    val isReplayGainEnabled: StateFlow<Boolean> = _isReplayGainEnabled.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -103,12 +108,18 @@ class PlaybackManager private constructor(private val context: Context) {
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
     init {
+        visualizerController.onRmsCalculated = { rms ->
+            replayGainController.onAudioBufferRms(rms)
+        }
+
         serviceScope.launch {
             // Restore settings
             _repeatMode.value = settingsDataStore.repeatModeFlow.first()
             _isShuffle.value = settingsDataStore.shuffleEnabledFlow.first()
             _isEqualizerEnabled.value = settingsDataStore.eqEnabledFlow.first()
             _equalizerPreset.value = settingsDataStore.eqPresetFlow.first()
+            _isReplayGainEnabled.value = settingsDataStore.replayGainEnabledFlow.first()
+            replayGainController.setEnabled(_isReplayGainEnabled.value)
 
             val bands = settingsDataStore.visualizerBandsFlow.first()
             val sens = settingsDataStore.visualizerSensitivityFlow.first()
@@ -154,6 +165,7 @@ class PlaybackManager private constructor(private val context: Context) {
                     if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
                         currentAudioSessionId = currentSessionId
                         visualizerController.attachToAudioSession(currentSessionId)
+                        replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
                         serviceScope.launch {
                             val savedLevels = settingsDataStore.eqLevelsFlow.first()
                             equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
@@ -167,6 +179,10 @@ class PlaybackManager private constructor(private val context: Context) {
                 }
                 else -> {}
             }
+        }
+
+        override fun onMetadata(metadata: Metadata) {
+            replayGainController.onMetadata(metadata)
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -190,11 +206,13 @@ class PlaybackManager private constructor(private val context: Context) {
         if (exoPlayer === player) return
         exoPlayer = player
         player.addListener(playerListener)
+        replayGainController.attachPlayer(player)
 
         val currentSessionId = player.audioSessionId
         if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
             currentAudioSessionId = currentSessionId
             visualizerController.attachToAudioSession(currentSessionId)
+            replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
             serviceScope.launch {
                 val savedLevels = settingsDataStore.eqLevelsFlow.first()
                 equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
@@ -230,6 +248,7 @@ class PlaybackManager private constructor(private val context: Context) {
         exoPlayer = null
         visualizerController.release()
         equalizerController.release()
+        replayGainController.release()
         _isPlaying.value = false
     }
 
@@ -302,6 +321,7 @@ class PlaybackManager private constructor(private val context: Context) {
             .setMediaMetadata(mediaMetadata)
             .build()
 
+        replayGainController.onTrackChanged(track)
         player.setMediaItem(mediaItem)
         player.prepare()
         if (startPaused) {
@@ -549,6 +569,14 @@ class PlaybackManager private constructor(private val context: Context) {
         val pos = _playbackPosition.value
         serviceScope.launch {
             settingsDataStore.savePlaybackState(track.id, pos)
+        }
+    }
+
+    fun setReplayGainEnabled(enabled: Boolean) {
+        _isReplayGainEnabled.value = enabled
+        replayGainController.setEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setReplayGainEnabled(enabled)
         }
     }
 
