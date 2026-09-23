@@ -52,4 +52,28 @@ class ExampleRobolectricTest {
     val afterEnable = settings.autoRotateFlow.first()
     assertEquals(true, afterEnable)
   }
+
+  @Test
+  fun `test crossfade settings persistence`() = kotlinx.coroutines.runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val settings = com.example.data.local.SettingsDataStore(context)
+    val initialEnabled = settings.crossfadeEnabledFlow.first()
+    assertEquals(true, initialEnabled)
+
+    val initialDuration = settings.crossfadeDurationSecondsFlow.first()
+    assertEquals(4, initialDuration)
+
+    settings.setCrossfadeEnabled(false)
+    assertEquals(false, settings.crossfadeEnabledFlow.first())
+
+    settings.setCrossfadeDurationSeconds(6)
+    assertEquals(6, settings.crossfadeDurationSecondsFlow.first())
+
+    // Test bounds clamping
+    settings.setCrossfadeDurationSeconds(20)
+    assertEquals(10, settings.crossfadeDurationSecondsFlow.first())
+
+    settings.setCrossfadeDurationSeconds(-5)
+    assertEquals(1, settings.crossfadeDurationSecondsFlow.first())
+  }
 }

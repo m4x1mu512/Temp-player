@@ -39,6 +39,16 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MINI_PLAYER_CUSTOM_COLOR = longPreferencesKey("mini_player_custom_color")
         private val KEY_AUTO_ROTATE = booleanPreferencesKey("auto_rotate")
         private val KEY_REPLAY_GAIN_ENABLED = booleanPreferencesKey("replay_gain_enabled")
+        private val KEY_CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
+        private val KEY_CROSSFADE_DURATION_SECONDS = intPreferencesKey("crossfade_duration_seconds")
+    }
+
+    val crossfadeEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_CROSSFADE_ENABLED] ?: true
+    }
+
+    val crossfadeDurationSecondsFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_CROSSFADE_DURATION_SECONDS] ?: 4
     }
 
     val replayGainEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -219,6 +229,18 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setReplayGainEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_REPLAY_GAIN_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setCrossfadeEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_CROSSFADE_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setCrossfadeDurationSeconds(seconds: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_CROSSFADE_DURATION_SECONDS] = seconds.coerceIn(1, 10)
         }
     }
 

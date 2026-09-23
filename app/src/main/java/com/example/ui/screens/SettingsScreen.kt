@@ -72,6 +72,7 @@ import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.viewmodel.MainViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +92,8 @@ fun SettingsScreen(
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
     val replayGainEnabled by viewModel.replayGainEnabled.collectAsStateWithLifecycle()
+    val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
+    val crossfadeDuration by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
@@ -590,6 +593,72 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setReplayGainEnabled(it) },
                         modifier = Modifier.testTag("replay_gain_toggle_switch")
                     )
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_crossfade_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "Плавный переход (Crossfade)",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (crossfadeEnabled) "Смешивание конца одного трека с началом другого ($crossfadeDuration с)" else "Отключен (обычное переключение)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = crossfadeEnabled,
+                            onCheckedChange = { viewModel.setCrossfadeEnabled(it) },
+                            modifier = Modifier.testTag("crossfade_toggle_switch")
+                        )
+                    }
+
+                    if (crossfadeEnabled) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Длительность перехода",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "$crossfadeDuration с",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = crossfadeDuration.toFloat(),
+                            onValueChange = { viewModel.setCrossfadeDurationSeconds(it.roundToInt()) },
+                            valueRange = 1f..10f,
+                            steps = 8,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("crossfade_duration_slider")
+                        )
+                    }
                 }
             }
 

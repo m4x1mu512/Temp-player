@@ -3,8 +3,13 @@ package com.example.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.media.AudioAttributes as AndroidAudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.OptIn
@@ -31,10 +36,34 @@ import kotlinx.coroutines.launch
 
 class PlaybackService : MediaSessionService() {
 
-    private var exoPlayer: ExoPlayer? = null
+    private var player1: ExoPlayer? = null
+    private var player2: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var playbackManager: PlaybackManager
+
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS,
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                playbackManager.pause()
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                // Focus regained
+            }
+        }
+    }
+
+    private val noisyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+                playbackManager.pause()
+            }
+        }
+    }
 
     companion object {
         private const val TAG = "TempPlayer"
@@ -42,15 +71,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     @OptIn(UnstableApi::class)
-    override fun onCreate() {
-        super.onCreate()
-        Log.d(TAG, "PlaybackService onCreate")
-
-        playbackManager = PlaybackManager.getInstance(this)
-
-        createNotificationChannel()
-
-        Log.d(TAG, "Creating ExoPlayer")
+    private fun buildExoPlayer(): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -69,29 +90,51 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        val player = ExoPlayer.Builder(this, renderersFactory)
-            .setAudioAttributes(audioAttributes, true) // Audio focus enabled, pauses on transient focus loss
-            .setHandleAudioBecomingNoisy(true)
+        return ExoPlayer.Builder(this, renderersFactory)
+            .setAudioAttributes(audioAttributes, false) // Controlled at service level for simultaneous crossfade
+            .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
-        exoPlayer = player
+    }
 
-        // Connect player to PlaybackManager so UI & StateFlows observe real state
-        playbackManager.attachPlayer(player)
+    private fun requestSystemAudioFocus(): Boolean {
+        val am = audioManager ?: return true
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = audioFocusRequest ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    AndroidAudioAttributes.Builder()
+                        .setUsage(AndroidAudioAttributes.USAGE_MEDIA)
+                        .setContentType(AndroidAudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setOnAudioFocusChangeListener(audioFocusChangeListener)
+                .build().also { audioFocusRequest = it }
+            am.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+    }
 
-        val sessionActivityPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+    private fun abandonSystemAudioFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(audioFocusChangeListener)
+        }
+    }
 
-        // ForwardingPlayer delegates media session commands (notification, lock screen, bluetooth)
-        val forwardingPlayer = object : ForwardingPlayer(player) {
+    private fun createForwardingPlayer(player: Player): ForwardingPlayer {
+        return object : ForwardingPlayer(player) {
             override fun play() {
                 Log.d(TAG, "play")
+                requestSystemAudioFocus()
                 playbackManager.play()
             }
 
@@ -103,6 +146,7 @@ class PlaybackService : MediaSessionService() {
             override fun stop() {
                 Log.d(TAG, "stop")
                 playbackManager.stop()
+                abandonSystemAudioFocus()
             }
 
             override fun seekToNext() {
@@ -148,10 +192,53 @@ class PlaybackService : MediaSessionService() {
                 }
             }
         }
+    }
 
-        mediaSession = MediaSession.Builder(this, forwardingPlayer)
+    @OptIn(UnstableApi::class)
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "PlaybackService onCreate")
+
+        playbackManager = PlaybackManager.getInstance(this)
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+
+        createNotificationChannel()
+
+        try {
+            val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+            registerReceiver(noisyReceiver, filter)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register noisy receiver: ${e.message}")
+        }
+
+        playbackManager.onRequestAudioFocus = {
+            requestSystemAudioFocus()
+        }
+
+        Log.d(TAG, "Creating dual ExoPlayers for crossfade support")
+        val p1 = buildExoPlayer()
+        val p2 = buildExoPlayer()
+        player1 = p1
+        player2 = p2
+
+        playbackManager.attachPlayers(p1, p2)
+
+        val sessionActivityPendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        mediaSession = MediaSession.Builder(this, createForwardingPlayer(p1))
             .setSessionActivity(sessionActivityPendingIntent)
             .build()
+
+        playbackManager.onActivePlayerChanged = { newActivePlayer ->
+            mediaSession?.setPlayer(createForwardingPlayer(newActivePlayer))
+        }
 
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider.Builder(this)
@@ -211,24 +298,29 @@ class PlaybackService : MediaSessionService() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         Log.d(TAG, "onTaskRemoved")
-        val player = exoPlayer
-        if (player == null || (!player.playWhenReady && !player.isPlaying)) {
+        val active = playbackManager.activePlayer
+        if (active == null || (!active.playWhenReady && !active.isPlaying)) {
             stopSelf()
         }
     }
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy")
+        try {
+            unregisterReceiver(noisyReceiver)
+        } catch (_: Exception) {}
+        abandonSystemAudioFocus()
         serviceScope.cancel()
-        val player = exoPlayer
         playbackManager.detachPlayer()
         mediaSession?.run {
             release()
             mediaSession = null
         }
-        Log.d(TAG, "PLAYER RELEASE IN SERVICE")
-        player?.release()
-        exoPlayer = null
+        Log.d(TAG, "RELEASING PLAYERS IN SERVICE")
+        player1?.release()
+        player2?.release()
+        player1 = null
+        player2 = null
         super.onDestroy()
     }
 }

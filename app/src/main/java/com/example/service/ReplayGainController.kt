@@ -151,7 +151,7 @@ class ReplayGainController(private val context: Context) {
         }
     }
 
-    private fun applyCurrentGain() {
+    fun applyCurrentGain() {
         if (!isEnabled) {
             setUnityGain()
             return

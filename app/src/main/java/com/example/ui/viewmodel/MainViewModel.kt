@@ -209,6 +209,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     val replayGainEnabled: StateFlow<Boolean> = playbackManager.isReplayGainEnabled
+    val crossfadeEnabled: StateFlow<Boolean> = playbackManager.isCrossfadeEnabled
+    val crossfadeDurationSeconds: StateFlow<Int> = playbackManager.crossfadeDurationSeconds
 
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
@@ -434,6 +436,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            playbackManager.setCrossfadeEnabled(enabled)
+        }
+    }
+
+    fun setCrossfadeDurationSeconds(seconds: Int) {
+        viewModelScope.launch {
+            playbackManager.setCrossfadeDurationSeconds(seconds)
+        }
+    }
+
     fun resetSettings() {
         viewModelScope.launch {
             settingsDataStore.resetSettings()
@@ -442,6 +456,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             playbackManager.setEqualizerPreset(EqualizerPreset.FLAT)
             playbackManager.setEqualizerEnabled(true)
             playbackManager.setReplayGainEnabled(true)
+            playbackManager.setCrossfadeEnabled(true)
+            playbackManager.setCrossfadeDurationSeconds(4)
             playbackManager.visualizerController.updateConfig(32, 1.0f)
         }
     }

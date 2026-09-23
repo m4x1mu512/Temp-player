@@ -14,7 +14,11 @@ import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import com.example.data.local.AppDatabase
 import com.example.data.local.SettingsDataStore
 import com.example.data.model.EqualizerBand
@@ -42,12 +46,27 @@ class PlaybackManager private constructor(private val context: Context) {
     val repository = MusicRepository(context, database)
     val settingsDataStore = SettingsDataStore(context)
 
-    var exoPlayer: ExoPlayer? = null
-        private set
+    // Dual-player architecture for seamless crossfading
+    private var playerA: ExoPlayer? = null
+    private var playerB: ExoPlayer? = null
+    private var activePlayerIndex: Int = 0 // 0 -> playerA, 1 -> playerB
+
+    val activePlayer: ExoPlayer?
+        get() = if (activePlayerIndex == 0) playerA else playerB
+
+    val secondaryPlayer: ExoPlayer?
+        get() = if (activePlayerIndex == 0) playerB else playerA
+
+    val exoPlayer: ExoPlayer?
+        get() = activePlayer
+
+    var onActivePlayerChanged: ((ExoPlayer) -> Unit)? = null
+    var onRequestAudioFocus: (() -> Unit)? = null
 
     val visualizerController = AudioVisualizerController(serviceScope)
     val equalizerController = EqualizerController()
     val replayGainController = ReplayGainController(context)
+    val crossfadeController = CrossfadeController(serviceScope)
 
     // Playback States
     private val _currentTrack = MutableStateFlow<Track?>(null)
@@ -92,6 +111,12 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _isReplayGainEnabled = MutableStateFlow(true)
     val isReplayGainEnabled: StateFlow<Boolean> = _isReplayGainEnabled.asStateFlow()
 
+    private val _isCrossfadeEnabled = MutableStateFlow(true)
+    val isCrossfadeEnabled: StateFlow<Boolean> = _isCrossfadeEnabled.asStateFlow()
+
+    private val _crossfadeDurationSeconds = MutableStateFlow(4)
+    val crossfadeDurationSeconds: StateFlow<Int> = _crossfadeDurationSeconds.asStateFlow()
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -121,6 +146,11 @@ class PlaybackManager private constructor(private val context: Context) {
             _isReplayGainEnabled.value = settingsDataStore.replayGainEnabledFlow.first()
             replayGainController.setEnabled(_isReplayGainEnabled.value)
 
+            _isCrossfadeEnabled.value = settingsDataStore.crossfadeEnabledFlow.first()
+            _crossfadeDurationSeconds.value = settingsDataStore.crossfadeDurationSecondsFlow.first()
+            crossfadeController.isEnabled = _isCrossfadeEnabled.value
+            crossfadeController.durationSeconds = _crossfadeDurationSeconds.value
+
             val bands = settingsDataStore.visualizerBandsFlow.first()
             val sens = settingsDataStore.visualizerSensitivityFlow.first()
             visualizerController.updateConfig(bands, sens)
@@ -130,67 +160,84 @@ class PlaybackManager private constructor(private val context: Context) {
     private data class PendingPlay(val track: Track, val startPaused: Boolean)
     private var pendingPlayTrack: PendingPlay? = null
 
-    @OptIn(UnstableApi::class)
-    private val playerListener = object : Player.Listener {
+    private fun createPlayerListener(isPlayerA: Boolean) = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _isPlaying.value = isPlaying
-            visualizerController.onPlaybackStateChanged(isPlaying)
-            if (isPlaying) {
-                startPositionTracking()
-            } else {
-                stopPositionTracking()
-                saveCurrentState()
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            if (isThisPlayerActive) {
+                _isPlaying.value = isPlaying
+                visualizerController.onPlaybackStateChanged(isPlaying)
+                if (isPlaying) {
+                    startPositionTracking()
+                } else if (!crossfadeController.isCrossfading) {
+                    stopPositionTracking()
+                    saveCurrentState()
+                }
             }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val player = exoPlayer ?: return
-            when (playbackState) {
-                Player.STATE_READY -> {
-                    val realDuration = player.duration
-                    if (realDuration > 0) {
-                        _duration.value = realDuration
-                        // Synchronize real duration with database & current track
-                        _currentTrack.value?.let { track ->
-                            if (track.duration != realDuration) {
-                                _currentTrack.value = track.copy(duration = realDuration)
-                                serviceScope.launch {
-                                    repository.updateTrackDuration(track.id, realDuration)
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            val player = if (isPlayerA) playerA else playerB
+
+            if (isThisPlayerActive && player != null) {
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        val realDuration = player.duration
+                        if (realDuration > 0) {
+                            _duration.value = realDuration
+                            // Synchronize real duration with database & current track
+                            _currentTrack.value?.let { track ->
+                                if (track.duration != realDuration) {
+                                    _currentTrack.value = track.copy(duration = realDuration)
+                                    serviceScope.launch {
+                                        repository.updateTrackDuration(track.id, realDuration)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    val currentSessionId = player.audioSessionId
-                    if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
-                        currentAudioSessionId = currentSessionId
-                        visualizerController.attachToAudioSession(currentSessionId)
-                        replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
-                        serviceScope.launch {
-                            val savedLevels = settingsDataStore.eqLevelsFlow.first()
-                            equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
-                            _equalizerBands.value = equalizerController.getBands()
-                            equalizerController.applyPreset(_equalizerPreset.value)
+                        val currentSessionId = player.audioSessionId
+                        if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
+                            currentAudioSessionId = currentSessionId
+                            visualizerController.attachToAudioSession(currentSessionId)
+                            replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
+                            serviceScope.launch {
+                                val savedLevels = settingsDataStore.eqLevelsFlow.first()
+                                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
+                                _equalizerBands.value = equalizerController.getBands()
+                                equalizerController.applyPreset(_equalizerPreset.value)
+                            }
                         }
                     }
+                    Player.STATE_ENDED -> {
+                        if (!crossfadeController.isCrossfading) {
+                            handleTrackEnded()
+                        }
+                    }
+                    else -> {}
                 }
-                Player.STATE_ENDED -> {
-                    handleTrackEnded()
-                }
-                else -> {}
             }
         }
 
         override fun onMetadata(metadata: Metadata) {
-            replayGainController.onMetadata(metadata)
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            if (isThisPlayerActive) {
+                replayGainController.onMetadata(metadata)
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            _errorMessage.value = "Не удалось воспроизвести файл: ${error.localizedMessage ?: "ошибка декодирования"}"
-            _isPlaying.value = false
-            visualizerController.onPlaybackStateChanged(false)
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            if (isThisPlayerActive) {
+                _errorMessage.value = "Не удалось воспроизвести файл: ${error.localizedMessage ?: "ошибка декодирования"}"
+                _isPlaying.value = false
+                visualizerController.onPlaybackStateChanged(false)
+            }
         }
     }
+
+    private val playerAListener = createPlayerListener(isPlayerA = true)
+    private val playerBListener = createPlayerListener(isPlayerA = false)
 
     fun startServiceIfNeeded() {
         try {
@@ -201,14 +248,22 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
-    @OptIn(UnstableApi::class)
-    fun attachPlayer(player: ExoPlayer) {
-        if (exoPlayer === player) return
-        exoPlayer = player
-        player.addListener(playerListener)
-        replayGainController.attachPlayer(player)
+    fun attachPlayers(player1: ExoPlayer, player2: ExoPlayer? = null) {
+        if (playerA === player1 && playerB === player2) return
 
-        val currentSessionId = player.audioSessionId
+        playerA?.removeListener(playerAListener)
+        playerB?.removeListener(playerBListener)
+
+        playerA = player1
+        playerB = player2
+        activePlayerIndex = 0
+
+        player1.addListener(playerAListener)
+        player2?.addListener(playerBListener)
+
+        replayGainController.attachPlayer(player1)
+
+        val currentSessionId = player1.audioSessionId
         if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
             currentAudioSessionId = currentSessionId
             visualizerController.attachToAudioSession(currentSessionId)
@@ -221,35 +276,74 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
+        // Restore pending playback if service was started on-demand
         val pending = pendingPlayTrack
         if (pending != null) {
             pendingPlayTrack = null
-            val resumePos = _playbackPosition.value
-            executePlay(player, pending.track, pending.startPaused)
-            if (resumePos > 0) {
-                player.seekTo(resumePos)
-            }
+            playTrack(pending.track, startPaused = pending.startPaused)
         } else {
-            val current = _currentTrack.value
-            if (current != null) {
-                // Restore current track into the newly attached player instance
-                executePlay(player, current, startPaused = true)
-                if (_playbackPosition.value > 0) {
-                    player.seekTo(_playbackPosition.value)
+            // Restore playback position if returning
+            serviceScope.launch {
+                val lastPos = settingsDataStore.lastPositionFlow.first()
+                if (lastPos > 0 && _playbackPosition.value == 0L) {
+                    _playbackPosition.value = lastPos
+                    player1.seekTo(lastPos)
                 }
             }
         }
     }
 
+    fun attachPlayer(player: ExoPlayer) {
+        attachPlayers(player, null)
+    }
+
     fun detachPlayer() {
         stopPositionTracking()
         cancelSleepTimer()
-        exoPlayer?.removeListener(playerListener)
-        exoPlayer = null
+        crossfadeController.release()
+        playerA?.removeListener(playerAListener)
+        playerB?.removeListener(playerBListener)
+        playerA = null
+        playerB = null
         visualizerController.release()
         equalizerController.release()
         replayGainController.release()
         _isPlaying.value = false
+    }
+
+    private fun createSecondaryPlayer(): ExoPlayer {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        val renderersFactory = object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setAudioProcessors(arrayOf(TeeAudioProcessor(visualizerController.audioBufferSink)))
+                    .build()
+            }
+        }
+
+        val player = ExoPlayer.Builder(context, renderersFactory)
+            .setAudioAttributes(audioAttributes, false) // Note: false to not compete for audio focus
+            .setHandleAudioBecomingNoisy(false)
+            .setWakeMode(C.WAKE_MODE_LOCAL)
+            .build()
+        player.addListener(playerBListener)
+        return player
+    }
+
+    private fun getOrCreateSecondaryPlayer(): ExoPlayer {
+        playerB?.let { return it }
+        val player = createSecondaryPlayer()
+        playerB = player
+        return player
     }
 
     private fun handleTrackEnded() {
@@ -262,8 +356,8 @@ class PlaybackManager private constructor(private val context: Context) {
 
         when (_repeatMode.value) {
             RepeatMode.ONE -> {
-                exoPlayer?.seekTo(0)
-                exoPlayer?.play()
+                activePlayer?.seekTo(0)
+                activePlayer?.play()
             }
             RepeatMode.ALL -> {
                 nextTrack(autoPlayIfPaused = true)
@@ -274,9 +368,9 @@ class PlaybackManager private constructor(private val context: Context) {
                     playTrackAtIndex(nextIdx, autoPlay = true)
                 } else {
                     // Reached end of queue
-                    exoPlayer?.pause()
+                    activePlayer?.pause()
                     _isPlaying.value = false
-                    exoPlayer?.seekTo(0)
+                    activePlayer?.seekTo(0)
                     _playbackPosition.value = 0
                 }
             }
@@ -284,6 +378,8 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun playTrack(track: Track, newQueue: List<Track>? = null, startIndex: Int = -1, startPaused: Boolean = false) {
+        crossfadeController.cancelCrossfade()
+
         if (newQueue != null && newQueue.isNotEmpty()) {
             _queue.value = newQueue
             _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
@@ -298,7 +394,7 @@ class PlaybackManager private constructor(private val context: Context) {
         _duration.value = track.duration
         _playbackPosition.value = 0
 
-        val player = exoPlayer
+        val player = activePlayer
         if (player == null) {
             pendingPlayTrack = PendingPlay(track, startPaused)
             startServiceIfNeeded()
@@ -321,6 +417,7 @@ class PlaybackManager private constructor(private val context: Context) {
             .setMediaMetadata(mediaMetadata)
             .build()
 
+        replayGainController.attachPlayer(player)
         replayGainController.onTrackChanged(track)
         player.setMediaItem(mediaItem)
         player.prepare()
@@ -328,6 +425,7 @@ class PlaybackManager private constructor(private val context: Context) {
             player.playWhenReady = false
             _isPlaying.value = false
         } else {
+            onRequestAudioFocus?.invoke()
             player.playWhenReady = true
             player.play()
             _isPlaying.value = true
@@ -335,6 +433,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun playTrackAtIndex(index: Int, autoPlay: Boolean) {
+        crossfadeController.cancelCrossfade()
         val q = _queue.value
         if (index in q.indices) {
             _queueIndex.value = index
@@ -343,7 +442,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun togglePlayPause() {
-        val player = exoPlayer
+        val player = activePlayer
         if (player != null && (player.isPlaying || player.playWhenReady)) {
             pause()
         } else {
@@ -353,7 +452,8 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun play() {
         Log.d("TempPlayer", "play")
-        val player = exoPlayer
+        onRequestAudioFocus?.invoke()
+        val player = activePlayer
         val track = _currentTrack.value
         if (player == null) {
             if (track != null) {
@@ -386,7 +486,8 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun pause() {
         Log.d("TempPlayer", "pause")
-        exoPlayer?.pause()
+        crossfadeController.cancelCrossfade()
+        activePlayer?.pause()
         _isPlaying.value = false
         stopPositionTracking()
         saveCurrentState()
@@ -394,16 +495,19 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun stop() {
         Log.d("TempPlayer", "stop")
-        exoPlayer?.stop()
+        crossfadeController.cancelCrossfade()
+        playerA?.stop()
+        playerB?.stop()
         _isPlaying.value = false
         stopPositionTracking()
         saveCurrentState()
     }
 
     fun seekTo(positionMs: Long) {
+        crossfadeController.cancelCrossfade()
         val clamped = positionMs.coerceIn(0, _duration.value.coerceAtLeast(0))
         _playbackPosition.value = clamped
-        exoPlayer?.seekTo(clamped)
+        activePlayer?.seekTo(clamped)
     }
 
     fun seekForward10s() {
@@ -414,12 +518,9 @@ class PlaybackManager private constructor(private val context: Context) {
         seekTo(_playbackPosition.value - 10_000L)
     }
 
-    /**
-     * Requirement:
-     * "Если трек не воспроизводится, при переключении на другой трек, этот другой трек не должен включаться сам."
-     */
     fun nextTrack(autoPlayIfPaused: Boolean = false) {
         Log.d("TempPlayer", "next")
+        crossfadeController.cancelCrossfade()
         val q = _queue.value
         if (q.isEmpty()) return
         val currentIdx = _queueIndex.value
@@ -440,6 +541,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun previousTrack(autoPlayIfPaused: Boolean = false) {
         Log.d("TempPlayer", "previous")
+        crossfadeController.cancelCrossfade()
         val q = _queue.value
         if (q.isEmpty()) return
         val currentIdx = _queueIndex.value
@@ -453,6 +555,79 @@ class PlaybackManager private constructor(private val context: Context) {
 
         val prevIdx = if (currentIdx - 1 >= 0) currentIdx - 1 else q.size - 1
         playTrackAtIndex(prevIdx, autoPlay = shouldPlay)
+    }
+
+    private fun getNextTrackIndex(): Int? {
+        val q = _queue.value
+        if (q.isEmpty()) return null
+        if (_repeatMode.value == RepeatMode.ONE) return null
+        val currentIdx = _queueIndex.value
+        return if (_isShuffle.value && q.size > 1) {
+            var randomIdx = (q.indices).random()
+            while (randomIdx == currentIdx) {
+                randomIdx = (q.indices).random()
+            }
+            randomIdx
+        } else {
+            if (currentIdx + 1 < q.size) {
+                currentIdx + 1
+            } else if (_repeatMode.value == RepeatMode.ALL) {
+                0
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun hasNextTrack(): Boolean {
+        return getNextTrackIndex() != null
+    }
+
+    private fun triggerCrossfadeTransition() {
+        val nextIdx = getNextTrackIndex() ?: return
+        val nextTrack = _queue.value.getOrNull(nextIdx) ?: return
+        val outgoingPlayer = activePlayer ?: return
+        val incomingPlayer = getOrCreateSecondaryPlayer()
+
+        Log.d("PlaybackManager", "Triggering crossfade from index $_queueIndex to $nextIdx: ${nextTrack.title}")
+
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(nextTrack.title)
+            .setArtist(nextTrack.artist)
+            .setAlbumTitle(nextTrack.album)
+            .setArtworkUri(nextTrack.albumArtUri)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setMediaId(nextTrack.id.toString())
+            .setUri(nextTrack.uri)
+            .setMediaMetadata(mediaMetadata)
+            .build()
+
+        incomingPlayer.setMediaItem(mediaItem)
+        incomingPlayer.prepare()
+        incomingPlayer.playWhenReady = true
+        incomingPlayer.play()
+
+        // Switch active index to incomingPlayer
+        activePlayerIndex = if (activePlayerIndex == 0) 1 else 0
+        _currentTrack.value = nextTrack
+        _queueIndex.value = nextIdx
+        _duration.value = nextTrack.duration
+        _playbackPosition.value = 0L
+
+        replayGainController.attachPlayer(incomingPlayer)
+        replayGainController.onTrackChanged(nextTrack)
+
+        onActivePlayerChanged?.invoke(incomingPlayer)
+
+        crossfadeController.startCrossfade(
+            outgoingPlayer = outgoingPlayer,
+            incomingPlayer = incomingPlayer,
+            onCrossfadeComplete = {
+                replayGainController.applyCurrentGain()
+            }
+        )
     }
 
     fun setRepeatMode(mode: RepeatMode) {
@@ -485,7 +660,6 @@ class PlaybackManager private constructor(private val context: Context) {
 
         if (minutes > 0) {
             val millis = minutes * 60 * 1000L
-            _sleepTimerRemainingMillis.value = millis
             sleepCountDownTimer = object : CountDownTimer(millis, 1000L) {
                 override fun onTick(millisUntilFinished: Long) {
                     _sleepTimerRemainingMillis.value = millisUntilFinished
@@ -537,6 +711,31 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    fun setReplayGainEnabled(enabled: Boolean) {
+        _isReplayGainEnabled.value = enabled
+        replayGainController.setEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setReplayGainEnabled(enabled)
+        }
+    }
+
+    fun setCrossfadeEnabled(enabled: Boolean) {
+        _isCrossfadeEnabled.value = enabled
+        crossfadeController.isEnabled = enabled
+        serviceScope.launch {
+            settingsDataStore.setCrossfadeEnabled(enabled)
+        }
+    }
+
+    fun setCrossfadeDurationSeconds(seconds: Int) {
+        val clamped = seconds.coerceIn(1, 10)
+        _crossfadeDurationSeconds.value = clamped
+        crossfadeController.durationSeconds = clamped
+        serviceScope.launch {
+            settingsDataStore.setCrossfadeDurationSeconds(clamped)
+        }
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
@@ -545,13 +744,22 @@ class PlaybackManager private constructor(private val context: Context) {
         positionProgressJob?.cancel()
         positionProgressJob = serviceScope.launch {
             while (isActive) {
-                exoPlayer?.let { player ->
+                activePlayer?.let { player ->
                     _playbackPosition.value = player.currentPosition
                     if (player.duration > 0 && _duration.value != player.duration) {
                         _duration.value = player.duration
                     }
+
+                    if (crossfadeController.shouldTriggerCrossfade(
+                            currentPositionMs = player.currentPosition,
+                            totalDurationMs = _duration.value,
+                            hasNextTrack = hasNextTrack()
+                        )
+                    ) {
+                        triggerCrossfadeTransition()
+                    }
                 }
-                delay(300)
+                delay(250)
             }
         }
     }
@@ -559,24 +767,18 @@ class PlaybackManager private constructor(private val context: Context) {
     private fun stopPositionTracking() {
         positionProgressJob?.cancel()
         positionProgressJob = null
-        exoPlayer?.let { player ->
+        activePlayer?.let { player ->
             _playbackPosition.value = player.currentPosition
         }
     }
 
     private fun saveCurrentState() {
-        val track = _currentTrack.value ?: return
+        val track = _currentTrack.value
         val pos = _playbackPosition.value
-        serviceScope.launch {
-            settingsDataStore.savePlaybackState(track.id, pos)
-        }
-    }
-
-    fun setReplayGainEnabled(enabled: Boolean) {
-        _isReplayGainEnabled.value = enabled
-        replayGainController.setEnabled(enabled)
-        serviceScope.launch {
-            settingsDataStore.setReplayGainEnabled(enabled)
+        if (track != null) {
+            serviceScope.launch {
+                settingsDataStore.savePlaybackState(track.id, pos)
+            }
         }
     }
 
