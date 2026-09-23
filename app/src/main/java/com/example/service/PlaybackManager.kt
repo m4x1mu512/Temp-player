@@ -2,7 +2,9 @@ package com.example.service
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.os.CountDownTimer
 import android.util.Log
 import androidx.annotation.OptIn
@@ -13,6 +15,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -21,6 +24,7 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import com.example.data.local.AppDatabase
 import com.example.data.local.SettingsDataStore
+import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.RepeatMode
@@ -37,6 +41,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 @OptIn(UnstableApi::class)
 class PlaybackManager private constructor(private val context: Context) {
@@ -120,6 +126,9 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _trackAudioSpecs = MutableStateFlow<AudioTrackSpecs?>(null)
+    val trackAudioSpecs: StateFlow<AudioTrackSpecs?> = _trackAudioSpecs.asStateFlow()
+
     val visualizerData: StateFlow<FloatArray> get() = visualizerController.rawFftData
     val visualizerWaveform: StateFlow<FloatArray> get() = visualizerController.waveformData
     val audioAmplitude: StateFlow<Float> get() = visualizerController.amplitude
@@ -135,6 +144,22 @@ class PlaybackManager private constructor(private val context: Context) {
     init {
         visualizerController.onRmsCalculated = { rms ->
             replayGainController.onAudioBufferRms(rms)
+        }
+
+        visualizerController.onAudioFormatDetected = { sampleRate, channels, encoding ->
+            val currentSpecs = _trackAudioSpecs.value
+            val bitDepth = when (encoding) {
+                C.ENCODING_PCM_24BIT -> 24
+                C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
+                else -> 16
+            }
+            if (currentSpecs != null) {
+                _trackAudioSpecs.value = currentSpecs.copy(
+                    sampleRateHz = if (sampleRate > 0) sampleRate else currentSpecs.sampleRateHz,
+                    channelCount = if (channels > 0) channels else currentSpecs.channelCount,
+                    bitDepth = if (bitDepth > 0) bitDepth else currentSpecs.bitDepth
+                )
+            }
         }
 
         serviceScope.launch {
@@ -195,6 +220,7 @@ class PlaybackManager private constructor(private val context: Context) {
                                 }
                             }
                         }
+                        updateAudioSpecsFromPlayer(player)
 
                         val currentSessionId = player.audioSessionId
                         if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
@@ -223,6 +249,14 @@ class PlaybackManager private constructor(private val context: Context) {
             val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
             if (isThisPlayerActive) {
                 replayGainController.onMetadata(metadata)
+            }
+        }
+
+        override fun onTracksChanged(tracks: Tracks) {
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            val player = if (isPlayerA) playerA else playerB
+            if (isThisPlayerActive && player != null) {
+                updateAudioSpecsFromPlayer(player)
             }
         }
 
@@ -393,6 +427,7 @@ class PlaybackManager private constructor(private val context: Context) {
         _currentTrack.value = track
         _duration.value = track.duration
         _playbackPosition.value = 0
+        updateAudioSpecsForTrack(track, activePlayer)
 
         val player = activePlayer
         if (player == null) {
@@ -621,6 +656,7 @@ class PlaybackManager private constructor(private val context: Context) {
         _queueIndex.value = nextIdx
         _duration.value = nextTrack.duration
         _playbackPosition.value = 0L
+        updateAudioSpecsForTrack(nextTrack, incomingPlayer)
 
         replayGainController.attachPlayer(incomingPlayer)
         replayGainController.onTrackChanged(nextTrack)
@@ -785,6 +821,149 @@ class PlaybackManager private constructor(private val context: Context) {
             serviceScope.launch {
                 settingsDataStore.savePlaybackState(track.id, pos)
             }
+        }
+    }
+
+    private fun updateAudioSpecsFromPlayer(player: ExoPlayer?) {
+        val track = _currentTrack.value ?: return
+        val audioFormat = player?.audioFormat
+        val currentSpecs = _trackAudioSpecs.value ?: buildInitialSpecs(track)
+
+        var sampleRate = audioFormat?.sampleRate ?: 0
+        if (sampleRate <= 0) sampleRate = visualizerController.getCurrentSampleRate()
+        if (sampleRate <= 0) sampleRate = currentSpecs.sampleRateHz
+
+        var bitrateKbps = if ((audioFormat?.bitrate ?: 0) > 0) audioFormat!!.bitrate / 1000 else currentSpecs.bitrateKbps
+        var channels = if ((audioFormat?.channelCount ?: 0) > 0) audioFormat!!.channelCount else visualizerController.getCurrentChannelCount()
+        if (channels <= 0) channels = currentSpecs.channelCount
+
+        val encoding = visualizerController.getCurrentEncoding()
+        val bitDepth = when (encoding) {
+            C.ENCODING_PCM_24BIT -> 24
+            C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
+            else -> currentSpecs.bitDepth
+        }
+
+        val format = detectFormat(track, audioFormat?.sampleMimeType)
+        val isLossless = format in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
+
+        _trackAudioSpecs.value = AudioTrackSpecs(
+            format = format,
+            sampleRateHz = sampleRate,
+            bitrateKbps = bitrateKbps,
+            bitDepth = bitDepth,
+            channelCount = channels,
+            isLossless = isLossless
+        )
+    }
+
+    private fun detectFormat(track: Track, sampleMimeType: String? = null): String {
+        sampleMimeType?.let { mime ->
+            when {
+                mime.contains("flac", ignoreCase = true) -> return "FLAC"
+                mime.contains("mpeg", ignoreCase = true) || mime.contains("mp3", ignoreCase = true) -> return "MP3"
+                mime.contains("mp4a", ignoreCase = true) || mime.contains("aac", ignoreCase = true) -> return "AAC"
+                mime.contains("wav", ignoreCase = true) || mime.contains("raw", ignoreCase = true) -> return "WAV"
+                mime.contains("ogg", ignoreCase = true) || mime.contains("vorbis", ignoreCase = true) -> return "OGG"
+                mime.contains("opus", ignoreCase = true) -> return "OPUS"
+                mime.contains("alac", ignoreCase = true) -> return "ALAC"
+                mime.contains("wma", ignoreCase = true) -> return "WMA"
+            }
+        }
+
+        val raw = if (track.path.isNotBlank()) track.path else track.uriString
+        val ext = raw.substringBefore('?').substringAfterLast('.', "").uppercase()
+        if (ext.isNotBlank() && ext.length in 2..5) {
+            return ext
+        }
+
+        return "MP3"
+    }
+
+    private fun buildInitialSpecs(track: Track): AudioTrackSpecs {
+        val format = detectFormat(track)
+        val isLossless = format in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
+
+        var calcBitrate = 0
+        if (track.size > 0 && track.duration > 0) {
+            calcBitrate = ((track.size * 8L) / track.duration).toInt()
+        }
+        if (calcBitrate !in 32..9216) {
+            calcBitrate = if (isLossless) (if (format == "WAV") 1411 else 850) else 320
+        }
+
+        val sampleRate = if (isLossless && (format == "FLAC" || format == "WAV")) 48000 else 44100
+        val bitDepth = if (isLossless && calcBitrate > 2000) 24 else 16
+
+        return AudioTrackSpecs(
+            format = format,
+            sampleRateHz = sampleRate,
+            bitrateKbps = calcBitrate,
+            bitDepth = bitDepth,
+            channelCount = 2,
+            isLossless = isLossless
+        )
+    }
+
+    private fun updateAudioSpecsForTrack(track: Track, player: ExoPlayer?) {
+        val initial = buildInitialSpecs(track)
+        _trackAudioSpecs.value = initial
+
+        serviceScope.launch(Dispatchers.IO) {
+            var sampleRate = initial.sampleRateHz
+            var bitrate = initial.bitrateKbps
+            var detectedFormat = initial.format
+            var isLossless = initial.isLossless
+
+            try {
+                val mmr = MediaMetadataRetriever()
+                if (track.path.isNotBlank() && File(track.path).exists()) {
+                    mmr.setDataSource(track.path)
+                } else {
+                    mmr.setDataSource(context, track.uri)
+                }
+
+                val mmrBitrate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()
+                if (mmrBitrate != null && mmrBitrate > 0) {
+                    bitrate = mmrBitrate / 1000
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val mmrSampleRate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)?.toIntOrNull()
+                    if (mmrSampleRate != null && mmrSampleRate > 0) {
+                        sampleRate = mmrSampleRate
+                    }
+                }
+
+                val mime = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                if (!mime.isNullOrBlank()) {
+                    detectedFormat = detectFormat(track, mime)
+                    isLossless = detectedFormat in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
+                }
+
+                mmr.release()
+            } catch (e: Exception) {
+                // Fallback to initial
+            }
+
+            val playerFormat = withContext(Dispatchers.Main) { player?.audioFormat }
+            if (playerFormat != null) {
+                if (playerFormat.sampleRate > 0) sampleRate = playerFormat.sampleRate
+                if (playerFormat.bitrate > 0) bitrate = playerFormat.bitrate / 1000
+                if (!playerFormat.sampleMimeType.isNullOrBlank()) {
+                    detectedFormat = detectFormat(track, playerFormat.sampleMimeType)
+                    isLossless = detectedFormat in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
+                }
+            }
+
+            _trackAudioSpecs.value = AudioTrackSpecs(
+                format = detectedFormat,
+                sampleRateHz = sampleRate,
+                bitrateKbps = bitrate,
+                bitDepth = if (isLossless && (sampleRate > 48000 || bitrate > 2000)) 24 else 16,
+                channelCount = playerFormat?.channelCount ?: 2,
+                isLossless = isLossless
+            )
         }
     }
 

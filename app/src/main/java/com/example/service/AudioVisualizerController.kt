@@ -81,12 +81,18 @@ class AudioVisualizerController(
     private var frameLoopJob: Job? = null
 
     var onRmsCalculated: ((Float) -> Unit)? = null
+    var onAudioFormatDetected: ((sampleRateHz: Int, channelCount: Int, encoding: Int) -> Unit)? = null
+
+    fun getCurrentSampleRate(): Int = currentSampleRate
+    fun getCurrentChannelCount(): Int = currentChannelCount
+    fun getCurrentEncoding(): Int = currentEncoding
 
     val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
         override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
             currentSampleRate = if (sampleRateHz > 0) sampleRateHz else 44100
             currentChannelCount = channelCount.coerceAtLeast(1)
             currentEncoding = encoding
+            onAudioFormatDetected?.invoke(currentSampleRate, currentChannelCount, currentEncoding)
         }
 
         override fun handleBuffer(buffer: ByteBuffer) {

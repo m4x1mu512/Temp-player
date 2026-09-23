@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.MiniPlayerBgMode
@@ -143,6 +144,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Playback States from Manager
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
+    val trackAudioSpecs: StateFlow<AudioTrackSpecs?> = playbackManager.trackAudioSpecs
     val currentQueue: StateFlow<List<Track>> = playbackManager.queue
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
     val playbackPosition: StateFlow<Long> = playbackManager.playbackPosition

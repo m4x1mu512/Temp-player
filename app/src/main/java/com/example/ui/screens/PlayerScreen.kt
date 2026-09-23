@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import com.example.ui.theme.FavoriteRed
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
@@ -64,6 +66,8 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -111,6 +115,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.R
+import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.RepeatMode
 import com.example.data.model.Track
 import com.example.ui.components.AddToPlaylistDialog
@@ -134,6 +139,7 @@ fun PlayerScreen(
     modifier: Modifier = Modifier
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
+    val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
@@ -190,6 +196,21 @@ fun PlayerScreen(
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
+
+    val audioSpecs = trackAudioSpecs ?: remember(currentTrack) {
+        currentTrack?.let { t ->
+            val ext = (if (t.path.isNotBlank()) t.path else t.uriString).substringBefore('?').substringAfterLast('.', "").uppercase().ifEmpty { "MP3" }
+            val calcBitrate = if (t.size > 0 && t.duration > 0) ((t.size * 8L) / t.duration).toInt().coerceIn(32, 9216) else 320
+            AudioTrackSpecs(
+                format = ext,
+                sampleRateHz = 44100,
+                bitrateKbps = calcBitrate,
+                bitDepth = 16,
+                channelCount = 2,
+                isLossless = ext in listOf("FLAC", "WAV", "ALAC", "AIFF")
+            )
+        }
+    }
 
     val colorScheme = rememberPlayerColors(
         bgMode = miniPlayerBgMode,
@@ -791,6 +812,17 @@ fun PlayerScreen(
                                     )
                                 }
                             }
+
+                            // Characteristics of the played track (kHz, kbps, format) in landscape
+                            if (audioSpecs != null) {
+                                AudioSpecsBadge(
+                                    specs = audioSpecs,
+                                    track = track,
+                                    modifier = Modifier
+                                        .padding(top = 4.dp)
+                                        .testTag("player_audio_specs_landscape")
+                                )
+                            }
                         }
                     }
                 } else {
@@ -798,7 +830,7 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = if (isCompact) 16.dp else 24.dp)
-                            .padding(bottom = if (isCompact) 6.dp else 12.dp)
+                            .padding(top = 2.dp, bottom = if (isCompact) 4.dp else 8.dp)
                             .pointerInput(Unit) {
                                 detectDragGestures(
                                     onDragStart = {
@@ -852,14 +884,17 @@ fun PlayerScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .padding(vertical = if (isCompact) 2.dp else 6.dp),
+                                .padding(vertical = if (isCompact) 2.dp else 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
                         BoxWithConstraints(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            val artSize = minOf(maxWidth * 0.90f, maxHeight * 0.96f).coerceAtLeast(100.dp)
+                            val artSize = minOf(
+                                maxWidth * (if (isCompact) 0.68f else if (isMedium) 0.73f else 0.78f),
+                                maxHeight * (if (isCompact) 0.70f else if (isMedium) 0.75f else 0.80f)
+                            ).coerceAtLeast(90.dp)
 
                             Box(
                                 modifier = Modifier
@@ -921,7 +956,7 @@ fun PlayerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isCompact) 36.dp else if (isMedium) 44.dp else 52.dp)
+                                .height(if (isCompact) 30.dp else if (isMedium) 36.dp else 42.dp)
                                 .padding(vertical = 1.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
@@ -1127,7 +1162,7 @@ fun PlayerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = if (isCompact) 2.dp else 6.dp),
+                            .padding(bottom = if (isCompact) 1.dp else 3.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1210,6 +1245,17 @@ fun PlayerScreen(
                             )
                         }
                     }
+
+                    // Characteristics of the played track (kHz, kbps, format)
+                    if (audioSpecs != null) {
+                        AudioSpecsBadge(
+                            specs = audioSpecs,
+                            track = track,
+                            modifier = Modifier
+                                .padding(top = if (isCompact) 2.dp else 4.dp, bottom = if (isCompact) 2.dp else 4.dp)
+                                .testTag("player_audio_specs_badge")
+                        )
+                    }
                 }
                 }
             }
@@ -1266,5 +1312,178 @@ fun PlayerScreen(
             onDismiss = { showCreatePlaylistDialog = false }
         )
     }
+    }
+}
+
+@Composable
+fun AudioSpecsBadge(
+    specs: AudioTrackSpecs,
+    track: Track,
+    modifier: Modifier = Modifier
+) {
+    var showDetailsDialog by remember { mutableStateOf(false) }
+
+    Surface(
+        onClick = { showDetailsDialog = true },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = modifier.testTag("audio_specs_badge")
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Format chip (MP3, FLAC, AAC, WAV, etc.)
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = if (specs.isLossless) NeonCyan.copy(alpha = 0.22f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                border = BorderStroke(
+                    1.dp,
+                    if (specs.isLossless) NeonCyan.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
+                )
+            ) {
+                Text(
+                    text = specs.format.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (specs.isLossless) NeonCyan else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+
+            // Sample rate in kHz (e.g. 44.1 kHz, 48 kHz, 96 kHz)
+            Text(
+                text = specs.sampleRateFormatted,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+
+            // Bitrate in kbps (e.g. 320 kbps, 1411 kbps)
+            Text(
+                text = specs.bitrateFormatted.ifEmpty { "320 kbps" },
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (specs.bitDepthFormatted.isNotEmpty()) {
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+                Text(
+                    text = specs.bitDepthFormatted,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = "Характеристики звука",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+
+    if (showDetailsDialog) {
+        AudioSpecsDetailsDialog(
+            specs = specs,
+            track = track,
+            onDismiss = { showDetailsDialog = false }
+        )
+    }
+}
+
+@Composable
+fun AudioSpecsDetailsDialog(
+    specs: AudioTrackSpecs,
+    track: Track,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "Характеристики звука",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                AudioSpecRow(label = "Формат / Кодек", value = specs.format.uppercase() + if (specs.isLossless) " (Lossless)" else "")
+                AudioSpecRow(label = "Частота дискретизации", value = "${specs.sampleRateHz} Гц (${specs.sampleRateFormatted})")
+                AudioSpecRow(label = "Битрейт", value = "${specs.bitrateKbps} кбит/с")
+                AudioSpecRow(label = "Разрядность", value = "${specs.bitDepth} бит")
+                AudioSpecRow(label = "Каналы", value = "${specs.channelCount} (${specs.channelsFormatted})")
+                if (track.size > 0) {
+                    val sizeMb = track.size / (1024.0 * 1024.0)
+                    AudioSpecRow(label = "Размер файла", value = String.format(java.util.Locale.US, "%.2f МБ", sizeMb))
+                }
+                if (track.path.isNotBlank()) {
+                    AudioSpecRow(label = "Файл", value = track.path.substringAfterLast('/'))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Закрыть")
+            }
+        }
+    )
+}
+
+@Composable
+private fun AudioSpecRow(
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1.3f)
+        )
     }
 }

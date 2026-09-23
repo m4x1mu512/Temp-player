@@ -33,6 +33,41 @@ data class Track(
     }
 }
 
+data class AudioTrackSpecs(
+    val format: String = "MP3",
+    val sampleRateHz: Int = 44100,
+    val bitrateKbps: Int = 320,
+    val bitDepth: Int = 16,
+    val channelCount: Int = 2,
+    val isLossless: Boolean = false
+) {
+    val sampleRateFormatted: String
+        get() {
+            if (sampleRateHz <= 0) return "44.1 kHz"
+            val khz = sampleRateHz / 1000.0
+            return if (sampleRateHz % 1000 == 0) {
+                "${sampleRateHz / 1000} kHz"
+            } else {
+                String.format(java.util.Locale.US, "%.1f kHz", khz)
+            }
+        }
+
+    val bitrateFormatted: String
+        get() = if (bitrateKbps > 0) "$bitrateKbps kbps" else ""
+
+    val channelsFormatted: String
+        get() = when (channelCount) {
+            1 -> "Mono"
+            2 -> "Stereo"
+            6 -> "5.1"
+            8 -> "7.1"
+            else -> if (channelCount > 2) "$channelCount ch" else "Stereo"
+        }
+
+    val bitDepthFormatted: String
+        get() = if (bitDepth > 0) "$bitDepth-bit" else ""
+}
+
 data class Playlist(
     val id: Long = 0,
     val name: String,
