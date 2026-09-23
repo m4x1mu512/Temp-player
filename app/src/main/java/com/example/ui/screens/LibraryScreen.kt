@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.background
@@ -137,6 +138,12 @@ fun LibraryScreen(
     // Selected folder / artist / album filter drilldown
     var selectedGroupTitle by remember { mutableStateOf<String?>(null) }
     var selectedGroupTracks by remember { mutableStateOf<List<Track>?>(null) }
+
+    // Intercept back gesture when a folder (or any category group) is open to return to the all-folders overview
+    BackHandler(enabled = selectedGroupTitle != null) {
+        selectedGroupTitle = null
+        selectedGroupTracks = null
+    }
 
     val coroutineScope = rememberCoroutineScope()
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
