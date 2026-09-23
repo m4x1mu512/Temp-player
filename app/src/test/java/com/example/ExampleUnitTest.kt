@@ -81,5 +81,49 @@ class ExampleUnitTest {
             )
         )
     }
+
+    @Test
+    fun `test audio visualizer controller processes 16bit and float buffers without permissions`() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val visualizer = com.example.service.AudioVisualizerController(scope)
+
+        assertEquals(32, visualizer.rawFftData.value.size)
+        assertEquals(32, visualizer.waveformData.value.size)
+
+        // Config band count update
+        visualizer.updateConfig(bands = 48, sens = 1.5f)
+        assertEquals(48, visualizer.rawFftData.value.size)
+        assertEquals(48, visualizer.waveformData.value.size)
+
+        // Playback state
+        visualizer.onPlaybackStateChanged(true)
+
+        // Test 16-bit PCM buffer
+        visualizer.audioBufferSink.flush(44100, 2, androidx.media3.common.C.ENCODING_PCM_16BIT)
+        val byteBuf16 = java.nio.ByteBuffer.allocateDirect(1024).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val shortBuf = byteBuf16.asShortBuffer()
+        for (i in 0 until 512) {
+            shortBuf.put((kotlin.math.sin(i * 0.1) * 16000).toInt().toShort())
+        }
+        visualizer.audioBufferSink.handleBuffer(byteBuf16)
+
+        assertTrue(visualizer.amplitude.value >= 0f)
+        assertEquals(48, visualizer.rawFftData.value.size)
+
+        // Test 32-bit Float PCM buffer
+        visualizer.audioBufferSink.flush(48000, 2, androidx.media3.common.C.ENCODING_PCM_FLOAT)
+        val byteBufFloat = java.nio.ByteBuffer.allocateDirect(2048).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val floatBuf = byteBufFloat.asFloatBuffer()
+        for (i in 0 until 512) {
+            floatBuf.put((kotlin.math.sin(i * 0.15) * 0.8).toFloat())
+        }
+        visualizer.audioBufferSink.handleBuffer(byteBufFloat)
+
+        assertTrue(visualizer.amplitude.value >= 0f)
+        assertEquals(48, visualizer.rawFftData.value.size)
+
+        // Clean release
+        visualizer.release()
+    }
 }
 

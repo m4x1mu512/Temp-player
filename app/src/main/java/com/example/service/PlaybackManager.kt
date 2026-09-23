@@ -424,11 +424,13 @@ class PlaybackManager private constructor(private val context: Context) {
         if (startPaused) {
             player.playWhenReady = false
             _isPlaying.value = false
+            visualizerController.onPlaybackStateChanged(false)
         } else {
             onRequestAudioFocus?.invoke()
             player.playWhenReady = true
             player.play()
             _isPlaying.value = true
+            visualizerController.onPlaybackStateChanged(true)
         }
     }
 
@@ -472,6 +474,7 @@ class PlaybackManager private constructor(private val context: Context) {
             player.seekTo(0)
             player.play()
             _isPlaying.value = true
+            visualizerController.onPlaybackStateChanged(true)
         } else if (player.currentMediaItem == null && track != null) {
             val resumePos = _playbackPosition.value
             executePlay(player, track, startPaused = false)
@@ -481,6 +484,7 @@ class PlaybackManager private constructor(private val context: Context) {
         } else {
             player.play()
             _isPlaying.value = true
+            visualizerController.onPlaybackStateChanged(true)
         }
     }
 
@@ -489,6 +493,7 @@ class PlaybackManager private constructor(private val context: Context) {
         crossfadeController.cancelCrossfade()
         activePlayer?.pause()
         _isPlaying.value = false
+        visualizerController.onPlaybackStateChanged(false)
         stopPositionTracking()
         saveCurrentState()
     }
@@ -499,6 +504,7 @@ class PlaybackManager private constructor(private val context: Context) {
         playerA?.stop()
         playerB?.stop()
         _isPlaying.value = false
+        visualizerController.onPlaybackStateChanged(false)
         stopPositionTracking()
         saveCurrentState()
     }

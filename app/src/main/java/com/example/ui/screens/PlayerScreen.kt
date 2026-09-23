@@ -505,7 +505,7 @@ fun PlayerScreen(
                                     contentAlignment = Alignment.Center,
                                     modifier = Modifier
                                         .fillMaxWidth(0.92f)
-                                        .height(34.dp)
+                                        .height(42.dp)
                                         .padding(top = 4.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { viewModel.cycleVisualizerMode() }
@@ -921,7 +921,7 @@ fun PlayerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(if (isCompact) 28.dp else if (isMedium) 38.dp else 48.dp)
+                                .height(if (isCompact) 36.dp else if (isMedium) 44.dp else 52.dp)
                                 .padding(vertical = 1.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
