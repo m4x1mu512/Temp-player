@@ -345,7 +345,7 @@ class PlaybackManager private constructor(private val context: Context) {
         _isPlaying.value = false
     }
 
-    private fun createSecondaryPlayer(): ExoPlayer {
+    private fun createSecondaryPlayer(isPlayerB: Boolean): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -369,15 +369,25 @@ class PlaybackManager private constructor(private val context: Context) {
             .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
-        player.addListener(playerBListener)
+        if (isPlayerB) {
+            player.addListener(playerBListener)
+        } else {
+            player.addListener(playerAListener)
+        }
         return player
     }
 
     private fun getOrCreateSecondaryPlayer(): ExoPlayer {
-        playerB?.let { return it }
-        val player = createSecondaryPlayer()
-        playerB = player
-        return player
+        val existing = secondaryPlayer
+        if (existing != null) return existing
+        val isForPlayerB = (activePlayerIndex == 0)
+        val newPlayer = createSecondaryPlayer(isPlayerB = isForPlayerB)
+        if (isForPlayerB) {
+            playerB = newPlayer
+        } else {
+            playerA = newPlayer
+        }
+        return newPlayer
     }
 
     private fun handleTrackEnded() {
@@ -435,10 +445,19 @@ class PlaybackManager private constructor(private val context: Context) {
             startServiceIfNeeded()
             return
         }
+        // Stop secondary player to prevent concurrent playback
+        secondaryPlayer?.let { sec ->
+            try {
+                sec.stop()
+                sec.clearMediaItems()
+                sec.volume = 1f
+            } catch (_: Exception) {}
+        }
         executePlay(player, track, startPaused)
     }
 
     private fun executePlay(player: ExoPlayer, track: Track, startPaused: Boolean) {
+        player.volume = 1f
         val mediaMetadata = MediaMetadata.Builder()
             .setTitle(track.title)
             .setArtist(track.artist)
@@ -467,6 +486,7 @@ class PlaybackManager private constructor(private val context: Context) {
             _isPlaying.value = true
             visualizerController.onPlaybackStateChanged(true)
         }
+        onActivePlayerChanged?.invoke(player)
     }
 
     fun playTrackAtIndex(index: Int, autoPlay: Boolean) {
@@ -527,6 +547,7 @@ class PlaybackManager private constructor(private val context: Context) {
         Log.d("TempPlayer", "pause")
         crossfadeController.cancelCrossfade()
         activePlayer?.pause()
+        secondaryPlayer?.pause()
         _isPlaying.value = false
         visualizerController.onPlaybackStateChanged(false)
         stopPositionTracking()
@@ -630,6 +651,11 @@ class PlaybackManager private constructor(private val context: Context) {
         val outgoingPlayer = activePlayer ?: return
         val incomingPlayer = getOrCreateSecondaryPlayer()
 
+        if (outgoingPlayer === incomingPlayer) {
+            Log.w("PlaybackManager", "Crossfade aborted: active and secondary players are the same instance.")
+            return
+        }
+
         Log.d("PlaybackManager", "Triggering crossfade from index $_queueIndex to $nextIdx: ${nextTrack.title}")
 
         val mediaMetadata = MediaMetadata.Builder()
@@ -645,6 +671,8 @@ class PlaybackManager private constructor(private val context: Context) {
             .setMediaMetadata(mediaMetadata)
             .build()
 
+        // Prepare incoming player silently for equal-power fade-in
+        incomingPlayer.volume = 0f
         incomingPlayer.setMediaItem(mediaItem)
         incomingPlayer.prepare()
         incomingPlayer.playWhenReady = true

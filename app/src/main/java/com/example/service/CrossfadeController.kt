@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -36,8 +37,8 @@ class CrossfadeController(
     val durationMs: Long
         get() = durationSeconds * 1000L
 
-    var isCrossfading: Boolean = false
-        private set
+    val isCrossfading: Boolean
+        get() = crossfadeJob?.isActive == true
 
     private var crossfadeJob: Job? = null
     private var fadingOutPlayer: ExoPlayer? = null
@@ -54,6 +55,8 @@ class CrossfadeController(
         if (!isEnabled || isCrossfading || !hasNextTrack) return false
         // Track must be comfortably longer than the crossfade window
         if (totalDurationMs < durationMs + 2000L) return false
+        // Never trigger crossfade during the first portion of the track
+        if (currentPositionMs < durationMs) return false
 
         val remainingMs = totalDurationMs - currentPositionMs
         return remainingMs in 1..durationMs
@@ -68,8 +71,15 @@ class CrossfadeController(
         incomingPlayer: ExoPlayer,
         onCrossfadeComplete: () -> Unit
     ) {
+        if (outgoingPlayer === incomingPlayer) {
+            Log.w(TAG, "Outgoing and incoming players are identical! Aborting crossfade.")
+            outgoingPlayer.volume = 1f
+            onCrossfadeComplete()
+            return
+        }
+
         cancelCrossfade()
-        isCrossfading = true
+
         fadingOutPlayer = outgoingPlayer
         fadingInPlayer = incomingPlayer
 
@@ -83,7 +93,7 @@ class CrossfadeController(
             try {
                 for (step in 1..totalSteps) {
                     delay(STEP_INTERVAL_MS)
-                    if (!isActive || !isCrossfading) break
+                    if (!isActive) break
 
                     val progress = step.toFloat() / totalSteps
                     // Equal-power volume curve
@@ -96,19 +106,22 @@ class CrossfadeController(
             } catch (e: Exception) {
                 Log.d(TAG, "Crossfade interrupted: ${e.message}")
             } finally {
-                // Ensure players end in valid volume states
-                try {
-                    outgoingPlayer.volume = 1f
-                    outgoingPlayer.stop()
-                } catch (_: Exception) {}
-                try {
-                    incomingPlayer.volume = 1f
-                } catch (_: Exception) {}
+                // Only clean up if this was still the active crossfade job
+                if (crossfadeJob === coroutineContext[Job]) {
+                    try {
+                        outgoingPlayer.volume = 1f
+                        outgoingPlayer.stop()
+                        outgoingPlayer.clearMediaItems()
+                    } catch (_: Exception) {}
+                    try {
+                        incomingPlayer.volume = 1f
+                    } catch (_: Exception) {}
 
-                fadingOutPlayer = null
-                fadingInPlayer = null
-                isCrossfading = false
-                onCrossfadeComplete()
+                    fadingOutPlayer = null
+                    fadingInPlayer = null
+                    crossfadeJob = null
+                    onCrossfadeComplete()
+                }
             }
         }
     }
@@ -117,19 +130,19 @@ class CrossfadeController(
      * Cancels any active crossfade immediately and restores normal volumes.
      */
     fun cancelCrossfade() {
-        if (!isCrossfading && crossfadeJob == null) return
-        crossfadeJob?.cancel()
+        val job = crossfadeJob ?: return
         crossfadeJob = null
+        job.cancel()
         try {
             fadingOutPlayer?.volume = 1f
             fadingOutPlayer?.stop()
+            fadingOutPlayer?.clearMediaItems()
         } catch (_: Exception) {}
         try {
             fadingInPlayer?.volume = 1f
         } catch (_: Exception) {}
         fadingOutPlayer = null
         fadingInPlayer = null
-        isCrossfading = false
     }
 
     fun release() {
