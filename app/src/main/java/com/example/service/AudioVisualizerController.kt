@@ -94,14 +94,22 @@ class AudioVisualizerController(
 
     val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
         override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
-            currentSampleRate = if (sampleRateHz > 0) sampleRateHz else 44100
-            currentChannelCount = channelCount.coerceAtLeast(1)
-            currentEncoding = if (encoding != C.ENCODING_INVALID) encoding else C.ENCODING_PCM_16BIT
-            onAudioFormatDetected?.invoke(currentSampleRate, currentChannelCount, currentEncoding)
+            try {
+                currentSampleRate = if (sampleRateHz > 0) sampleRateHz else 44100
+                currentChannelCount = channelCount.coerceAtLeast(1)
+                currentEncoding = if (encoding != C.ENCODING_INVALID) encoding else C.ENCODING_PCM_16BIT
+                onAudioFormatDetected?.invoke(currentSampleRate, currentChannelCount, currentEncoding)
+            } catch (t: Throwable) {
+                // Buffer safety
+            }
         }
 
         override fun handleBuffer(buffer: ByteBuffer) {
-            processAudioBuffer(buffer)
+            try {
+                processAudioBuffer(buffer)
+            } catch (t: Throwable) {
+                // Buffer safety
+            }
         }
     }
 
@@ -281,7 +289,8 @@ class AudioVisualizerController(
             val pcmMono = FloatArray(windowSize)
 
             while (isActive) {
-                val now = System.currentTimeMillis()
+                try {
+                    val now = System.currentTimeMillis()
                 val bands = currentBandCount
                 val sens = sensitivity
 
@@ -450,8 +459,11 @@ class AudioVisualizerController(
                         }
                     }
                 }
+            } catch (t: Throwable) {
+                // Calculation safety
+            }
 
-                delay(16)
+            delay(16)
             }
         }
     }

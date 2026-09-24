@@ -2,6 +2,8 @@ package com.example.service
 
 import android.content.Context
 import android.media.audiofx.LoudnessEnhancer
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.media3.common.Metadata
 import androidx.media3.common.util.UnstableApi
@@ -21,6 +23,7 @@ class ReplayGainController(private val context: Context) {
         private const val MAX_GAIN_DB = 8.0f
     }
 
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var exoPlayer: ExoPlayer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var currentAudioSessionId: Int = 0
@@ -135,60 +138,100 @@ class ReplayGainController(private val context: Context) {
     }
 
     fun onAudioBufferRms(rms: Float) {
-        if (!isEnabled || hasStaticTag) return
-        if (rms < 0.02f) return // Skip silence or quiet intro/outro
+        try {
+            if (!isEnabled || hasStaticTag) return
+            if (rms < 0.02f) return // Skip silence or quiet intro/outro
 
-        smoothedRms = smoothedRms * 0.95f + rms * 0.05f
-        bufferCount++
+            smoothedRms = smoothedRms * 0.95f + rms * 0.05f
+            bufferCount++
 
-        // After analyzing initial frames, adjust dynamic gain smoothly
-        if (bufferCount >= 15) {
-            val ratio = TARGET_RMS / max(0.02f, smoothedRms)
-            val targetDb = (20.0 * log10(ratio.toDouble())).toFloat().coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
-            // Smoothly move dynamicGainDb towards target
-            dynamicGainDb = dynamicGainDb * 0.90f + targetDb * 0.10f
-            applyCurrentGain()
+            // After analyzing initial frames, adjust dynamic gain smoothly
+            if (bufferCount >= 15) {
+                val ratio = TARGET_RMS / max(0.02f, smoothedRms)
+                val targetDb = (20.0 * log10(ratio.toDouble())).toFloat().coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+                // Smoothly move dynamicGainDb towards target
+                dynamicGainDb = dynamicGainDb * 0.90f + targetDb * 0.10f
+                applyCurrentGain()
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Error calculating dynamic gain: ${t.message}")
         }
     }
 
     fun applyCurrentGain() {
-        if (!isEnabled) {
-            setUnityGain()
-            return
-        }
-
-        val targetGainDb = if (hasStaticTag) {
-            staticGainDb.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            applyCurrentGainInternal()
         } else {
-            dynamicGainDb.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
-        }
-
-        currentAppliedGainDb = targetGainDb
-
-        if (targetGainDb < 0f) {
-            // Attenuation: use player volume, set loudness boost to 0
-            try {
-                loudnessEnhancer?.setTargetGain(0)
-            } catch (_: Exception) {}
-
-            val volumeFactor = 10.0.pow(targetGainDb / 20.0).toFloat().coerceIn(0.1f, 1.0f)
-            exoPlayer?.volume = volumeFactor
-        } else {
-            // Amplification: player volume full, use loudness enhancer digital pre-gain
-            exoPlayer?.volume = 1.0f
-
-            val boostMb = (targetGainDb * 100f).toInt().coerceIn(0, 800) // 100 mB = 1 dB
-            try {
-                loudnessEnhancer?.setTargetGain(boostMb)
-            } catch (e: Exception) {
-                Log.w(TAG, "Error applying targetGain to LoudnessEnhancer: ${e.message}")
+            mainHandler.post {
+                applyCurrentGainInternal()
             }
         }
     }
 
-    private fun setUnityGain() {
-        exoPlayer?.volume = 1.0f
+    private fun applyCurrentGainInternal() {
+        if (!isEnabled) {
+            setUnityGainInternal()
+            return
+        }
+
         try {
+            val targetGainDb = if (hasStaticTag) {
+                staticGainDb.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+            } else {
+                dynamicGainDb.coerceIn(MIN_GAIN_DB, MAX_GAIN_DB)
+            }
+
+            currentAppliedGainDb = targetGainDb
+
+            if (targetGainDb < 0f) {
+                // Attenuation: use player volume, set loudness boost to 0
+                try {
+                    loudnessEnhancer?.setTargetGain(0)
+                } catch (_: Exception) {}
+
+                val volumeFactor = 10.0.pow(targetGainDb / 20.0).toFloat().coerceIn(0.1f, 1.0f)
+                exoPlayer?.let { player ->
+                    if (player.volume != volumeFactor) {
+                        player.volume = volumeFactor
+                    }
+                }
+            } else {
+                // Amplification: player volume full, use loudness enhancer digital pre-gain
+                exoPlayer?.let { player ->
+                    if (player.volume != 1.0f) {
+                        player.volume = 1.0f
+                    }
+                }
+
+                val boostMb = (targetGainDb * 100f).toInt().coerceIn(0, 800) // 100 mB = 1 dB
+                try {
+                    loudnessEnhancer?.setTargetGain(boostMb)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error applying targetGain to LoudnessEnhancer: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error applying current gain: ${e.message}")
+        }
+    }
+
+    private fun setUnityGain() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            setUnityGainInternal()
+        } else {
+            mainHandler.post {
+                setUnityGainInternal()
+            }
+        }
+    }
+
+    private fun setUnityGainInternal() {
+        try {
+            exoPlayer?.let { player ->
+                if (player.volume != 1.0f) {
+                    player.volume = 1.0f
+                }
+            }
             loudnessEnhancer?.setTargetGain(0)
         } catch (_: Exception) {}
         currentAppliedGainDb = 0f

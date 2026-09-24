@@ -146,11 +146,19 @@ class PlaybackManager private constructor(private val context: Context) {
 
     init {
         visualizerController.onRmsCalculated = { rms ->
-            replayGainController.onAudioBufferRms(rms)
+            serviceScope.launch {
+                try {
+                    replayGainController.onAudioBufferRms(rms)
+                } catch (t: Throwable) {
+                    Log.w("PlaybackManager", "Error in onAudioBufferRms: ${t.message}")
+                }
+            }
         }
 
         visualizerController.onAudioFormatDetected = { sampleRate, channels, encoding ->
-            val currentSpecs = _trackAudioSpecs.value
+            serviceScope.launch {
+                try {
+                    val currentSpecs = _trackAudioSpecs.value
             val bitDepth = when (encoding) {
                 C.ENCODING_PCM_24BIT -> 24
                 C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
@@ -163,7 +171,11 @@ class PlaybackManager private constructor(private val context: Context) {
                     bitDepth = if (bitDepth > 0) bitDepth else currentSpecs.bitDepth
                 )
             }
+        } catch (t: Throwable) {
+            Log.w("PlaybackManager", "Error in onAudioFormatDetected: ${t.message}")
         }
+    }
+}
 
         serviceScope.launch {
             // Restore settings
@@ -366,7 +378,8 @@ class PlaybackManager private constructor(private val context: Context) {
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink {
                 return DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(false)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioOffloadSupportProvider { _, _ -> AudioOffloadSupport.DEFAULT_UNSUPPORTED }
                     .setAudioProcessors(arrayOf(TeeAudioProcessor(visualizerController.audioBufferSink)))
                     .build()
@@ -431,72 +444,82 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun playTrack(track: Track, newQueue: List<Track>? = null, startIndex: Int = -1, startPaused: Boolean = false) {
-        crossfadeController.cancelCrossfade()
+        try {
+            crossfadeController.cancelCrossfade()
 
-        if (newQueue != null && newQueue.isNotEmpty()) {
-            _queue.value = newQueue
-            _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        } else if (!_queue.value.any { it.id == track.id }) {
-            _queue.value = listOf(track)
-            _queueIndex.value = 0
-        } else {
-            _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
-        }
+            if (newQueue != null && newQueue.isNotEmpty()) {
+                _queue.value = newQueue
+                _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+            } else if (!_queue.value.any { it.id == track.id }) {
+                _queue.value = listOf(track)
+                _queueIndex.value = 0
+            } else {
+                _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
+            }
 
-        _currentTrack.value = track
-        _duration.value = track.duration
-        _playbackPosition.value = 0
-        visualizerController.resetBuffers()
-        updateAudioSpecsForTrack(track, activePlayer)
+            _currentTrack.value = track
+            _duration.value = track.duration
+            _playbackPosition.value = 0
+            visualizerController.resetBuffers()
+            updateAudioSpecsForTrack(track, activePlayer)
 
-        val player = activePlayer
-        if (player == null) {
-            pendingPlayTrack = PendingPlay(track, startPaused)
-            startServiceIfNeeded()
-            return
+            val player = activePlayer
+            if (player == null) {
+                pendingPlayTrack = PendingPlay(track, startPaused)
+                startServiceIfNeeded()
+                return
+            }
+            // Stop secondary player to prevent concurrent playback
+            secondaryPlayer?.let { sec ->
+                try {
+                    sec.stop()
+                    sec.clearMediaItems()
+                    sec.volume = 1f
+                } catch (_: Exception) {}
+            }
+            executePlay(player, track, startPaused)
+        } catch (t: Throwable) {
+            Log.e("PlaybackManager", "Error in playTrack: ${t.message}", t)
+            _errorMessage.value = "Ошибка воспроизведения: ${t.localizedMessage ?: "неизвестная ошибка"}"
         }
-        // Stop secondary player to prevent concurrent playback
-        secondaryPlayer?.let { sec ->
-            try {
-                sec.stop()
-                sec.clearMediaItems()
-                sec.volume = 1f
-            } catch (_: Exception) {}
-        }
-        executePlay(player, track, startPaused)
     }
 
     private fun executePlay(player: ExoPlayer, track: Track, startPaused: Boolean) {
-        player.volume = 1f
-        val mediaMetadata = MediaMetadata.Builder()
-            .setTitle(track.title)
-            .setArtist(track.artist)
-            .setAlbumTitle(track.album)
-            .setArtworkUri(track.albumArtUri)
-            .build()
+        try {
+            player.volume = 1f
+            val mediaMetadata = MediaMetadata.Builder()
+                .setTitle(track.title)
+                .setArtist(track.artist)
+                .setAlbumTitle(track.album)
+                .setArtworkUri(track.albumArtUri)
+                .build()
 
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(track.id.toString())
-            .setUri(track.uri)
-            .setMediaMetadata(mediaMetadata)
-            .build()
+            val mediaItem = MediaItem.Builder()
+                .setMediaId(track.id.toString())
+                .setUri(track.uri)
+                .setMediaMetadata(mediaMetadata)
+                .build()
 
-        replayGainController.attachPlayer(player)
-        replayGainController.onTrackChanged(track)
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        if (startPaused) {
-            player.playWhenReady = false
-            _isPlaying.value = false
-            visualizerController.onPlaybackStateChanged(false)
-        } else {
-            onRequestAudioFocus?.invoke()
-            player.playWhenReady = true
-            player.play()
-            _isPlaying.value = true
-            visualizerController.onPlaybackStateChanged(true)
+            replayGainController.attachPlayer(player)
+            replayGainController.onTrackChanged(track)
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            if (startPaused) {
+                player.playWhenReady = false
+                _isPlaying.value = false
+                visualizerController.onPlaybackStateChanged(false)
+            } else {
+                onRequestAudioFocus?.invoke()
+                player.playWhenReady = true
+                player.play()
+                _isPlaying.value = true
+                visualizerController.onPlaybackStateChanged(true)
+            }
+            onActivePlayerChanged?.invoke(player)
+        } catch (t: Throwable) {
+            Log.e("PlaybackManager", "Error in executePlay: ${t.message}", t)
+            _errorMessage.value = "Ошибка воспроизведения: ${t.localizedMessage ?: "неизвестная ошибка"}"
         }
-        onActivePlayerChanged?.invoke(player)
     }
 
     fun playTrackAtIndex(index: Int, autoPlay: Boolean) {

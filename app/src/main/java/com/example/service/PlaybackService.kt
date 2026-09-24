@@ -85,7 +85,8 @@ class PlaybackService : MediaSessionService() {
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink {
                 return DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(false)
+                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioOffloadSupportProvider { _, _ -> AudioOffloadSupport.DEFAULT_UNSUPPORTED }
                     .setAudioProcessors(arrayOf(TeeAudioProcessor(playbackManager.visualizerController.audioBufferSink)))
                     .build()
@@ -239,7 +240,14 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         playbackManager.onActivePlayerChanged = { newActivePlayer ->
-            mediaSession?.setPlayer(createForwardingPlayer(newActivePlayer))
+            try {
+                val currentForwarding = mediaSession?.player as? ForwardingPlayer
+                if (currentForwarding?.wrappedPlayer !== newActivePlayer) {
+                    mediaSession?.setPlayer(createForwardingPlayer(newActivePlayer))
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error updating player in mediaSession: ${t.message}")
+            }
         }
 
         setMediaNotificationProvider(
