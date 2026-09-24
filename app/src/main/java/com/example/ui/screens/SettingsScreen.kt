@@ -84,6 +84,7 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
+    val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
@@ -527,31 +528,64 @@ fun SettingsScreen(
                     .padding(vertical = 4.dp)
                     .testTag("settings_visualizer_card")
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(16.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                        Text(
-                            text = "Визуализатор звука",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (visualizerEnabled) "Включен (переключение эффектов нажатием на сам визуализатор)" else "Отключен",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "Визуализатор звука",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (visualizerEnabled) "Включен (переключение эффектов нажатием на сам визуализатор)" else "Отключен",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = visualizerEnabled,
+                            onCheckedChange = { viewModel.setVisualizerEnabled(it) },
+                            modifier = Modifier.testTag("visualizer_toggle_switch")
                         )
                     }
-                    Switch(
-                        checked = visualizerEnabled,
-                        onCheckedChange = { viewModel.setVisualizerEnabled(it) },
-                        modifier = Modifier.testTag("visualizer_toggle_switch")
-                    )
+
+                    if (visualizerEnabled) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Чувствительность",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${(visualizerSensitivity * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = visualizerSensitivity,
+                            onValueChange = { viewModel.setVisualizerSensitivity(((it * 10).roundToInt()) / 10f) },
+                            valueRange = 0.2f..3.0f,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("visualizer_sensitivity_slider")
+                        )
+                    }
                 }
             }
 

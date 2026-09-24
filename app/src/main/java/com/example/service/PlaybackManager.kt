@@ -19,6 +19,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioOffloadSupport
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
@@ -38,6 +39,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -176,9 +179,14 @@ class PlaybackManager private constructor(private val context: Context) {
             crossfadeController.isEnabled = _isCrossfadeEnabled.value
             crossfadeController.durationSeconds = _crossfadeDurationSeconds.value
 
-            val bands = settingsDataStore.visualizerBandsFlow.first()
-            val sens = settingsDataStore.visualizerSensitivityFlow.first()
-            visualizerController.updateConfig(bands, sens)
+            launch {
+                combine(
+                    settingsDataStore.visualizerBandsFlow,
+                    settingsDataStore.visualizerSensitivityFlow
+                ) { bands, sens ->
+                    visualizerController.updateConfig(bands, sens)
+                }.collect()
+            }
         }
     }
 
@@ -358,7 +366,8 @@ class PlaybackManager private constructor(private val context: Context) {
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink {
                 return DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(enableFloatOutput)
+                    .setEnableFloatOutput(false)
+                    .setAudioOffloadSupportProvider { _, _ -> AudioOffloadSupport.DEFAULT_UNSUPPORTED }
                     .setAudioProcessors(arrayOf(TeeAudioProcessor(visualizerController.audioBufferSink)))
                     .build()
             }
@@ -437,6 +446,7 @@ class PlaybackManager private constructor(private val context: Context) {
         _currentTrack.value = track
         _duration.value = track.duration
         _playbackPosition.value = 0
+        visualizerController.resetBuffers()
         updateAudioSpecsForTrack(track, activePlayer)
 
         val player = activePlayer
@@ -569,6 +579,7 @@ class PlaybackManager private constructor(private val context: Context) {
         crossfadeController.cancelCrossfade()
         val clamped = positionMs.coerceIn(0, _duration.value.coerceAtLeast(0))
         _playbackPosition.value = clamped
+        visualizerController.resetBuffers()
         activePlayer?.seekTo(clamped)
     }
 
