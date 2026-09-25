@@ -352,20 +352,6 @@ fun PlayerScreen(
                     },
                     actions = {
                         IconButton(
-                            onClick = {
-                                viewModel.openPlaybackQueue()
-                                onNavigateBack()
-                            },
-                            modifier = Modifier.testTag("player_queue_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QueueMusic,
-                                contentDescription = "Список воспроизведения",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        IconButton(
                             onClick = { showSleepTimerDialog = true },
                             modifier = Modifier.testTag("player_sleep_timer_button")
                         ) {

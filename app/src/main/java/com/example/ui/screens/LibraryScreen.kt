@@ -123,7 +123,6 @@ fun LibraryScreen(
 
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
-    val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val scanMessage by viewModel.scanMessage.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
@@ -155,28 +154,14 @@ fun LibraryScreen(
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
     val pageCount = 6
     val pagerState = rememberPagerState(
-        initialPage = if (selectedTab in 0 until pageCount) selectedTab else 0,
+        initialPage = 0,
         pageCount = { pageCount }
     )
 
-    LaunchedEffect(pagerState.currentPage) {
-        if (selectedTab != pagerState.currentPage) {
-            viewModel.onTabSelected(pagerState.currentPage)
-            selectedGroupTitle = null
-            selectedGroupTracks = null
-        }
-    }
-
-    LaunchedEffect(selectedTab) {
-        if (selectedTab in 0 until pageCount) {
-            if (selectedTab == 0) {
-                selectedGroupTitle = null
-                selectedGroupTracks = null
-            }
-            if (pagerState.currentPage != selectedTab) {
-                pagerState.scrollToPage(selectedTab)
-            }
-        }
+    // Reset selected group drilldown when user swipes between tabs
+    LaunchedEffect(pagerState.settledPage) {
+        selectedGroupTitle = null
+        selectedGroupTracks = null
     }
 
     // Explicit event to open playback queue (tab 0) and scroll to current track
