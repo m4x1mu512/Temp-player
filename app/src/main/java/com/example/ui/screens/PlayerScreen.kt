@@ -114,6 +114,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.AudioTrackSpecs
@@ -142,14 +143,10 @@ fun PlayerScreen(
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
 
-    val visualizerData by viewModel.visualizerData.collectAsStateWithLifecycle()
-    val visualizerWaveform by viewModel.visualizerWaveform.collectAsStateWithLifecycle()
-    val audioAmplitude by viewModel.audioAmplitude.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
 
@@ -177,8 +174,6 @@ fun PlayerScreen(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
-    var isUserScrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableFloatStateOf(0f) }
     var dragDistanceX by remember { mutableFloatStateOf(0f) }
     var dragDistanceY by remember { mutableFloatStateOf(0f) }
 
@@ -418,30 +413,6 @@ fun PlayerScreen(
                 val configuration = LocalConfiguration.current
                 val isLandscape = autoRotate && (maxWidth > maxHeight || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
 
-                // Subtle continuous pulsing animation when music is actively playing
-                val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
-                val pulseScale by infiniteTransition.animateFloat(
-                    initialValue = 1.0f,
-                    targetValue = if (isPlaying) 1.035f else 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
-                        repeatMode = AnimRepeatMode.Reverse
-                    ),
-                    label = "pulse_scale"
-                )
-                val dynamicAmpPulse = if (isPlaying) 1.0f + (audioAmplitude * 0.045f) else 1.0f
-
-                // Smooth scale transition when playing vs paused
-                val playbackStateScale by animateFloatAsState(
-                    targetValue = if (isPlaying) 1.0f else 0.94f,
-                    animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
-                    label = "playback_state_scale"
-                )
-
-                // Interactive parallax tilt & offset based on user horizontal swipe
-                val parallaxRotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
-                val parallaxTranslationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
-
                 if (isLandscape) {
                     // Dedicated Landscape horizontal orientation layout for PlayerScreen
                     Row(
@@ -465,61 +436,16 @@ fun PlayerScreen(
                                     .fillMaxWidth(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                BoxWithConstraints(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val artSize = minOf(maxWidth * 0.88f, maxHeight * 0.92f).coerceAtLeast(120.dp)
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(artSize)
-                                            .graphicsLayer {
-                                                scaleX = pulseScale * dynamicAmpPulse * playbackStateScale
-                                                scaleY = pulseScale * dynamicAmpPulse * playbackStateScale
-                                                rotationY = parallaxRotationY
-                                                translationX = parallaxTranslationX
-                                                cameraDistance = 14f * density
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize(0.94f)
-                                                .shadow(
-                                                    elevation = if (isPlaying) 20.dp else 8.dp,
-                                                    shape = RoundedCornerShape(22.dp),
-                                                    spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                                                    ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.4f) else Color.Transparent
-                                                )
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .clip(RoundedCornerShape(20.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (track.albumArtUri != null) {
-                                                AsyncImage(
-                                                    model = track.albumArtUri,
-                                                    contentDescription = "Обложка трека",
-                                                    contentScale = ContentScale.Crop,
-                                                    error = painterResource(id = R.drawable.ic_default_art),
-                                                    placeholder = painterResource(id = R.drawable.ic_default_art),
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            } else {
-                                                AsyncImage(
-                                                    model = R.drawable.ic_default_art,
-                                                    contentDescription = "Обложка трека",
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                                PlayerArtworkCard(
+                                    track = track,
+                                    isPlaying = isPlaying,
+                                    amplitudeFlow = viewModel.audioAmplitude,
+                                    dragDistanceX = dragDistanceX,
+                                    isLandscape = true,
+                                    isCompact = isCompact,
+                                    isMedium = isMedium,
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
 
                             if (visualizerEnabled) {
@@ -534,9 +460,9 @@ fun PlayerScreen(
                                         .testTag("player_visualizer_container_landscape")
                                 ) {
                                     AudioVisualizerView(
-                                        fftData = visualizerData,
-                                        waveformData = visualizerWaveform,
-                                        amplitude = audioAmplitude,
+                                        fftDataFlow = viewModel.visualizerData,
+                                        waveformDataFlow = viewModel.visualizerWaveform,
+                                        amplitudeFlow = viewModel.audioAmplitude,
                                         mode = visualizerMode,
                                         isPlaying = isPlaying,
                                         modifier = Modifier.fillMaxSize()
@@ -610,53 +536,14 @@ fun PlayerScreen(
                             }
 
                             // Progress Slider & Timestamps
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp)
-                            ) {
-                                val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
-                                val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
-
-                                Slider(
-                                    value = sliderVal,
-                                    onValueChange = {
-                                        isUserScrubbing = true
-                                        scrubPosition = it
-                                    },
-                                    onValueChangeFinished = {
-                                        viewModel.seekTo(scrubPosition.toLong())
-                                        isUserScrubbing = false
-                                    },
-                                    valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = MaterialTheme.colorScheme.primary,
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("player_progress_slider_landscape")
-                                )
-
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = formatTime(currentPos),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        text = formatTime(duration),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+                            PlayerProgressSection(
+                                positionFlow = viewModel.playbackPosition,
+                                duration = duration,
+                                isCompact = isCompact,
+                                onSeek = { viewModel.seekTo(it) },
+                                sliderTestTag = "player_progress_slider_landscape",
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
 
                             // Secondary Controls: Shuffle, Favorite, Add to Playlist, Repeat
                             Row(
@@ -902,68 +789,17 @@ fun PlayerScreen(
                                 .padding(vertical = if (isCompact) 2.dp else 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                        BoxWithConstraints(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val artSize = minOf(
-                                maxWidth * (if (isCompact) 0.68f else if (isMedium) 0.73f else 0.78f),
-                                maxHeight * (if (isCompact) 0.70f else if (isMedium) 0.75f else 0.80f)
-                            ).coerceAtLeast(90.dp)
-
-                            Box(
-                                modifier = Modifier
-                                    .size(artSize)
-                                    .graphicsLayer {
-                                        scaleX = pulseScale * dynamicAmpPulse * playbackStateScale
-                                        scaleY = pulseScale * dynamicAmpPulse * playbackStateScale
-                                        rotationY = parallaxRotationY
-                                        translationX = parallaxTranslationX
-                                        cameraDistance = 14f * density
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Ambient colorful glow behind the artwork
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize(0.94f)
-                                        .shadow(
-                                            elevation = if (isPlaying) 28.dp else 10.dp,
-                                            shape = RoundedCornerShape(28.dp),
-                                            spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                                            ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
-                                        )
-                                )
-
-                                // Album Art container with rounded corners
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(26.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (track.albumArtUri != null) {
-                                        AsyncImage(
-                                            model = track.albumArtUri,
-                                            contentDescription = "Обложка трека",
-                                            contentScale = ContentScale.Crop,
-                                            error = painterResource(id = R.drawable.ic_default_art),
-                                            placeholder = painterResource(id = R.drawable.ic_default_art),
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    } else {
-                                        AsyncImage(
-                                            model = R.drawable.ic_default_art,
-                                            contentDescription = "Обложка трека",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
-                                    }
-                                }
-                            }
+                            PlayerArtworkCard(
+                                track = track,
+                                isPlaying = isPlaying,
+                                amplitudeFlow = viewModel.audioAmplitude,
+                                dragDistanceX = dragDistanceX,
+                                isLandscape = false,
+                                isCompact = isCompact,
+                                isMedium = isMedium,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                    }
 
                     // Visualizer Canvas View (scaled to fit screen height)
                     if (visualizerEnabled) {
@@ -978,9 +814,9 @@ fun PlayerScreen(
                                 .testTag("player_visualizer_container_portrait")
                         ) {
                             AudioVisualizerView(
-                                fftData = visualizerData,
-                                waveformData = visualizerWaveform,
-                                amplitude = audioAmplitude,
+                                fftDataFlow = viewModel.visualizerData,
+                                waveformDataFlow = viewModel.visualizerWaveform,
+                                amplitudeFlow = viewModel.audioAmplitude,
                                 mode = visualizerMode,
                                 isPlaying = isPlaying,
                                 modifier = Modifier.fillMaxSize()
@@ -1044,53 +880,13 @@ fun PlayerScreen(
                     }
 
                     // Progress Slider & Timestamps
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = if (isCompact) 0.dp else 2.dp)
-                    ) {
-                        val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
-                        val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
-
-                        Slider(
-                            value = sliderVal,
-                            onValueChange = {
-                                isUserScrubbing = true
-                                scrubPosition = it
-                            },
-                            onValueChangeFinished = {
-                                viewModel.seekTo(scrubPosition.toLong())
-                                isUserScrubbing = false
-                            },
-                            valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("player_progress_slider")
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = formatTime(currentPos),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = formatTime(duration),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                    PlayerProgressSection(
+                        positionFlow = viewModel.playbackPosition,
+                        duration = duration,
+                        isCompact = isCompact,
+                        onSeek = { viewModel.seekTo(it) },
+                        sliderTestTag = "player_progress_slider"
+                    )
 
                     // Secondary controls: Shuffle, Favorite, Add to Playlist, Repeat
                     Row(
@@ -1515,5 +1311,161 @@ private fun AudioSpecRow(
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1.3f)
         )
+    }
+}
+
+@Composable
+private fun PlayerArtworkCard(
+    track: Track,
+    isPlaying: Boolean,
+    amplitudeFlow: StateFlow<Float>,
+    dragDistanceX: Float,
+    isLandscape: Boolean,
+    isCompact: Boolean,
+    isMedium: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = if (isPlaying) 1.035f else 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = AnimRepeatMode.Reverse
+        ),
+        label = "pulse_scale"
+    )
+    val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
+    val playbackStateScale by animateFloatAsState(
+        targetValue = if (isPlaying) 1.0f else 0.94f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
+        label = "playback_state_scale"
+    )
+
+    BoxWithConstraints(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        val artSize = if (isLandscape) {
+            minOf(maxWidth * 0.88f, maxHeight * 0.92f).coerceAtLeast(120.dp)
+        } else {
+            minOf(
+                maxWidth * (if (isCompact) 0.68f else if (isMedium) 0.73f else 0.78f),
+                maxHeight * (if (isCompact) 0.70f else if (isMedium) 0.75f else 0.80f)
+            ).coerceAtLeast(90.dp)
+        }
+
+        Box(
+            modifier = Modifier
+                .size(artSize)
+                .graphicsLayer {
+                    val ampPulse = if (isPlaying) 1.0f + (amplitude * 0.045f) else 1.0f
+                    val scale = pulseScale * ampPulse * playbackStateScale
+                    scaleX = scale
+                    scaleY = scale
+                    rotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
+                    translationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
+                    cameraDistance = 14f * density
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize(0.94f)
+                    .shadow(
+                        elevation = if (isPlaying) (if (isLandscape) 20.dp else 28.dp) else (if (isLandscape) 8.dp else 10.dp),
+                        shape = RoundedCornerShape(if (isLandscape) 22.dp else 28.dp),
+                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
+                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(if (isLandscape) 20.dp else 26.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = track.albumArtUri,
+                        contentDescription = "Обложка трека",
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.ic_default_art),
+                        placeholder = painterResource(id = R.drawable.ic_default_art),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    AsyncImage(
+                        model = R.drawable.ic_default_art,
+                        contentDescription = "Обложка трека",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerProgressSection(
+    positionFlow: StateFlow<Long>,
+    duration: Long,
+    isCompact: Boolean,
+    onSeek: (Long) -> Unit,
+    sliderTestTag: String,
+    modifier: Modifier = Modifier
+) {
+    val position by positionFlow.collectAsStateWithLifecycle()
+    var isUserScrubbing by remember { mutableStateOf(false) }
+    var scrubPosition by remember { mutableFloatStateOf(0f) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = if (isCompact) 0.dp else 2.dp)
+    ) {
+        val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
+        val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
+
+        Slider(
+            value = sliderVal,
+            onValueChange = {
+                isUserScrubbing = true
+                scrubPosition = it
+            },
+            onValueChangeFinished = {
+                onSeek(scrubPosition.toLong())
+                isUserScrubbing = false
+            },
+            valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(sliderTestTag)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = formatTime(currentPos),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = formatTime(duration),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

@@ -463,7 +463,7 @@ class AudioVisualizerController(
                 // Calculation safety
             }
 
-            delay(16)
+            delay(20)
             }
         }
     }

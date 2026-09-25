@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -239,19 +240,40 @@ fun AppNavigation(viewModel: MainViewModel) {
         startDestination = "library",
         modifier = Modifier.fillMaxSize(),
         enterTransition = {
-            slideIntoContainer(
-                AnimatedContentTransitionScope.SlideDirection.Up,
-                animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
+            fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
         },
         exitTransition = {
-            slideOutOfContainer(
-                AnimatedContentTransitionScope.SlideDirection.Down,
-                animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
+            fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
         }
     ) {
-        composable("library") {
+        composable(
+            route = "library",
+            enterTransition = {
+                if (initialState.destination.route == "player") {
+                    fadeIn(animationSpec = tween(260))
+                } else if (initialState.destination.route == "settings") {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.End,
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + fadeIn(animationSpec = tween(240))
+                } else {
+                    fadeIn(animationSpec = tween(260))
+                }
+            },
+            exitTransition = {
+                if (targetState.destination.route == "player") {
+                    fadeOut(animationSpec = tween(220))
+                } else {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(240))
+                }
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(260))
+            }
+        ) {
             LibraryScreen(
                 viewModel = viewModel,
                 onNavigateToPlayer = { navController.navigate("player") },
@@ -259,7 +281,30 @@ fun AppNavigation(viewModel: MainViewModel) {
             )
         }
 
-        composable("player") {
+        composable(
+            route = "player",
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(320, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(250))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(280, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(220))
+            },
+            popEnterTransition = {
+                fadeIn(animationSpec = tween(250))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(240))
+            }
+        ) {
             PlayerScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
@@ -272,7 +317,33 @@ fun AppNavigation(viewModel: MainViewModel) {
             )
         }
 
-        composable("settings") {
+        composable(
+            route = "settings",
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(240))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(240))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(240))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(240))
+            }
+        ) {
             SettingsScreen(
                 viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },

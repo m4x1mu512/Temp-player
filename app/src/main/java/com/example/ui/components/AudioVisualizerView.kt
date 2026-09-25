@@ -1,8 +1,6 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -12,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -25,14 +22,44 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.VisualizerMode
 import com.example.ui.theme.NeonCyan
-import com.example.ui.theme.NeonPink
 import com.example.ui.theme.NeonPurple
 import com.example.ui.theme.NeonTurquoise
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+
+@Composable
+fun AudioVisualizerView(
+    fftDataFlow: StateFlow<FloatArray>,
+    waveformDataFlow: StateFlow<FloatArray>,
+    amplitudeFlow: StateFlow<Float>,
+    mode: VisualizerMode,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier,
+    neonColorStart: Color = NeonCyan,
+    neonColorMiddle: Color = NeonTurquoise,
+    neonColorEnd: Color = NeonPurple
+) {
+    val fftData by fftDataFlow.collectAsStateWithLifecycle()
+    val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
+    val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
+
+    AudioVisualizerView(
+        fftData = fftData,
+        waveformData = waveformData,
+        amplitude = amplitude,
+        mode = mode,
+        isPlaying = isPlaying,
+        modifier = modifier,
+        neonColorStart = neonColorStart,
+        neonColorMiddle = neonColorMiddle,
+        neonColorEnd = neonColorEnd
+    )
+}
 
 @Composable
 fun AudioVisualizerView(
@@ -46,19 +73,6 @@ fun AudioVisualizerView(
     neonColorMiddle: Color = NeonTurquoise,
     neonColorEnd: Color = NeonPurple
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseGlow by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseGlow"
-    )
-
-    val dynamicPulse = if (isPlaying) pulseGlow + (amplitude * 0.25f) else 1.0f
-
     Box(modifier = modifier.testTag("audio_visualizer_view")) {
         when (mode) {
             VisualizerMode.AMPLITUDE -> {
@@ -96,7 +110,7 @@ fun AudioVisualizerView(
                 CircleVisualizer(
                     data = fftData,
                     isPlaying = isPlaying,
-                    pulse = dynamicPulse,
+                    amplitude = amplitude,
                     colorStart = neonColorStart,
                     colorMiddle = neonColorMiddle,
                     colorEnd = neonColorEnd,
@@ -263,6 +277,9 @@ private fun WaveVisualizer(
     colorEnd: Color,
     modifier: Modifier = Modifier
 ) {
+    val path = remember { Path() }
+    val fillPath = remember { Path() }
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -270,8 +287,9 @@ private fun WaveVisualizer(
         val points = data.size.coerceAtLeast(16)
         val stepX = width / (points - 1).coerceAtLeast(1)
 
-        val path = Path()
-        val fillPath = Path()
+        path.reset()
+        fillPath.reset()
+
         path.moveTo(0f, midY)
         fillPath.moveTo(0f, height)
         fillPath.lineTo(0f, midY)
@@ -325,12 +343,25 @@ private fun WaveVisualizer(
 private fun CircleVisualizer(
     data: FloatArray,
     isPlaying: Boolean,
-    pulse: Float,
+    amplitude: Float,
     colorStart: Color,
     colorMiddle: Color,
     colorEnd: Color,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseGlow by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseGlow"
+    )
+
+    val pulse = if (isPlaying) pulseGlow + (amplitude * 0.25f) else 1.0f
+
     Canvas(modifier = modifier) {
         val centerX = size.width / 2f
         val centerY = size.height / 2f

@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +48,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.MiniPlayerBgMode
@@ -54,6 +57,42 @@ import com.example.data.model.Track
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.formatTime
 import com.example.ui.util.rememberMiniPlayerColors
+
+@Composable
+fun MiniPlayer(
+    currentTrack: Track?,
+    isPlaying: Boolean,
+    positionFlow: StateFlow<Long>,
+    duration: Long,
+    onTogglePlayPause: () -> Unit,
+    onNextTrack: () -> Unit,
+    onPreviousTrack: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null,
+    bgMode: MiniPlayerBgMode = MiniPlayerBgMode.ALBUM_ART,
+    customColor: Long = 0L,
+    autoRotate: Boolean = true
+) {
+    val position by positionFlow.collectAsStateWithLifecycle()
+    MiniPlayer(
+        currentTrack = currentTrack,
+        isPlaying = isPlaying,
+        position = position,
+        duration = duration,
+        onTogglePlayPause = onTogglePlayPause,
+        onNextTrack = onNextTrack,
+        onPreviousTrack = onPreviousTrack,
+        onClick = onClick,
+        modifier = modifier,
+        isFavorite = isFavorite,
+        onToggleFavorite = onToggleFavorite,
+        bgMode = bgMode,
+        customColor = customColor,
+        autoRotate = autoRotate
+    )
+}
 
 @Composable
 fun MiniPlayer(

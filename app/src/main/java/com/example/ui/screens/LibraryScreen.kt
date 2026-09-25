@@ -2,6 +2,8 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -110,7 +112,6 @@ fun LibraryScreen(
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
@@ -221,6 +222,26 @@ fun LibraryScreen(
         }
     }
 
+    val navigateToTab: (Int) -> Unit = { targetPage ->
+        if (pagerState.currentPage != targetPage) {
+            selectedGroupTitle = null
+            selectedGroupTracks = null
+            coroutineScope.launch {
+                if (kotlin.math.abs(pagerState.currentPage - targetPage) > 1) {
+                    val adjacent = if (targetPage > pagerState.currentPage) targetPage - 1 else targetPage + 1
+                    pagerState.scrollToPage(adjacent)
+                }
+                pagerState.animateScrollToPage(
+                    page = targetPage,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioNoBouncy,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                )
+            }
+        }
+    }
+
     Scaffold(
         modifier = modifier.testTag("library_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -238,10 +259,8 @@ fun LibraryScreen(
                 // 1. Список воспроизведения (Queue)
                 IconButton(
                     onClick = {
-                        coroutineScope.launch {
-                            if (pagerState.currentPage != 0) {
-                                pagerState.animateScrollToPage(0)
-                            }
+                        if (pagerState.currentPage != 0) {
+                            navigateToTab(0)
                         }
                         selectedGroupTitle = null
                         selectedGroupTracks = null
@@ -260,11 +279,7 @@ fun LibraryScreen(
 
                 // 2. Папки (Folders)
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(1) }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                    },
+                    onClick = { navigateToTab(1) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_folders_button")
@@ -278,11 +293,7 @@ fun LibraryScreen(
 
                 // 3. Плейлисты (Playlists)
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                    },
+                    onClick = { navigateToTab(2) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_playlists_button")
@@ -296,11 +307,7 @@ fun LibraryScreen(
 
                 // 4. Альбомы (Albums)
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(3) }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                    },
+                    onClick = { navigateToTab(3) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_albums_button")
@@ -314,11 +321,7 @@ fun LibraryScreen(
 
                 // 5. Исполнители (Artists)
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(4) }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                    },
+                    onClick = { navigateToTab(4) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_artists_button")
@@ -332,11 +335,7 @@ fun LibraryScreen(
 
                 // 6. Поиск (Search)
                 IconButton(
-                    onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(5) }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                    },
+                    onClick = { navigateToTab(5) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_search_button")
@@ -452,7 +451,7 @@ fun LibraryScreen(
             MiniPlayer(
                 currentTrack = currentTrack,
                 isPlaying = isPlaying,
-                position = position,
+                positionFlow = viewModel.playbackPosition,
                 duration = duration,
                 isFavorite = isCurrentTrackFavorite,
                 onToggleFavorite = { currentTrack?.let { viewModel.toggleFavorite(it.id) } },
@@ -823,11 +822,12 @@ private fun GroupedListSection(
             }
         }
     } else {
+        val groupKeys = remember(groups) { groups.keys.toList() }
         LazyColumn(
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(groups.keys.toList()) { groupKey ->
+            items(groupKeys, key = { it }) { groupKey ->
                 val count = groups[groupKey]?.size ?: 0
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -1132,7 +1132,7 @@ private fun PlaylistsSection(
             }
 
             // User Playlists
-            items(playlists) { pl ->
+            items(playlists, key = { it.id }) { pl ->
                 var menuExpanded by remember { mutableStateOf(false) }
 
                 Card(
