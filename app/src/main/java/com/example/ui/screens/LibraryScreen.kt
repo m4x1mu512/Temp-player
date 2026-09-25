@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -126,6 +127,7 @@ fun LibraryScreen(
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val scanMessage by viewModel.scanMessage.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -150,6 +152,7 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     val queueListState = rememberLazyListState()
     var scrollToCurrentTrackTrigger by remember { mutableIntStateOf(0) }
+    var lastHandledOpenQueue by rememberSaveable { mutableIntStateOf(0) }
 
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
     val pageCount = 6
@@ -165,12 +168,19 @@ fun LibraryScreen(
     }
 
     // Explicit event to open playback queue (tab 0) and scroll to current track
-    LaunchedEffect(Unit) {
-        viewModel.navigateToQueueEvent.collect {
+    LaunchedEffect(openQueueEvent) {
+        if (openQueueEvent > 0 && openQueueEvent != lastHandledOpenQueue) {
+            lastHandledOpenQueue = openQueueEvent
             selectedGroupTitle = null
             selectedGroupTracks = null
-            if (pagerState.currentPage != 0) {
+            try {
                 pagerState.scrollToPage(0)
+            } catch (_: Exception) {}
+            if (pagerState.currentPage != 0) {
+                delay(60)
+                try {
+                    pagerState.scrollToPage(0)
+                } catch (_: Exception) {}
             }
             scrollToCurrentTrackTrigger++
         }
