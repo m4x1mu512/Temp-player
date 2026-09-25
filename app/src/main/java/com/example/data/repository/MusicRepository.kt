@@ -18,6 +18,7 @@ import com.example.data.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -63,6 +64,20 @@ class MusicRepository(
             val favoriteSet = favoriteIds.toSet()
             entities.map { it.toTrack(isFavorite = favoriteSet.contains(it.id)) }
         }.flowOn(Dispatchers.IO)
+    }
+
+    suspend fun getTracksByIds(ids: List<Long>): List<Track> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+        val entities = trackDao.getTracksByIds(ids)
+        val favoriteIds = try {
+            favoriteDao.getAllFavoriteIds().first().toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+        val entityMap = entities.associateBy { it.id }
+        ids.mapNotNull { id ->
+            entityMap[id]?.toTrack(isFavorite = favoriteIds.contains(id))
+        }
     }
 
     suspend fun scanLocalMusic(): Int = withContext(Dispatchers.IO) {

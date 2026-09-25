@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,10 +62,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,6 +149,9 @@ fun LibraryScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
+    val queueListState = rememberLazyListState()
+    var scrollToCurrentTrackTrigger by remember { mutableIntStateOf(0) }
+
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
     val pageCount = 6
     val pagerState = rememberPagerState(
@@ -164,6 +170,27 @@ fun LibraryScreen(
     LaunchedEffect(selectedTab) {
         if (pagerState.currentPage != selectedTab && selectedTab in 0 until pageCount) {
             pagerState.animateScrollToPage(selectedTab)
+        }
+    }
+
+    // Auto-scroll to currently playing / paused track when opening playback queue
+    LaunchedEffect(pagerState.currentPage, currentTrack?.id, scrollToCurrentTrackTrigger, currentQueue) {
+        if (pagerState.currentPage == 0 && currentTrack != null) {
+            val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val targetIndex = queueToDisplay.indexOfFirst { it.id == currentTrack?.id }
+            if (targetIndex >= 0) {
+                try {
+                    delay(80)
+                    val currentFirst = queueListState.firstVisibleItemIndex
+                    if (kotlin.math.abs(currentFirst - targetIndex) > 15) {
+                        val preScroll = if (targetIndex > currentFirst) targetIndex - 8 else targetIndex + 8
+                        queueListState.scrollToItem(preScroll.coerceIn(0, queueToDisplay.lastIndex))
+                    }
+                    queueListState.animateScrollToItem(targetIndex)
+                } catch (_: Exception) {
+                    queueListState.scrollToItem(targetIndex)
+                }
+            }
         }
     }
 
@@ -198,9 +225,14 @@ fun LibraryScreen(
                 // 1. Список воспроизведения (Queue)
                 IconButton(
                     onClick = {
-                        coroutineScope.launch { pagerState.animateScrollToPage(0) }
+                        coroutineScope.launch {
+                            if (pagerState.currentPage != 0) {
+                                pagerState.animateScrollToPage(0)
+                            }
+                        }
                         selectedGroupTitle = null
                         selectedGroupTracks = null
+                        scrollToCurrentTrackTrigger++
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -453,6 +485,7 @@ fun LibraryScreen(
                                     )
                                 } else {
                                     LazyColumn(
+                                        state = queueListState,
                                         contentPadding = PaddingValues(bottom = 80.dp),
                                         modifier = Modifier.fillMaxSize()
                                     ) {
@@ -721,6 +754,20 @@ private fun GroupedListSection(
 ) {
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
+            if (currentTrack != null && tracks.isNotEmpty()) {
+                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
+                if (targetIndex >= 0) {
+                    try {
+                        delay(60)
+                        listState.scrollToItem(targetIndex)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -746,6 +793,7 @@ private fun GroupedListSection(
             }
 
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(bottom = 80.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -849,6 +897,19 @@ private fun PlaylistsSection(
                 } else emptyList()
             }
         }
+        val listState = rememberLazyListState()
+
+        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
+            if (currentTrack != null && tracks.isNotEmpty()) {
+                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
+                if (targetIndex >= 0) {
+                    try {
+                        delay(60)
+                        listState.scrollToItem(targetIndex)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -883,6 +944,7 @@ private fun PlaylistsSection(
                 )
             } else {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {

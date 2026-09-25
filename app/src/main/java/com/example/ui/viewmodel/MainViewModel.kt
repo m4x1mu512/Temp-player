@@ -117,6 +117,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
+    init {
+        viewModelScope.launch {
+            rawTracks.collect { tracks ->
+                if (tracks.isNotEmpty() && currentQueue.value.isEmpty()) {
+                    playbackManager.restoreSavedQueueAndTrack()
+                }
+            }
+        }
+    }
+
     // Groupings
     val folderGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
         tracks.groupBy { it.folderName }
@@ -146,6 +156,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
     val trackAudioSpecs: StateFlow<AudioTrackSpecs?> = playbackManager.trackAudioSpecs
     val currentQueue: StateFlow<List<Track>> = playbackManager.queue
+    val currentQueueIndex: StateFlow<Int> = playbackManager.queueIndex
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
     val playbackPosition: StateFlow<Long> = playbackManager.playbackPosition
     val duration: StateFlow<Long> = playbackManager.duration
@@ -232,6 +243,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val count = repository.scanLocalMusic()
                 _scanMessage.value = if (count > 0) "Найдено треков: $count" else "Аудиофайлы не найдены"
+                if (currentQueue.value.isEmpty()) {
+                    playbackManager.restoreSavedQueueAndTrack()
+                }
             } catch (e: Exception) {
                 _scanMessage.value = "Ошибка сканирования: ${e.localizedMessage}"
             } finally {

@@ -256,24 +256,11 @@ class PlaybackService : MediaSessionService() {
                 .build()
         )
 
-        // Restore last track if available and no current track in PlaybackManager
+        // Restore last track and queue if available and no current track in PlaybackManager
         if (playbackManager.currentTrack.value == null) {
             serviceScope.launch {
                 try {
-                    val lastTrackId = playbackManager.settingsDataStore.lastTrackIdFlow.first()
-                    val lastPos = playbackManager.settingsDataStore.lastPositionFlow.first()
-                    if (lastTrackId > 0 && playbackManager.currentTrack.value == null) {
-                        val allTracks = playbackManager.repository.allTracks.first()
-                        val track = allTracks.find { it.id == lastTrackId }
-                        if (track != null && playbackManager.currentTrack.value == null) {
-                            playbackManager.playTrack(
-                                track = track,
-                                newQueue = allTracks,
-                                startPaused = true
-                            )
-                            playbackManager.seekTo(lastPos)
-                        }
-                    }
+                    playbackManager.restoreSavedQueueAndTrack()
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

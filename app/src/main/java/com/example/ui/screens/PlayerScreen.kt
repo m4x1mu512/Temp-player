@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Repeat
 import android.content.res.Configuration
@@ -350,6 +351,20 @@ fun PlayerScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            onClick = {
+                                viewModel.onTabSelected(0)
+                                onNavigateBack()
+                            },
+                            modifier = Modifier.testTag("player_queue_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Список воспроизведения",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
                         IconButton(
                             onClick = { showSleepTimerDialog = true },
                             modifier = Modifier.testTag("player_sleep_timer_button")

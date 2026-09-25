@@ -199,6 +199,8 @@ class PlaybackManager private constructor(private val context: Context) {
                     visualizerController.updateConfig(bands, sens)
                 }.collect()
             }
+
+            restoreSavedQueueAndTrack()
         }
     }
 
@@ -330,11 +332,25 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
-        // Restore pending playback if service was started on-demand
+        // Restore pending playback if service was started on-demand or restored on launch
         val pending = pendingPlayTrack
         if (pending != null) {
             pendingPlayTrack = null
-            playTrack(pending.track, startPaused = pending.startPaused)
+            executePlay(player1, pending.track, startPaused = pending.startPaused)
+            serviceScope.launch {
+                val lastPos = settingsDataStore.lastPositionFlow.first()
+                if (lastPos > 0) {
+                    player1.seekTo(lastPos)
+                    _playbackPosition.value = lastPos
+                }
+            }
+        } else if (player1.currentMediaItem == null && _currentTrack.value != null) {
+            val track = _currentTrack.value!!
+            executePlay(player1, track, startPaused = !_isPlaying.value)
+            val pos = _playbackPosition.value
+            if (pos > 0) {
+                player1.seekTo(pos)
+            }
         } else {
             // Restore playback position if returning
             serviceScope.launch {
@@ -459,13 +475,16 @@ class PlaybackManager private constructor(private val context: Context) {
 
             _currentTrack.value = track
             _duration.value = track.duration
-            _playbackPosition.value = 0
+            if (!startPaused) {
+                _playbackPosition.value = 0
+            }
             visualizerController.resetBuffers()
             updateAudioSpecsForTrack(track, activePlayer)
 
             val player = activePlayer
             if (player == null) {
                 pendingPlayTrack = PendingPlay(track, startPaused)
+                saveCurrentState()
                 startServiceIfNeeded()
                 return
             }
@@ -478,6 +497,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 } catch (_: Exception) {}
             }
             executePlay(player, track, startPaused)
+            saveCurrentState()
         } catch (t: Throwable) {
             Log.e("PlaybackManager", "Error in playTrack: ${t.message}", t)
             _errorMessage.value = "Ошибка воспроизведения: ${t.localizedMessage ?: "неизвестная ошибка"}"
@@ -847,6 +867,7 @@ class PlaybackManager private constructor(private val context: Context) {
     private fun startPositionTracking() {
         positionProgressJob?.cancel()
         positionProgressJob = serviceScope.launch {
+            var tickCount = 0
             while (isActive) {
                 activePlayer?.let { player ->
                     _playbackPosition.value = player.currentPosition
@@ -863,6 +884,10 @@ class PlaybackManager private constructor(private val context: Context) {
                         triggerCrossfadeTransition()
                     }
                 }
+                tickCount++
+                if (tickCount % 20 == 0) {
+                    saveCurrentState()
+                }
                 delay(250)
             }
         }
@@ -876,12 +901,94 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    suspend fun restoreSavedQueueAndTrack() {
+        try {
+            if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
+
+            val savedQueueIds = settingsDataStore.queueTrackIdsFlow.first()
+            val savedQueueIndex = settingsDataStore.lastQueueIndexFlow.first()
+            val lastTrackId = settingsDataStore.lastTrackIdFlow.first()
+            val lastPos = settingsDataStore.lastPositionFlow.first()
+
+            val restoredQueue = if (savedQueueIds.isNotEmpty()) {
+                repository.getTracksByIds(savedQueueIds)
+            } else {
+                emptyList()
+            }
+
+            if (restoredQueue.isNotEmpty()) {
+                _queue.value = restoredQueue
+                val targetIndex = if (savedQueueIndex in restoredQueue.indices) {
+                    savedQueueIndex
+                } else if (lastTrackId > 0) {
+                    restoredQueue.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
+                } else {
+                    0
+                }
+                _queueIndex.value = targetIndex
+
+                val trackToRestore = if (lastTrackId > 0) {
+                    restoredQueue.find { it.id == lastTrackId } ?: restoredQueue.getOrNull(targetIndex)
+                } else {
+                    restoredQueue.getOrNull(targetIndex)
+                }
+
+                if (trackToRestore != null && _currentTrack.value == null) {
+                    _currentTrack.value = trackToRestore
+                    _duration.value = trackToRestore.duration
+                    _playbackPosition.value = lastPos
+                    updateAudioSpecsForTrack(trackToRestore, activePlayer)
+                    val player = activePlayer
+                    if (player != null) {
+                        executePlay(player, trackToRestore, startPaused = true)
+                        if (lastPos > 0) {
+                            player.seekTo(lastPos)
+                        }
+                    } else {
+                        pendingPlayTrack = PendingPlay(trackToRestore, startPaused = true)
+                    }
+                }
+            } else if (lastTrackId > 0) {
+                // If no saved queue IDs, fallback to finding last track in allTracks
+                val allTracks = repository.allTracks.first()
+                val track = allTracks.find { it.id == lastTrackId }
+                if (track != null && _currentTrack.value == null) {
+                    _queue.value = allTracks
+                    val idx = allTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+                    _queueIndex.value = idx
+                    _currentTrack.value = track
+                    _duration.value = track.duration
+                    _playbackPosition.value = lastPos
+                    updateAudioSpecsForTrack(track, activePlayer)
+                    val player = activePlayer
+                    if (player != null) {
+                        executePlay(player, track, startPaused = true)
+                        if (lastPos > 0) {
+                            player.seekTo(lastPos)
+                        }
+                    } else {
+                        pendingPlayTrack = PendingPlay(track, startPaused = true)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PlaybackManager", "Error restoring saved queue: ${e.message}", e)
+        }
+    }
+
     private fun saveCurrentState() {
         val track = _currentTrack.value
         val pos = _playbackPosition.value
-        if (track != null) {
+        val q = _queue.value
+        val idx = _queueIndex.value
+        if (track != null || q.isNotEmpty()) {
             serviceScope.launch {
-                settingsDataStore.savePlaybackState(track.id, pos)
+                settingsDataStore.savePlaybackState(
+                    trackId = track?.id ?: -1L,
+                    position = pos,
+                    queueIds = if (q.isNotEmpty()) q.map { it.id } else null,
+                    queueIndex = if (idx >= 0) idx else null
+                )
             }
         }
     }

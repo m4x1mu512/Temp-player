@@ -41,6 +41,21 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_REPLAY_GAIN_ENABLED = booleanPreferencesKey("replay_gain_enabled")
         private val KEY_CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
         private val KEY_CROSSFADE_DURATION_SECONDS = intPreferencesKey("crossfade_duration_seconds")
+        private val KEY_QUEUE_TRACK_IDS = stringPreferencesKey("queue_track_ids")
+        private val KEY_LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
+    }
+
+    val queueTrackIdsFlow: Flow<List<Long>> = context.dataStore.data.map { preferences ->
+        val raw = preferences[KEY_QUEUE_TRACK_IDS] ?: ""
+        if (raw.isBlank()) {
+            emptyList()
+        } else {
+            raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+    }
+
+    val lastQueueIndexFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LAST_QUEUE_INDEX] ?: -1
     }
 
     val crossfadeEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -171,10 +186,28 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
-    suspend fun savePlaybackState(trackId: Long, position: Long) {
+    suspend fun savePlaybackState(
+        trackId: Long,
+        position: Long,
+        queueIds: List<Long>? = null,
+        queueIndex: Int? = null
+    ) {
         context.dataStore.edit { preferences ->
             preferences[KEY_LAST_TRACK_ID] = trackId
             preferences[KEY_LAST_POSITION] = position
+            if (queueIds != null) {
+                preferences[KEY_QUEUE_TRACK_IDS] = queueIds.joinToString(",")
+            }
+            if (queueIndex != null) {
+                preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
+            }
+        }
+    }
+
+    suspend fun saveQueue(trackIds: List<Long>, queueIndex: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_QUEUE_TRACK_IDS] = trackIds.joinToString(",")
+            preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
         }
     }
 
