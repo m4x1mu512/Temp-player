@@ -36,8 +36,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val navigateToPlayerEvent: SharedFlow<Unit> = _navigateToPlayerEvent.asSharedFlow()
 
+    private val _navigateToQueueEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val navigateToQueueEvent: SharedFlow<Unit> = _navigateToQueueEvent.asSharedFlow()
+
     fun requestNavigateToPlayer() {
         _navigateToPlayerEvent.tryEmit(Unit)
+    }
+
+    fun openPlaybackQueue() {
+        _selectedTab.value = 0
+        _navigateToQueueEvent.tryEmit(Unit)
     }
 
     fun handleExternalAudioUri(uri: Uri) {

@@ -353,7 +353,7 @@ fun PlayerScreen(
                     actions = {
                         IconButton(
                             onClick = {
-                                viewModel.onTabSelected(0)
+                                viewModel.openPlaybackQueue()
                                 onNavigateBack()
                             },
                             modifier = Modifier.testTag("player_queue_button")
@@ -744,6 +744,20 @@ fun PlayerScreen(
                                             tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        viewModel.openPlaybackQueue()
+                                        onNavigateBack()
+                                    },
+                                    modifier = Modifier.testTag("player_secondary_queue_button_landscape")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QueueMusic,
+                                        contentDescription = "Список воспроизведения",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
 
@@ -1170,6 +1184,21 @@ fun PlayerScreen(
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
+                        }
+
+                        // Queue / Список воспроизведения (First tab of Main Screen)
+                        IconButton(
+                            onClick = {
+                                viewModel.openPlaybackQueue()
+                                onNavigateBack()
+                            },
+                            modifier = Modifier.testTag("player_bottom_queue_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QueueMusic,
+                                contentDescription = "Список воспроизведения",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
 

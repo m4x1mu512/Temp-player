@@ -168,8 +168,26 @@ fun LibraryScreen(
     }
 
     LaunchedEffect(selectedTab) {
-        if (pagerState.currentPage != selectedTab && selectedTab in 0 until pageCount) {
-            pagerState.animateScrollToPage(selectedTab)
+        if (selectedTab in 0 until pageCount) {
+            if (selectedTab == 0) {
+                selectedGroupTitle = null
+                selectedGroupTracks = null
+            }
+            if (pagerState.currentPage != selectedTab) {
+                pagerState.scrollToPage(selectedTab)
+            }
+        }
+    }
+
+    // Explicit event to open playback queue (tab 0) and scroll to current track
+    LaunchedEffect(Unit) {
+        viewModel.navigateToQueueEvent.collect {
+            selectedGroupTitle = null
+            selectedGroupTracks = null
+            if (pagerState.currentPage != 0) {
+                pagerState.scrollToPage(0)
+            }
+            scrollToCurrentTrackTrigger++
         }
     }
 

@@ -262,7 +262,13 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable("player") {
             PlayerScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate("library") {
+                            launchSingleTop = true
+                        }
+                    }
+                }
             )
         }
 
