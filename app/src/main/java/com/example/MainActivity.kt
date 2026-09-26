@@ -235,6 +235,20 @@ fun AppNavigation(viewModel: MainViewModel) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.navigateToQueueEvent.collect {
+            if (navController.currentDestination?.route != "library") {
+                val popped = navController.popBackStack("library", inclusive = false)
+                if (!popped) {
+                    navController.navigate("library") {
+                        popUpTo("library") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = "library",
@@ -310,6 +324,16 @@ fun AppNavigation(viewModel: MainViewModel) {
                 onNavigateBack = {
                     if (!navController.popBackStack()) {
                         navController.navigate("library") {
+                            launchSingleTop = true
+                        }
+                    }
+                },
+                onNavigateToQueue = {
+                    viewModel.openPlaybackQueue()
+                    val popped = navController.popBackStack("library", inclusive = false)
+                    if (!popped) {
+                        navController.navigate("library") {
+                            popUpTo("library") { inclusive = false }
                             launchSingleTop = true
                         }
                     }

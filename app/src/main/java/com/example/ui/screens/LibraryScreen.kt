@@ -154,7 +154,7 @@ fun LibraryScreen(
     val coroutineScope = rememberCoroutineScope()
     val queueListState = rememberLazyListState()
     var scrollToCurrentTrackTrigger by remember { mutableIntStateOf(0) }
-    var lastHandledOpenQueue by rememberSaveable { mutableIntStateOf(0) }
+    var lastHandledOpenQueue by remember { mutableIntStateOf(0) }
 
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
     val pageCount = 6
@@ -169,20 +169,36 @@ fun LibraryScreen(
         selectedGroupTracks = null
     }
 
+    // Direct event from ViewModel to open playback queue (tab 0)
+    LaunchedEffect(Unit) {
+        viewModel.navigateToQueueEvent.collect {
+            selectedGroupTitle = null
+            selectedGroupTracks = null
+            for (retry in 0..4) {
+                if (pagerState.currentPage != 0) {
+                    try {
+                        pagerState.scrollToPage(0)
+                    } catch (_: Exception) {}
+                    delay(50)
+                }
+            }
+            scrollToCurrentTrackTrigger++
+        }
+    }
+
     // Explicit event to open playback queue (tab 0) and scroll to current track
     LaunchedEffect(openQueueEvent) {
         if (openQueueEvent > 0 && openQueueEvent != lastHandledOpenQueue) {
             lastHandledOpenQueue = openQueueEvent
             selectedGroupTitle = null
             selectedGroupTracks = null
-            try {
-                pagerState.scrollToPage(0)
-            } catch (_: Exception) {}
-            if (pagerState.currentPage != 0) {
-                delay(60)
-                try {
-                    pagerState.scrollToPage(0)
-                } catch (_: Exception) {}
+            for (retry in 0..4) {
+                if (pagerState.currentPage != 0) {
+                    try {
+                        pagerState.scrollToPage(0)
+                    } catch (_: Exception) {}
+                    delay(50)
+                }
             }
             scrollToCurrentTrackTrigger++
         }

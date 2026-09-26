@@ -138,7 +138,11 @@ import kotlin.math.abs
 fun PlayerScreen(
     viewModel: MainViewModel,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToQueue: () -> Unit = {
+        viewModel.openPlaybackQueue()
+        onNavigateBack()
+    }
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
@@ -620,10 +624,7 @@ fun PlayerScreen(
                                 }
 
                                 IconButton(
-                                    onClick = {
-                                        viewModel.openPlaybackQueue()
-                                        onNavigateBack()
-                                    },
+                                    onClick = onNavigateToQueue,
                                     modifier = Modifier.testTag("player_secondary_queue_button_landscape")
                                 ) {
                                     Icon(
@@ -970,10 +971,7 @@ fun PlayerScreen(
 
                         // Queue / Список воспроизведения (First tab of Main Screen)
                         IconButton(
-                            onClick = {
-                                viewModel.openPlaybackQueue()
-                                onNavigateBack()
-                            },
+                            onClick = onNavigateToQueue,
                             modifier = Modifier.testTag("player_bottom_queue_button")
                         ) {
                             Icon(
