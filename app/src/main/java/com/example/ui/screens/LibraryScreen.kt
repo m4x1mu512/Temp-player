@@ -104,6 +104,7 @@ fun LibraryScreen(
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
+    val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val folderGroups by viewModel.folderGroups.collectAsStateWithLifecycle()
@@ -441,10 +442,10 @@ fun LibraryScreen(
             }
         },
         bottomBar = {
-            val isCurrentTrackFavorite = remember(favoriteTracks, currentTrack?.id) {
+            val isCurrentTrackFavorite = remember(favoriteIds, currentTrack?.id) {
                 val currentId = currentTrack?.id
                 if (currentId != null) {
-                    favoriteTracks.any { it.id == currentId }
+                    favoriteIds.contains(currentId)
                 } else false
             }
 
@@ -506,6 +507,7 @@ fun LibraryScreen(
                                                 track = track,
                                                 isCurrent = currentTrack?.id == track.id,
                                                 isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                isFavorite = favoriteIds.contains(track.id),
                                                 onClick = {
                                                     viewModel.playTrack(
                                                         track = track,
@@ -538,7 +540,8 @@ fun LibraryScreen(
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it }
+                                    onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    favoriteIds = favoriteIds
                                 )
                             }
 
@@ -565,7 +568,8 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    getPlaylistTracks = { viewModel.getPlaylistTracks(it) }
+                                    getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
+                                    favoriteIds = favoriteIds
                                 )
                             }
 
@@ -587,7 +591,8 @@ fun LibraryScreen(
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it }
+                                    onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    favoriteIds = favoriteIds
                                 )
                             }
 
@@ -609,7 +614,8 @@ fun LibraryScreen(
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it }
+                                    onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    favoriteIds = favoriteIds
                                 )
                             }
 
@@ -661,6 +667,7 @@ fun LibraryScreen(
                                                     track = track,
                                                     isCurrent = currentTrack?.id == track.id,
                                                     isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                    isFavorite = favoriteIds.contains(track.id),
                                                     onClick = {
                                                         viewModel.playTrack(
                                                             track = track,
@@ -762,7 +769,8 @@ private fun GroupedListSection(
     onBackFromGroup: () -> Unit,
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
-    onAddToPlaylist: (Track) -> Unit
+    onAddToPlaylist: (Track) -> Unit,
+    favoriteIds: Set<Long> = emptySet()
 ) {
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
@@ -814,6 +822,7 @@ private fun GroupedListSection(
                         track = track,
                         isCurrent = currentTrack?.id == track.id,
                         isPlaying = isPlaying && currentTrack?.id == track.id,
+                        isFavorite = favoriteIds.contains(track.id),
                         onClick = { onPlayTrack(track, tracks) },
                         onToggleFavorite = { onToggleFavorite(track.id) },
                         onAddToPlaylist = { onAddToPlaylist(track) }
@@ -894,7 +903,8 @@ private fun PlaylistsSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
-    getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>
+    getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>,
+    favoriteIds: Set<Long> = emptySet()
 ) {
     if (selectedTitle != null) {
         // Show selected playlist / favorites / all tracks
@@ -966,6 +976,7 @@ private fun PlaylistsSection(
                             track = track,
                             isCurrent = currentTrack?.id == track.id,
                             isPlaying = isPlaying && currentTrack?.id == track.id,
+                            isFavorite = favoriteIds.contains(track.id),
                             onClick = { onPlayTrack(track, tracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
                             onAddToPlaylist = { onAddToPlaylist(track) }

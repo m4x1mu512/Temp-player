@@ -673,6 +673,20 @@ class PlaybackManager private constructor(private val context: Context) {
         playTrackAtIndex(prevIdx, autoPlay = shouldPlay)
     }
 
+    fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
+        val curr = _currentTrack.value
+        if (curr != null && curr.id == trackId) {
+            _currentTrack.value = curr.copy(isFavorite = isFavorite)
+        }
+        val q = _queue.value
+        if (q.isNotEmpty()) {
+            val updatedQueue = q.map { track ->
+                if (track.id == trackId) track.copy(isFavorite = isFavorite) else track
+            }
+            _queue.value = updatedQueue
+        }
+    }
+
     private fun getNextTrackIndex(): Int? {
         val q = _queue.value
         if (q.isEmpty()) return null

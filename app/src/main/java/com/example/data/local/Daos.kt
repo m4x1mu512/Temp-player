@@ -46,6 +46,12 @@ interface FavoriteDao {
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE trackId = :trackId)")
     fun isFavorite(trackId: Long): Flow<Boolean>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE trackId = :trackId)")
+    suspend fun isFavoriteDirect(trackId: Long): Boolean
+
+    @Query("SELECT trackId FROM favorites")
+    suspend fun getAllFavoriteIdsDirect(): List<Long>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavorite(favorite: FavoriteEntity)
 

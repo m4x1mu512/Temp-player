@@ -159,11 +159,11 @@ fun PlayerScreen(
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
 
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
-    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
-    val isCurrentTrackFavorite = remember(favoriteTracks, currentTrack?.id) {
+    val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
+    val isCurrentTrackFavorite = remember(favoriteIds, currentTrack?.id) {
         val currentId = currentTrack?.id
         if (currentId != null) {
-            favoriteTracks.any { it.id == currentId }
+            favoriteIds.contains(currentId)
         } else {
             false
         }

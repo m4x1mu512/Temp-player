@@ -86,7 +86,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
-    val favoriteTracks: StateFlow<List<Track>> = repository.favoriteTracks.stateIn(
+    private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
+    val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
+
+    val favoriteTracks: StateFlow<List<Track>> = combine(
+        rawTracks,
+        _favoriteIds
+    ) { tracks, favIds ->
+        tracks.filter { favIds.contains(it.id) }
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
@@ -130,6 +138,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     init {
+        viewModelScope.launch {
+            try {
+                val directIds = repository.getAllFavoriteIdsDirect().toSet()
+                if (directIds.isNotEmpty()) {
+                    _favoriteIds.value = directIds
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            repository.favoriteIds.collect { dbIds ->
+                _favoriteIds.value = dbIds
+            }
+        }
+
         viewModelScope.launch {
             rawTracks.collect { tracks ->
                 if (tracks.isNotEmpty() && currentQueue.value.isEmpty()) {
@@ -324,8 +346,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleFavorite(trackId: Long) {
+        val currentSet = _favoriteIds.value
+        val isCurrentlyFav = if (currentSet.isNotEmpty() || rawTracks.value.isEmpty()) {
+            currentSet.contains(trackId)
+        } else {
+            rawTracks.value.find { it.id == trackId }?.isFavorite == true
+        }
+        val newSet = if (isCurrentlyFav) currentSet - trackId else currentSet + trackId
+        _favoriteIds.value = newSet
+
+        playbackManager.updateTrackFavorite(trackId, !isCurrentlyFav)
+
         viewModelScope.launch {
-            repository.toggleFavorite(trackId)
+            try {
+                repository.toggleFavorite(trackId)
+            } catch (e: Exception) {
+                _favoriteIds.value = currentSet
+                playbackManager.updateTrackFavorite(trackId, isCurrentlyFav)
+            }
         }
     }
 

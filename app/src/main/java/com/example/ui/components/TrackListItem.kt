@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
@@ -32,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -50,7 +54,8 @@ fun TrackListItem(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isFavorite: Boolean = track.isFavorite
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -131,6 +136,14 @@ fun TrackListItem(
         }
 
         // Favorite Button
+        val heartScale by animateFloatAsState(
+            targetValue = if (isFavorite) 1.25f else 1.0f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "heartScale_${track.id}"
+        )
         IconButton(
             onClick = onToggleFavorite,
             modifier = Modifier
@@ -138,10 +151,15 @@ fun TrackListItem(
                 .testTag("favorite_button_${track.id}")
         ) {
             Icon(
-                imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (track.isFavorite) "Удалить из избранного" else "В избранное",
-                tint = if (track.isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier.size(22.dp)
+                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
+                tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer {
+                        scaleX = heartScale
+                        scaleY = heartScale
+                    }
             )
         }
 
@@ -172,7 +190,7 @@ fun TrackListItem(
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text(if (track.isFavorite) "Удалить из избранного" else "В избранное") },
+                    text = { Text(if (isFavorite) "Удалить из избранного" else "В избранное") },
                     onClick = {
                         menuExpanded = false
                         onToggleFavorite()

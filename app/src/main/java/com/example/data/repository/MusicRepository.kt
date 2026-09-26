@@ -42,6 +42,14 @@ class MusicRepository(
         }
     }.flowOn(Dispatchers.IO)
 
+    val favoriteIds: Flow<Set<Long>> = favoriteDao.getAllFavoriteIds()
+        .map { it.toSet() }
+        .flowOn(Dispatchers.IO)
+
+    suspend fun getAllFavoriteIdsDirect(): List<Long> = withContext(Dispatchers.IO) {
+        favoriteDao.getAllFavoriteIdsDirect()
+    }
+
     val favoriteTracks: Flow<List<Track>> = allTracks.map { tracks ->
         tracks.filter { it.isFavorite }
     }.flowOn(Dispatchers.IO)
@@ -216,15 +224,7 @@ class MusicRepository(
     }
 
     suspend fun toggleFavorite(trackId: Long) = withContext(Dispatchers.IO) {
-        val favoriteIds = mutableListOf<Long>()
-        // Check current favorite state
-        val isFav = database.favoriteDao()
-        // Simple direct query
-        val count = database.openHelper.readableDatabase.compileStatement(
-            "SELECT COUNT(*) FROM favorites WHERE trackId = $trackId"
-        ).simpleQueryForLong()
-
-        if (count > 0) {
+        if (favoriteDao.isFavoriteDirect(trackId)) {
             favoriteDao.removeFavorite(trackId)
         } else {
             favoriteDao.addFavorite(FavoriteEntity(trackId = trackId))
