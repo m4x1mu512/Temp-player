@@ -178,9 +178,9 @@ fun MiniPlayer(
                     val alphaAnim by animatedVisibilityScope.transition.animateFloat(
                         transitionSpec = {
                             if (targetState == EnterExitState.Visible) {
-                                tween(durationMillis = 260, delayMillis = 60, easing = FastOutSlowInEasing)
+                                tween(durationMillis = 180, delayMillis = 20, easing = FastOutSlowInEasing)
                             } else {
-                                tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                                tween(durationMillis = 120, easing = FastOutSlowInEasing)
                             }
                         },
                         label = "mini_controls_alpha"

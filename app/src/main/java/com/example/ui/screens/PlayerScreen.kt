@@ -165,9 +165,9 @@ fun PlayerScreen(
         val alphaAnim by animatedVisibilityScope.transition.animateFloat(
             transitionSpec = {
                 if (targetState == EnterExitState.Visible) {
-                    tween(durationMillis = 280, delayMillis = 60, easing = FastOutSlowInEasing)
+                    tween(durationMillis = 180, delayMillis = 20, easing = FastOutSlowInEasing)
                 } else {
-                    tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                    tween(durationMillis = 120, easing = FastOutSlowInEasing)
                 }
             },
             label = "player_controls_alpha"
