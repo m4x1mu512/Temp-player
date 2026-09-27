@@ -73,6 +73,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedTab = MutableStateFlow(0) // 0: Tracks, 1: Folders, 2: Artists, 3: Albums, 4: Playlists
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
+    fun selectTab(tabIndex: Int) {
+        _selectedTab.value = tabIndex
+    }
+
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 

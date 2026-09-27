@@ -2,6 +2,8 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import com.example.ui.theme.FavoriteRed
@@ -93,13 +95,14 @@ import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
 import com.example.ui.viewmodel.MainViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(
     viewModel: MainViewModel,
     onNavigateToPlayer: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
@@ -478,7 +481,9 @@ fun LibraryScreen(
                 onClick = onNavigateToPlayer,
                 bgMode = miniPlayerBgMode,
                 customColor = miniPlayerCustomColor,
-                autoRotate = autoRotate
+                autoRotate = autoRotate,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
             )
         }
     ) { paddingValues ->

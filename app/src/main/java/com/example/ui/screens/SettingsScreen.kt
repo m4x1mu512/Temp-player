@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -74,13 +76,14 @@ import com.example.ui.components.SleepTimerDialog
 import com.example.ui.viewmodel.MainViewModel
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: MainViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToPlayer: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
@@ -152,7 +155,9 @@ fun SettingsScreen(
                 onClick = onNavigateToPlayer,
                 bgMode = miniPlayerBgMode,
                 customColor = miniPlayerCustomColor,
-                autoRotate = autoRotate
+                autoRotate = autoRotate,
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope
             )
         }
     ) { paddingValues ->

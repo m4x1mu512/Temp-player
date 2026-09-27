@@ -17,6 +17,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -31,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +48,7 @@ import com.example.ui.screens.PermissionScreen
 import com.example.ui.screens.PlayerScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.util.PLAYER_TRANSITION_DURATION
 import com.example.ui.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -249,130 +255,148 @@ fun AppNavigation(viewModel: MainViewModel) {
         }
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = "library",
-        modifier = Modifier.fillMaxSize(),
-        enterTransition = {
-            fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
-        },
-        exitTransition = {
-            fadeOut(animationSpec = tween(220, easing = FastOutSlowInEasing))
-        }
-    ) {
-        composable(
-            route = "library",
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = "library",
+            modifier = Modifier.fillMaxSize(),
             enterTransition = {
-                if (initialState.destination.route == "player") {
-                    fadeIn(animationSpec = tween(260))
-                } else if (initialState.destination.route == "settings") {
-                    slideIntoContainer(
-                        AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(300, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(240))
-                } else {
-                    fadeIn(animationSpec = tween(260))
-                }
+                fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
             },
             exitTransition = {
-                if (targetState.destination.route == "player") {
-                    fadeOut(animationSpec = tween(220))
-                } else {
+                fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+            }
+        ) {
+            composable(
+                route = "library",
+                enterTransition = {
+                    if (initialState.destination.route == "player") {
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else if (initialState.destination.route == "settings") {
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(240))
+                    } else {
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    }
+                },
+                exitTransition = {
+                    if (targetState.destination.route == "player") {
+                        fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else {
+                        slideOutOfContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(240))
+                    }
+                },
+                popEnterTransition = {
+                    if (initialState.destination.route == "player") {
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else {
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(240))
+                    }
+                }
+            ) {
+                LibraryScreen(
+                    viewModel = viewModel,
+                    onNavigateToPlayer = { navController.navigate("player") },
+                    onNavigateToSettings = { navController.navigate("settings") },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable
+                )
+            }
+
+            composable(
+                route = "player",
+                enterTransition = {
+                    fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                },
+                exitTransition = {
+                    fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                },
+                popEnterTransition = {
+                    fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                },
+                popExitTransition = {
+                    fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                }
+            ) {
+                PlayerScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {
+                        if (!navController.popBackStack()) {
+                            navController.navigate("library") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onNavigateToQueue = {
+                        viewModel.openPlaybackQueue()
+                        val popped = navController.popBackStack("library", inclusive = false)
+                        if (!popped) {
+                            navController.navigate("library") {
+                                popUpTo("library") { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable
+                )
+            }
+
+            composable(
+                route = "settings",
+                enterTransition = {
+                    if (initialState.destination.route == "player") {
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else {
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(240))
+                    }
+                },
+                exitTransition = {
+                    if (targetState.destination.route == "player") {
+                        fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else {
+                        slideOutOfContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Start,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(240))
+                    }
+                },
+                popEnterTransition = {
+                    if (initialState.destination.route == "player") {
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = FastOutSlowInEasing))
+                    } else {
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(240))
+                    }
+                },
+                popExitTransition = {
                     slideOutOfContainer(
-                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        AnimatedContentTransitionScope.SlideDirection.End,
                         animationSpec = tween(300, easing = FastOutSlowInEasing)
                     ) + fadeOut(animationSpec = tween(240))
                 }
-            },
-            popEnterTransition = {
-                fadeIn(animationSpec = tween(260))
+            ) {
+                SettingsScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPlayer = { navController.navigate("player") },
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable
+                )
             }
-        ) {
-            LibraryScreen(
-                viewModel = viewModel,
-                onNavigateToPlayer = { navController.navigate("player") },
-                onNavigateToSettings = { navController.navigate("settings") }
-            )
-        }
-
-        composable(
-            route = "player",
-            enterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Up,
-                    animationSpec = tween(320, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(250))
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(280, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(220))
-            },
-            popEnterTransition = {
-                fadeIn(animationSpec = tween(250))
-            },
-            popExitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Down,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(240))
-            }
-        ) {
-            PlayerScreen(
-                viewModel = viewModel,
-                onNavigateBack = {
-                    if (!navController.popBackStack()) {
-                        navController.navigate("library") {
-                            launchSingleTop = true
-                        }
-                    }
-                },
-                onNavigateToQueue = {
-                    viewModel.openPlaybackQueue()
-                    val popped = navController.popBackStack("library", inclusive = false)
-                    if (!popped) {
-                        navController.navigate("library") {
-                            popUpTo("library") { inclusive = false }
-                            launchSingleTop = true
-                        }
-                    }
-                }
-            )
-        }
-
-        composable(
-            route = "settings",
-            enterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(240))
-            },
-            exitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Start,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(240))
-            },
-            popEnterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(240))
-            },
-            popExitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.End,
-                    animationSpec = tween(300, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(240))
-            }
-        ) {
-            SettingsScreen(
-                viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToPlayer = { navController.navigate("player") }
-            )
         }
     }
 }

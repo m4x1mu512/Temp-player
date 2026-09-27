@@ -9,8 +9,17 @@ import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.ui.graphics.RectangleShape
+import com.example.ui.util.KEY_PLAYER_ALBUM_ART
+import com.example.ui.util.KEY_PLAYER_CONTAINER
+import com.example.ui.util.KEY_PLAYER_TRACK_TEXT
+import com.example.ui.util.playerSharedBounds
+import com.example.ui.util.playerSharedElement
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -133,7 +142,6 @@ import com.example.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
     viewModel: MainViewModel,
@@ -142,7 +150,9 @@ fun PlayerScreen(
     onNavigateToQueue: () -> Unit = {
         viewModel.openPlaybackQueue()
         onNavigateBack()
-    }
+    },
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
@@ -150,6 +160,22 @@ fun PlayerScreen(
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
+
+    val playerControlsAlpha = if (animatedVisibilityScope != null) {
+        val alphaAnim by animatedVisibilityScope.transition.animateFloat(
+            transitionSpec = {
+                if (targetState == EnterExitState.Visible) {
+                    tween(durationMillis = 280, delayMillis = 60, easing = FastOutSlowInEasing)
+                } else {
+                    tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                }
+            },
+            label = "player_controls_alpha"
+        ) { state ->
+            if (state == EnterExitState.Visible) 1f else 0f
+        }
+        alphaAnim
+    } else 1f
 
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
@@ -254,6 +280,12 @@ fun PlayerScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
+                .playerSharedBounds(
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    key = KEY_PLAYER_CONTAINER,
+                    clipShape = RectangleShape
+                )
                 .then(
                     if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
                         Modifier.background(colorScheme.backgroundBrush)
@@ -278,6 +310,7 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer { alpha = playerControlsAlpha }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
@@ -448,7 +481,9 @@ fun PlayerScreen(
                                     isLandscape = true,
                                     isCompact = isCompact,
                                     isMedium = isMedium,
-                                    modifier = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize(),
+                                    sharedTransitionScope = sharedTransitionScope,
+                                    animatedVisibilityScope = animatedVisibilityScope
                                 )
                             }
 
@@ -461,6 +496,7 @@ fun PlayerScreen(
                                         .padding(top = 4.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { viewModel.cycleVisualizerMode() }
+                                        .graphicsLayer { alpha = playerControlsAlpha }
                                         .testTag("player_visualizer_container_landscape")
                                 ) {
                                     AudioVisualizerView(
@@ -508,6 +544,11 @@ fun PlayerScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .playerSharedBounds(
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        key = KEY_PLAYER_TRACK_TEXT
+                                    )
                                     .padding(horizontal = 8.dp)
                             ) {
                                 Text(
@@ -546,12 +587,16 @@ fun PlayerScreen(
                                 isCompact = isCompact,
                                 onSeek = { viewModel.seekTo(it) },
                                 sliderTestTag = "player_progress_slider_landscape",
-                                modifier = Modifier.padding(horizontal = 8.dp)
+                                modifier = Modifier
+                                    .padding(horizontal = 8.dp)
+                                    .graphicsLayer { alpha = playerControlsAlpha }
                             )
 
                             // Secondary Controls: Shuffle, Favorite, Add to Playlist, Repeat
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer { alpha = playerControlsAlpha },
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -637,7 +682,9 @@ fun PlayerScreen(
 
                             // Primary Playback Controls: -10s, Prev, Play/Pause, Next, +10s
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer { alpha = playerControlsAlpha },
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -723,6 +770,7 @@ fun PlayerScreen(
                                     track = track,
                                     modifier = Modifier
                                         .padding(top = 4.dp)
+                                        .graphicsLayer { alpha = playerControlsAlpha }
                                         .testTag("player_audio_specs_landscape")
                                 )
                             }
@@ -798,7 +846,9 @@ fun PlayerScreen(
                                 isLandscape = false,
                                 isCompact = isCompact,
                                 isMedium = isMedium,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope
                             )
                         }
 
@@ -812,6 +862,7 @@ fun PlayerScreen(
                                 .padding(vertical = 1.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
+                                .graphicsLayer { alpha = playerControlsAlpha }
                                 .testTag("player_visualizer_container_portrait")
                         ) {
                             AudioVisualizerView(
@@ -849,6 +900,11 @@ fun PlayerScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .playerSharedBounds(
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                                key = KEY_PLAYER_TRACK_TEXT
+                            )
                             .padding(horizontal = 8.dp, vertical = if (isCompact) 1.dp else 3.dp)
                     ) {
                         Text(
@@ -886,14 +942,16 @@ fun PlayerScreen(
                         duration = duration,
                         isCompact = isCompact,
                         onSeek = { viewModel.seekTo(it) },
-                        sliderTestTag = "player_progress_slider"
+                        sliderTestTag = "player_progress_slider",
+                        modifier = Modifier.graphicsLayer { alpha = playerControlsAlpha }
                     )
 
                     // Secondary controls: Shuffle, Favorite, Add to Playlist, Repeat
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = if (isCompact) 0.dp else 2.dp),
+                            .padding(vertical = if (isCompact) 0.dp else 2.dp)
+                            .graphicsLayer { alpha = playerControlsAlpha },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -986,7 +1044,8 @@ fun PlayerScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = if (isCompact) 1.dp else 3.dp),
+                            .padding(bottom = if (isCompact) 1.dp else 3.dp)
+                            .graphicsLayer { alpha = playerControlsAlpha },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1077,6 +1136,7 @@ fun PlayerScreen(
                             track = track,
                             modifier = Modifier
                                 .padding(top = if (isCompact) 2.dp else 4.dp, bottom = if (isCompact) 2.dp else 4.dp)
+                                .graphicsLayer { alpha = playerControlsAlpha }
                                 .testTag("player_audio_specs_badge")
                         )
                     }
@@ -1321,7 +1381,9 @@ private fun PlayerArtworkCard(
     isLandscape: Boolean,
     isCompact: Boolean,
     isMedium: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
     val pulseScale by infiniteTransition.animateFloat(
@@ -1380,6 +1442,12 @@ private fun PlayerArtworkCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .playerSharedElement(
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        key = KEY_PLAYER_ALBUM_ART,
+                        clipShape = RoundedCornerShape(if (isLandscape) 20.dp else 26.dp)
+                    )
                     .clip(RoundedCornerShape(if (isLandscape) 20.dp else 26.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center

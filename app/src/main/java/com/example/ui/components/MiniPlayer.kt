@@ -2,6 +2,12 @@ package com.example.ui.components
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
@@ -41,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
@@ -55,7 +62,12 @@ import com.example.R
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Track
 import com.example.ui.theme.FavoriteRed
+import com.example.ui.util.KEY_PLAYER_ALBUM_ART
+import com.example.ui.util.KEY_PLAYER_CONTAINER
+import com.example.ui.util.KEY_PLAYER_TRACK_TEXT
 import com.example.ui.util.formatTime
+import com.example.ui.util.playerSharedBounds
+import com.example.ui.util.playerSharedElement
 import com.example.ui.util.rememberMiniPlayerColors
 
 @Composable
@@ -73,7 +85,9 @@ fun MiniPlayer(
     onToggleFavorite: (() -> Unit)? = null,
     bgMode: MiniPlayerBgMode = MiniPlayerBgMode.ALBUM_ART,
     customColor: Long = 0L,
-    autoRotate: Boolean = true
+    autoRotate: Boolean = true,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val position by positionFlow.collectAsStateWithLifecycle()
     MiniPlayer(
@@ -90,7 +104,9 @@ fun MiniPlayer(
         onToggleFavorite = onToggleFavorite,
         bgMode = bgMode,
         customColor = customColor,
-        autoRotate = autoRotate
+        autoRotate = autoRotate,
+        sharedTransitionScope = sharedTransitionScope,
+        animatedVisibilityScope = animatedVisibilityScope
     )
 }
 
@@ -109,7 +125,9 @@ fun MiniPlayer(
     onToggleFavorite: (() -> Unit)? = null,
     bgMode: MiniPlayerBgMode = MiniPlayerBgMode.ALBUM_ART,
     customColor: Long = 0L,
-    autoRotate: Boolean = true
+    autoRotate: Boolean = true,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     AnimatedVisibility(
         visible = currentTrack != null,
@@ -135,6 +153,12 @@ fun MiniPlayer(
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = modifier
                 .fillMaxWidth()
+                .playerSharedBounds(
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    key = KEY_PLAYER_CONTAINER,
+                    clipShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                )
                 .testTag("mini_player")
         ) {
             Box(
@@ -149,6 +173,23 @@ fun MiniPlayer(
                     )
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                // Fade out controls during transition to full player
+                val miniControlsAlpha = if (animatedVisibilityScope != null) {
+                    val alphaAnim by animatedVisibilityScope.transition.animateFloat(
+                        transitionSpec = {
+                            if (targetState == EnterExitState.Visible) {
+                                tween(durationMillis = 260, delayMillis = 60, easing = FastOutSlowInEasing)
+                            } else {
+                                tween(durationMillis = 180, easing = FastOutSlowInEasing)
+                            }
+                        },
+                        label = "mini_controls_alpha"
+                    ) { state ->
+                        if (state == EnterExitState.Visible) 1f else 0f
+                    }
+                    alphaAnim
+                } else 1f
+
                 // Progress line
                 val progress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
                 LinearProgressIndicator(
@@ -156,6 +197,7 @@ fun MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
+                        .graphicsLayer { alpha = miniControlsAlpha }
                         .testTag("mini_player_progress"),
                     color = colorScheme.accentColor,
                     trackColor = colorScheme.progressTrackColor
@@ -180,6 +222,12 @@ fun MiniPlayer(
                             Box(
                                 modifier = Modifier
                                     .size(52.dp)
+                                    .playerSharedElement(
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        key = KEY_PLAYER_ALBUM_ART,
+                                        clipShape = RoundedCornerShape(12.dp)
+                                    )
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
@@ -207,7 +255,13 @@ fun MiniPlayer(
 
                             // Title & Artist with Album
                             Column(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .playerSharedBounds(
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        key = KEY_PLAYER_TRACK_TEXT
+                                    ),
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
@@ -246,6 +300,7 @@ fun MiniPlayer(
                             color = colorScheme.onSurfaceColor.copy(alpha = 0.08f),
                             modifier = Modifier
                                 .padding(horizontal = 8.dp)
+                                .graphicsLayer { alpha = miniControlsAlpha }
                                 .clickable { onClick() }
                         ) {
                             Text(
@@ -262,6 +317,7 @@ fun MiniPlayer(
                                 onClick = onToggleFavorite,
                                 modifier = Modifier
                                     .size(42.dp)
+                                    .graphicsLayer { alpha = miniControlsAlpha }
                                     .testTag("mini_player_favorite")
                             ) {
                                 Icon(
@@ -276,7 +332,8 @@ fun MiniPlayer(
                         // Playback Controls
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.graphicsLayer { alpha = miniControlsAlpha }
                         ) {
                             IconButton(
                                 onClick = onPreviousTrack,
@@ -343,6 +400,12 @@ fun MiniPlayer(
                             Box(
                                 modifier = Modifier
                                     .size(56.dp)
+                                    .playerSharedElement(
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        key = KEY_PLAYER_ALBUM_ART,
+                                        clipShape = RoundedCornerShape(12.dp)
+                                    )
                                     .clip(RoundedCornerShape(12.dp))
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
@@ -370,7 +433,13 @@ fun MiniPlayer(
 
                             // Title & Artist
                             Column(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .playerSharedBounds(
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        key = KEY_PLAYER_TRACK_TEXT
+                                    ),
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
@@ -397,7 +466,8 @@ fun MiniPlayer(
                         // Control buttons: Previous, Play/Pause, Next
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.graphicsLayer { alpha = miniControlsAlpha }
                         ) {
                             // Previous track button
                             IconButton(
@@ -452,6 +522,6 @@ fun MiniPlayer(
             }
         }
     }
-    }
+}
 }
 
