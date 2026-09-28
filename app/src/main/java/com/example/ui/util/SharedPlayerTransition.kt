@@ -15,9 +15,9 @@ const val KEY_PLAYER_CONTAINER = "player_container"
 const val KEY_PLAYER_ALBUM_ART = "player_album_art"
 const val KEY_PLAYER_TRACK_TEXT = "player_track_text"
 
-const val PLAYER_EXPAND_DURATION = 320
-const val PLAYER_COLLAPSE_DURATION = 260
-const val PLAYER_TRANSITION_DURATION = 300
+const val PLAYER_EXPAND_DURATION = 260
+const val PLAYER_COLLAPSE_DURATION = 240
+const val PLAYER_TRANSITION_DURATION = 260
 
 val PlayerEmphasizedEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
 val PlayerEmphasizedDecelerateEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
@@ -30,23 +30,7 @@ fun Modifier.playerSharedBounds(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     key: String,
     clipShape: Shape? = null
-): Modifier {
-    if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
-    return with(sharedTransitionScope) {
-        this@playerSharedBounds.sharedBounds(
-            sharedContentState = rememberSharedContentState(key = key),
-            animatedVisibilityScope = animatedVisibilityScope,
-            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) } ?: OverlayClip(RectangleShape),
-            zIndexInOverlay = 5f,
-            boundsTransform = { initialBounds, targetBounds ->
-                val isExpanding = (targetBounds.width * targetBounds.height) >= (initialBounds.width * initialBounds.height)
-                val duration = if (isExpanding) PLAYER_EXPAND_DURATION else PLAYER_COLLAPSE_DURATION
-                val easing = if (isExpanding) PlayerEmphasizedDecelerateEasing else PlayerEmphasizedAccelerateEasing
-                tween(durationMillis = duration, easing = easing)
-            }
-        )
-    }
-}
+): Modifier = this
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -55,20 +39,4 @@ fun Modifier.playerSharedElement(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     key: String,
     clipShape: Shape? = null
-): Modifier {
-    if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
-    return with(sharedTransitionScope) {
-        this@playerSharedElement.sharedElement(
-            state = rememberSharedContentState(key = key),
-            animatedVisibilityScope = animatedVisibilityScope,
-            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) } ?: OverlayClip(RectangleShape),
-            zIndexInOverlay = 6f,
-            boundsTransform = { initialBounds, targetBounds ->
-                val isExpanding = (targetBounds.width * targetBounds.height) >= (initialBounds.width * initialBounds.height)
-                val duration = if (isExpanding) PLAYER_EXPAND_DURATION else PLAYER_COLLAPSE_DURATION
-                val easing = if (isExpanding) PlayerEmphasizedDecelerateEasing else PlayerEmphasizedAccelerateEasing
-                tween(durationMillis = duration, easing = easing)
-            }
-        )
-    }
-}
+): Modifier = this

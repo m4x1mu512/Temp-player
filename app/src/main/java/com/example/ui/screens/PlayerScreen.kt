@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -161,6 +162,10 @@ fun PlayerScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
+    BackHandler {
+        onNavigateBack()
+    }
+
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
@@ -301,13 +306,7 @@ fun PlayerScreen(
                     }
                 )
                 .graphicsLayer {
-                    val offset = dragOffsetY.value.coerceAtLeast(0f)
-                    translationY = offset
-                    val fraction = (offset / 700f).coerceIn(0f, 1f)
-                    alpha = 1f - (fraction * 0.35f)
-                    val scale = 1f - (fraction * 0.05f)
-                    scaleX = scale
-                    scaleY = scale
+                    translationY = dragOffsetY.value.coerceAtLeast(0f)
                 }
                 .testTag("player_screen")
         ) {
@@ -326,19 +325,19 @@ fun PlayerScreen(
                             onDragEnd = {
                                 if (dragOffsetY.value > dismissThresholdPx) {
                                     coroutineScope.launch {
-                                        dragOffsetY.animateTo(2500f, tween(180))
+                                        dragOffsetY.animateTo(2500f, tween(200, easing = FastOutSlowInEasing))
                                         onNavigateBack()
                                     }
                                 } else {
                                     coroutineScope.launch {
-                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                     }
                                 }
                                 dragDistanceY = 0f
                             },
                             onDragCancel = {
                                 coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                 }
                                 dragDistanceY = 0f
                             },
@@ -808,12 +807,12 @@ fun PlayerScreen(
                                     onDragEnd = {
                                         if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
                                             coroutineScope.launch {
-                                                dragOffsetY.animateTo(2500f, tween(180))
+                                                dragOffsetY.animateTo(2500f, tween(200, easing = FastOutSlowInEasing))
                                                 onNavigateBack()
                                             }
                                         } else {
                                             coroutineScope.launch {
-                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                             }
                                             if (abs(dragDistanceX) > abs(dragDistanceY)) {
                                                 if (dragDistanceX < -80f) {
@@ -828,7 +827,7 @@ fun PlayerScreen(
                                     },
                                     onDragCancel = {
                                         coroutineScope.launch {
-                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 350f))
+                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                         }
                                         dragDistanceX = 0f
                                         dragDistanceY = 0f

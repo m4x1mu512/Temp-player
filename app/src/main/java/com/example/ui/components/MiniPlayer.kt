@@ -24,6 +24,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -168,6 +170,16 @@ fun MiniPlayer(
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = modifier
                 .fillMaxWidth()
+                .pointerInput(onClick) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { change, dragAmount ->
+                            if (dragAmount < -8f) {
+                                change.consume()
+                                onClick()
+                            }
+                        }
+                    )
+                }
                 .playerSharedBounds(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
@@ -238,6 +250,16 @@ fun MiniPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
+                                .pointerInput(onClick) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
+                                            }
+                                        }
+                                    )
+                                }
                                 .clickable { onClick() }
                         ) {
                             // Album art
@@ -423,6 +445,16 @@ fun MiniPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
+                                .pointerInput(onClick) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
+                                            }
+                                        }
+                                    )
+                                }
                                 .clickable { onClick() }
                         ) {
                             // Album art (taller: 56.dp)

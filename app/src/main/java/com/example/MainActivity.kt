@@ -18,6 +18,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
@@ -276,19 +278,19 @@ fun AppNavigation(viewModel: MainViewModel) {
                 route = "library",
                 enterTransition = {
                     if (initialState.destination.route == "player") {
-                        fadeIn(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                        EnterTransition.None
                     } else if (initialState.destination.route == "settings") {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
                             animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
                         ) + fadeIn(animationSpec = tween(220))
                     } else {
-                        fadeIn(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedDecelerateEasing))
                     }
                 },
                 exitTransition = {
                     if (targetState.destination.route == "player") {
-                        fadeOut(animationSpec = tween(PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedAccelerateEasing))
+                        ExitTransition.None
                     } else {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
@@ -298,7 +300,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 },
                 popEnterTransition = {
                     if (initialState.destination.route == "player") {
-                        fadeIn(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                        EnterTransition.None
                     } else {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
@@ -319,16 +321,40 @@ fun AppNavigation(viewModel: MainViewModel) {
             composable(
                 route = "player",
                 enterTransition = {
-                    fadeIn(animationSpec = tween(PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(
+                            durationMillis = PLAYER_EXPAND_DURATION,
+                            easing = PlayerEmphasizedDecelerateEasing
+                        )
+                    )
                 },
                 exitTransition = {
-                    fadeOut(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedAccelerateEasing))
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(
+                            durationMillis = PLAYER_COLLAPSE_DURATION,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
                 },
                 popEnterTransition = {
-                    fadeIn(animationSpec = tween(PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(
+                            durationMillis = PLAYER_EXPAND_DURATION,
+                            easing = PlayerEmphasizedDecelerateEasing
+                        )
+                    )
                 },
                 popExitTransition = {
-                    fadeOut(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedAccelerateEasing))
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(
+                            durationMillis = PLAYER_COLLAPSE_DURATION,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
                 }
             ) {
                 PlayerScreen(
@@ -359,7 +385,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 route = "settings",
                 enterTransition = {
                     if (initialState.destination.route == "player") {
-                        fadeIn(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = FastOutSlowInEasing))
+                        EnterTransition.None
                     } else {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
@@ -369,7 +395,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 },
                 exitTransition = {
                     if (targetState.destination.route == "player") {
-                        fadeOut(animationSpec = tween(PLAYER_EXPAND_DURATION, easing = FastOutSlowInEasing))
+                        ExitTransition.None
                     } else {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
@@ -379,7 +405,7 @@ fun AppNavigation(viewModel: MainViewModel) {
                 },
                 popEnterTransition = {
                     if (initialState.destination.route == "player") {
-                        fadeIn(animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = FastOutSlowInEasing))
+                        EnterTransition.None
                     } else {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
