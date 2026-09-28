@@ -21,6 +21,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import coil.request.ImageRequest
 import androidx.compose.runtime.State
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
@@ -173,21 +174,7 @@ fun PlayerScreen(
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
 
-    val playerControlsAlphaState: State<Float>? = if (animatedVisibilityScope != null) {
-        animatedVisibilityScope.transition.animateFloat(
-            transitionSpec = {
-                if (targetState == EnterExitState.Visible) {
-                    tween(durationMillis = 220, delayMillis = 40, easing = FastOutSlowInEasing)
-                } else {
-                    tween(durationMillis = 140, easing = FastOutSlowInEasing)
-                }
-            },
-            label = "player_controls_alpha"
-        ) { state ->
-            if (state == EnterExitState.Visible) 1f else 0f
-        }
-    } else null
-    val getPlayerControlsAlpha: () -> Float = { playerControlsAlphaState?.value ?: 1f }
+    val getPlayerControlsAlpha: () -> Float = { 1f }
 
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
@@ -221,6 +208,9 @@ fun PlayerScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val dragOffsetY = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        dragOffsetY.snapTo(0f)
+    }
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
@@ -292,6 +282,7 @@ fun PlayerScreen(
         Box(
             modifier = modifier
                 .fillMaxSize()
+                .zIndex(10f)
                 .playerSharedBounds(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
@@ -324,10 +315,7 @@ fun PlayerScreen(
                             },
                             onDragEnd = {
                                 if (dragOffsetY.value > dismissThresholdPx) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.animateTo(2500f, tween(200, easing = FastOutSlowInEasing))
-                                        onNavigateBack()
-                                    }
+                                    onNavigateBack()
                                 } else {
                                     coroutineScope.launch {
                                         dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
@@ -806,10 +794,7 @@ fun PlayerScreen(
                                     },
                                     onDragEnd = {
                                         if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
-                                            coroutineScope.launch {
-                                                dragOffsetY.animateTo(2500f, tween(200, easing = FastOutSlowInEasing))
-                                                onNavigateBack()
-                                            }
+                                            onNavigateBack()
                                         } else {
                                             coroutineScope.launch {
                                                 dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))

@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -314,7 +315,8 @@ fun AppNavigation(viewModel: MainViewModel) {
                     onNavigateToPlayer = { navController.navigate("player") },
                     onNavigateToSettings = { navController.navigate("settings") },
                     sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@composable
+                    animatedVisibilityScope = this@composable,
+                    modifier = Modifier.zIndex(0f)
                 )
             }
 
@@ -377,7 +379,8 @@ fun AppNavigation(viewModel: MainViewModel) {
                         }
                     },
                     sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@composable
+                    animatedVisibilityScope = this@composable,
+                    modifier = Modifier.zIndex(10f)
                 )
             }
 

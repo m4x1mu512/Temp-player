@@ -200,22 +200,7 @@ fun MiniPlayer(
                     )
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                // Deferred alpha read: does NOT trigger recomposition of MiniPlayer
-                val miniControlsAlphaState: State<Float>? = if (animatedVisibilityScope != null) {
-                    animatedVisibilityScope.transition.animateFloat(
-                        transitionSpec = {
-                            if (targetState == EnterExitState.Visible) {
-                                tween(durationMillis = 200, delayMillis = 30, easing = FastOutSlowInEasing)
-                            } else {
-                                tween(durationMillis = 120, easing = FastOutSlowInEasing)
-                            }
-                        },
-                        label = "mini_controls_alpha"
-                    ) { state ->
-                        if (state == EnterExitState.Visible) 1f else 0f
-                    }
-                } else null
-                val getMiniControlsAlpha: () -> Float = { miniControlsAlphaState?.value ?: 1f }
+                val getMiniControlsAlpha: () -> Float = { 1f }
 
                 // Smooth continuous progress line without 250ms jerkiness
                 val targetProgress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f

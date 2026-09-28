@@ -270,8 +270,8 @@ fun LibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
                     .background(MaterialTheme.colorScheme.background)
+                    .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
