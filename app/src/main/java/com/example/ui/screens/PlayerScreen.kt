@@ -8,13 +8,20 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
 import com.example.ui.theme.FavoriteRed
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
+import androidx.compose.runtime.State
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
 import com.example.ui.util.KEY_PLAYER_CONTAINER
 import com.example.ui.util.KEY_PLAYER_TRACK_TEXT
@@ -161,21 +168,21 @@ fun PlayerScreen(
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
 
-    val playerControlsAlpha = if (animatedVisibilityScope != null) {
-        val alphaAnim by animatedVisibilityScope.transition.animateFloat(
+    val playerControlsAlphaState: State<Float>? = if (animatedVisibilityScope != null) {
+        animatedVisibilityScope.transition.animateFloat(
             transitionSpec = {
                 if (targetState == EnterExitState.Visible) {
-                    tween(durationMillis = 180, delayMillis = 20, easing = FastOutSlowInEasing)
+                    tween(durationMillis = 220, delayMillis = 40, easing = FastOutSlowInEasing)
                 } else {
-                    tween(durationMillis = 120, easing = FastOutSlowInEasing)
+                    tween(durationMillis = 140, easing = FastOutSlowInEasing)
                 }
             },
             label = "player_controls_alpha"
         ) { state ->
             if (state == EnterExitState.Visible) 1f else 0f
         }
-        alphaAnim
-    } else 1f
+    } else null
+    val getPlayerControlsAlpha: () -> Float = { playerControlsAlphaState?.value ?: 1f }
 
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
@@ -310,7 +317,7 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer { alpha = playerControlsAlpha }
+                    .graphicsLayer { alpha = getPlayerControlsAlpha() }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
@@ -477,7 +484,7 @@ fun PlayerScreen(
                                     track = track,
                                     isPlaying = isPlaying,
                                     amplitudeFlow = viewModel.audioAmplitude,
-                                    dragDistanceX = dragDistanceX,
+                                    dragDistanceXProvider = { dragDistanceX },
                                     isLandscape = true,
                                     isCompact = isCompact,
                                     isMedium = isMedium,
@@ -496,7 +503,7 @@ fun PlayerScreen(
                                         .padding(top = 4.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable { viewModel.cycleVisualizerMode() }
-                                        .graphicsLayer { alpha = playerControlsAlpha }
+                                        .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                         .testTag("player_visualizer_container_landscape")
                                 ) {
                                     AudioVisualizerView(
@@ -584,19 +591,20 @@ fun PlayerScreen(
                             PlayerProgressSection(
                                 positionFlow = viewModel.playbackPosition,
                                 duration = duration,
+                                isPlaying = isPlaying,
                                 isCompact = isCompact,
                                 onSeek = { viewModel.seekTo(it) },
                                 sliderTestTag = "player_progress_slider_landscape",
                                 modifier = Modifier
                                     .padding(horizontal = 8.dp)
-                                    .graphicsLayer { alpha = playerControlsAlpha }
+                                    .graphicsLayer { alpha = getPlayerControlsAlpha() }
                             )
 
                             // Secondary Controls: Shuffle, Favorite, Add to Playlist, Repeat
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .graphicsLayer { alpha = playerControlsAlpha },
+                                    .graphicsLayer { alpha = getPlayerControlsAlpha() },
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -684,7 +692,7 @@ fun PlayerScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .graphicsLayer { alpha = playerControlsAlpha },
+                                    .graphicsLayer { alpha = getPlayerControlsAlpha() },
                                 horizontalArrangement = Arrangement.SpaceEvenly,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -727,11 +735,20 @@ fun PlayerScreen(
                                         .shadow(10.dp, CircleShape, spotColor = NeonCyan)
                                         .testTag("player_play_pause_button_landscape")
                                 ) {
-                                    Icon(
-                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                                        modifier = Modifier.size(34.dp)
-                                    )
+                                    AnimatedContent(
+                                        targetState = isPlaying,
+                                        transitionSpec = {
+                                            (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                                .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                        },
+                                        label = "player_play_pause_land_anim"
+                                    ) { playing ->
+                                        Icon(
+                                            imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (playing) "Пауза" else "Воспроизведение",
+                                            modifier = Modifier.size(34.dp)
+                                        )
+                                    }
                                 }
 
                                 IconButton(
@@ -770,7 +787,7 @@ fun PlayerScreen(
                                     track = track,
                                     modifier = Modifier
                                         .padding(top = 4.dp)
-                                        .graphicsLayer { alpha = playerControlsAlpha }
+                                        .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                         .testTag("player_audio_specs_landscape")
                                 )
                             }
@@ -842,7 +859,7 @@ fun PlayerScreen(
                                 track = track,
                                 isPlaying = isPlaying,
                                 amplitudeFlow = viewModel.audioAmplitude,
-                                dragDistanceX = dragDistanceX,
+                                dragDistanceXProvider = { dragDistanceX },
                                 isLandscape = false,
                                 isCompact = isCompact,
                                 isMedium = isMedium,
@@ -862,7 +879,7 @@ fun PlayerScreen(
                                 .padding(vertical = 1.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
-                                .graphicsLayer { alpha = playerControlsAlpha }
+                                .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                 .testTag("player_visualizer_container_portrait")
                         ) {
                             AudioVisualizerView(
@@ -940,10 +957,11 @@ fun PlayerScreen(
                     PlayerProgressSection(
                         positionFlow = viewModel.playbackPosition,
                         duration = duration,
+                        isPlaying = isPlaying,
                         isCompact = isCompact,
                         onSeek = { viewModel.seekTo(it) },
                         sliderTestTag = "player_progress_slider",
-                        modifier = Modifier.graphicsLayer { alpha = playerControlsAlpha }
+                        modifier = Modifier.graphicsLayer { alpha = getPlayerControlsAlpha() }
                     )
 
                     // Secondary controls: Shuffle, Favorite, Add to Playlist, Repeat
@@ -951,7 +969,7 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = if (isCompact) 0.dp else 2.dp)
-                            .graphicsLayer { alpha = playerControlsAlpha },
+                            .graphicsLayer { alpha = getPlayerControlsAlpha() },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1045,7 +1063,7 @@ fun PlayerScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = if (isCompact) 1.dp else 3.dp)
-                            .graphicsLayer { alpha = playerControlsAlpha },
+                            .graphicsLayer { alpha = getPlayerControlsAlpha() },
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -1091,11 +1109,20 @@ fun PlayerScreen(
                                 .shadow(if (isCompact) 8.dp else 12.dp, CircleShape, spotColor = NeonCyan)
                                 .testTag("player_play_pause_button")
                         ) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                                modifier = Modifier.size(if (isCompact) 32.dp else 36.dp)
-                            )
+                            AnimatedContent(
+                                targetState = isPlaying,
+                                transitionSpec = {
+                                    (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                        .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                },
+                                label = "player_play_pause_button_anim"
+                            ) { playing ->
+                                Icon(
+                                    imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (playing) "Пауза" else "Воспроизведение",
+                                    modifier = Modifier.size(if (isCompact) 32.dp else 36.dp)
+                                )
+                            }
                         }
 
                         // Next Track
@@ -1136,7 +1163,7 @@ fun PlayerScreen(
                             track = track,
                             modifier = Modifier
                                 .padding(top = if (isCompact) 2.dp else 4.dp, bottom = if (isCompact) 2.dp else 4.dp)
-                                .graphicsLayer { alpha = playerControlsAlpha }
+                                .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                 .testTag("player_audio_specs_badge")
                         )
                     }
@@ -1377,7 +1404,7 @@ private fun PlayerArtworkCard(
     track: Track,
     isPlaying: Boolean,
     amplitudeFlow: StateFlow<Float>,
-    dragDistanceX: Float,
+    dragDistanceXProvider: () -> Float,
     isLandscape: Boolean,
     isCompact: Boolean,
     isMedium: Boolean,
@@ -1386,7 +1413,7 @@ private fun PlayerArtworkCard(
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "artwork_pulse_transition")
-    val pulseScale by infiniteTransition.animateFloat(
+    val pulseScaleState = infiniteTransition.animateFloat(
         initialValue = 1.0f,
         targetValue = if (isPlaying) 1.035f else 1.0f,
         animationSpec = infiniteRepeatable(
@@ -1395,8 +1422,8 @@ private fun PlayerArtworkCard(
         ),
         label = "pulse_scale"
     )
-    val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
-    val playbackStateScale by animateFloatAsState(
+    val amplitudeState = amplitudeFlow.collectAsStateWithLifecycle()
+    val playbackStateScaleState = animateFloatAsState(
         targetValue = if (isPlaying) 1.0f else 0.94f,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 300f),
         label = "playback_state_scale"
@@ -1415,16 +1442,28 @@ private fun PlayerArtworkCard(
             ).coerceAtLeast(90.dp)
         }
 
+        val context = LocalContext.current
+        val artRequest = remember(track.albumArtUri) {
+            ImageRequest.Builder(context)
+                .data(track.albumArtUri ?: R.drawable.ic_default_art)
+                .crossfade(180)
+                .placeholder(R.drawable.ic_default_art)
+                .error(R.drawable.ic_default_art)
+                .build()
+        }
+
         Box(
             modifier = Modifier
                 .size(artSize)
                 .graphicsLayer {
-                    val ampPulse = if (isPlaying) 1.0f + (amplitude * 0.045f) else 1.0f
-                    val scale = pulseScale * ampPulse * playbackStateScale
+                    val amp = amplitudeState.value
+                    val ampPulse = if (isPlaying) 1.0f + (amp * 0.045f) else 1.0f
+                    val scale = pulseScaleState.value * ampPulse * playbackStateScaleState.value
                     scaleX = scale
                     scaleY = scale
-                    rotationY = (dragDistanceX / 25f).coerceIn(-18f, 18f)
-                    translationX = (dragDistanceX / 3.5f).coerceIn(-60f, 60f)
+                    val dragX = dragDistanceXProvider()
+                    rotationY = (dragX / 25f).coerceIn(-18f, 18f)
+                    translationX = (dragX / 3.5f).coerceIn(-60f, 60f)
                     cameraDistance = 14f * density
                 },
             contentAlignment = Alignment.Center
@@ -1452,23 +1491,12 @@ private fun PlayerArtworkCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (track.albumArtUri != null) {
-                    AsyncImage(
-                        model = track.albumArtUri,
-                        contentDescription = "Обложка трека",
-                        contentScale = ContentScale.Crop,
-                        error = painterResource(id = R.drawable.ic_default_art),
-                        placeholder = painterResource(id = R.drawable.ic_default_art),
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    AsyncImage(
-                        model = R.drawable.ic_default_art,
-                        contentDescription = "Обложка трека",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                AsyncImage(
+                    model = artRequest,
+                    contentDescription = "Обложка трека",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -1478,22 +1506,43 @@ private fun PlayerArtworkCard(
 private fun PlayerProgressSection(
     positionFlow: StateFlow<Long>,
     duration: Long,
+    isPlaying: Boolean,
     isCompact: Boolean,
     onSeek: (Long) -> Unit,
     sliderTestTag: String,
     modifier: Modifier = Modifier
 ) {
-    val position by positionFlow.collectAsStateWithLifecycle()
+    val rawPosition by positionFlow.collectAsStateWithLifecycle()
     var isUserScrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
+
+    val smoothAnimatedPos = remember { Animatable(rawPosition.toFloat()) }
+
+    LaunchedEffect(rawPosition, isPlaying, isUserScrubbing) {
+        if (!isUserScrubbing) {
+            val rawFloat = rawPosition.toFloat()
+            if (!isPlaying) {
+                smoothAnimatedPos.snapTo(rawFloat)
+            } else {
+                if (abs(smoothAnimatedPos.value - rawFloat) > 1500f) {
+                    smoothAnimatedPos.snapTo(rawFloat)
+                }
+                val target = if (duration > 0) minOf(duration.toFloat(), rawFloat + 250f) else rawFloat + 250f
+                smoothAnimatedPos.animateTo(
+                    targetValue = target,
+                    animationSpec = tween(durationMillis = 250, easing = LinearEasing)
+                )
+            }
+        }
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = if (isCompact) 0.dp else 2.dp)
     ) {
-        val currentPos = if (isUserScrubbing) scrubPosition.toLong() else position
-        val sliderVal = if (duration > 0) currentPos.toFloat().coerceIn(0f, duration.toFloat()) else 0f
+        val currentFloat = if (isUserScrubbing) scrubPosition else smoothAnimatedPos.value
+        val sliderVal = if (duration > 0) currentFloat.coerceIn(0f, duration.toFloat()) else 0f
 
         Slider(
             value = sliderVal,
@@ -1516,6 +1565,10 @@ private fun PlayerProgressSection(
                 .testTag(sliderTestTag)
         )
 
+        val currentSeconds = (currentFloat / 1000f).toLong().coerceAtLeast(0L)
+        val formattedCurrent = remember(currentSeconds) { formatTime(currentSeconds * 1000L) }
+        val formattedDuration = remember(duration) { formatTime(duration) }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1523,12 +1576,12 @@ private fun PlayerProgressSection(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = formatTime(currentPos),
+                text = formattedCurrent,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = formatTime(duration),
+                text = formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -15,9 +15,13 @@ const val KEY_PLAYER_CONTAINER = "player_container"
 const val KEY_PLAYER_ALBUM_ART = "player_album_art"
 const val KEY_PLAYER_TRACK_TEXT = "player_track_text"
 
-const val PLAYER_EXPAND_DURATION = 260
-const val PLAYER_COLLAPSE_DURATION = 200
-const val PLAYER_TRANSITION_DURATION = 250
+const val PLAYER_EXPAND_DURATION = 320
+const val PLAYER_COLLAPSE_DURATION = 260
+const val PLAYER_TRANSITION_DURATION = 300
+
+val PlayerEmphasizedEasing = CubicBezierEasing(0.2f, 0.0f, 0.0f, 1.0f)
+val PlayerEmphasizedDecelerateEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
+val PlayerEmphasizedAccelerateEasing = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -37,7 +41,8 @@ fun Modifier.playerSharedBounds(
             boundsTransform = { initialBounds, targetBounds ->
                 val isExpanding = (targetBounds.width * targetBounds.height) >= (initialBounds.width * initialBounds.height)
                 val duration = if (isExpanding) PLAYER_EXPAND_DURATION else PLAYER_COLLAPSE_DURATION
-                tween(durationMillis = duration, easing = FastOutSlowInEasing)
+                val easing = if (isExpanding) PlayerEmphasizedDecelerateEasing else PlayerEmphasizedAccelerateEasing
+                tween(durationMillis = duration, easing = easing)
             }
         )
     }
@@ -61,7 +66,8 @@ fun Modifier.playerSharedElement(
             boundsTransform = { initialBounds, targetBounds ->
                 val isExpanding = (targetBounds.width * targetBounds.height) >= (initialBounds.width * initialBounds.height)
                 val duration = if (isExpanding) PLAYER_EXPAND_DURATION else PLAYER_COLLAPSE_DURATION
-                tween(durationMillis = duration, easing = FastOutSlowInEasing)
+                val easing = if (isExpanding) PlayerEmphasizedDecelerateEasing else PlayerEmphasizedAccelerateEasing
+                tween(durationMillis = duration, easing = easing)
             }
         )
     }

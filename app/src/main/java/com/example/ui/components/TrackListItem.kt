@@ -1,8 +1,10 @@
 package com.example.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
@@ -37,12 +39,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.Track
 
@@ -58,16 +62,20 @@ fun TrackListItem(
     isFavorite: Boolean = track.isFavorite
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    val itemBgColor by animateColorAsState(
+        targetValue = if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.09f) else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "item_bg_${track.id}"
+    )
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() }
-            .background(
-                if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
-                else Color.Transparent
-            )
+            .background(itemBgColor)
             .padding(horizontal = 16.dp, vertical = 10.dp)
             .testTag("track_item_${track.id}")
     ) {
@@ -79,36 +87,45 @@ fun TrackListItem(
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
-            if (track.albumArtUri != null) {
-                AsyncImage(
-                    model = track.albumArtUri,
-                    contentDescription = "Обложка ${track.title}",
-                    contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.ic_default_art),
-                    placeholder = painterResource(id = R.drawable.ic_default_art),
-                    modifier = Modifier.size(50.dp)
-                )
-            } else {
-                AsyncImage(
-                    model = R.drawable.ic_default_art,
-                    contentDescription = "Обложка по умолчанию",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(50.dp)
-                )
+            val thumbnailRequest = remember(track.albumArtUri) {
+                ImageRequest.Builder(context)
+                    .data(track.albumArtUri ?: R.drawable.ic_default_art)
+                    .size(150, 150)
+                    .crossfade(150)
+                    .placeholder(R.drawable.ic_default_art)
+                    .error(R.drawable.ic_default_art)
+                    .build()
             }
+
+            AsyncImage(
+                model = thumbnailRequest,
+                contentDescription = "Обложка ${track.title}",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(50.dp)
+            )
 
             if (isCurrent) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)),
                     contentAlignment = Alignment.Center
                 ) {
+                    val eqScale by animateFloatAsState(
+                        targetValue = if (isPlaying) 1.05f else 0.95f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                        label = "eq_scale_${track.id}"
+                    )
                     Icon(
                         imageVector = Icons.Default.GraphicEq,
                         contentDescription = "Сейчас играет",
                         tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier
+                            .size(24.dp)
+                            .graphicsLayer {
+                                scaleX = eqScale
+                                scaleY = eqScale
+                            }
                     )
                 }
             }

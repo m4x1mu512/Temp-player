@@ -1,15 +1,26 @@
 package com.example.ui.components
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,7 +53,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Track
@@ -173,12 +188,12 @@ fun MiniPlayer(
                     )
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                // Fade out controls during transition to full player
-                val miniControlsAlpha = if (animatedVisibilityScope != null) {
-                    val alphaAnim by animatedVisibilityScope.transition.animateFloat(
+                // Deferred alpha read: does NOT trigger recomposition of MiniPlayer
+                val miniControlsAlphaState: State<Float>? = if (animatedVisibilityScope != null) {
+                    animatedVisibilityScope.transition.animateFloat(
                         transitionSpec = {
                             if (targetState == EnterExitState.Visible) {
-                                tween(durationMillis = 180, delayMillis = 20, easing = FastOutSlowInEasing)
+                                tween(durationMillis = 200, delayMillis = 30, easing = FastOutSlowInEasing)
                             } else {
                                 tween(durationMillis = 120, easing = FastOutSlowInEasing)
                             }
@@ -187,21 +202,28 @@ fun MiniPlayer(
                     ) { state ->
                         if (state == EnterExitState.Visible) 1f else 0f
                     }
-                    alphaAnim
-                } else 1f
+                } else null
+                val getMiniControlsAlpha: () -> Float = { miniControlsAlphaState?.value ?: 1f }
 
-                // Progress line
-                val progress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+                // Smooth continuous progress line without 250ms jerkiness
+                val targetProgress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+                val animatedProgress by animateFloatAsState(
+                    targetValue = targetProgress,
+                    animationSpec = if (isPlaying) tween(durationMillis = 250, easing = LinearEasing) else snap(),
+                    label = "mini_player_animated_progress"
+                )
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { animatedProgress },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(3.dp)
-                        .graphicsLayer { alpha = miniControlsAlpha }
+                        .graphicsLayer { alpha = getMiniControlsAlpha() }
                         .testTag("mini_player_progress"),
                     color = colorScheme.accentColor,
                     trackColor = colorScheme.progressTrackColor
                 )
+
+                val context = LocalContext.current
 
                 if (isLandscape) {
                     // Landscape horizontal orientation layout for MiniPlayer
@@ -232,23 +254,21 @@ fun MiniPlayer(
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (currentTrack.albumArtUri != null) {
-                                    AsyncImage(
-                                        model = currentTrack.albumArtUri,
-                                        contentDescription = "Обложка трека",
-                                        contentScale = ContentScale.Crop,
-                                        error = painterResource(id = R.drawable.ic_default_art),
-                                        placeholder = painterResource(id = R.drawable.ic_default_art),
-                                        modifier = Modifier.size(52.dp)
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = R.drawable.ic_default_art,
-                                        contentDescription = "Обложка трека",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(52.dp)
-                                    )
+                                val miniLandscapeArtRequest = remember(currentTrack.albumArtUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(currentTrack.albumArtUri ?: R.drawable.ic_default_art)
+                                        .size(160, 160)
+                                        .crossfade(150)
+                                        .placeholder(R.drawable.ic_default_art)
+                                        .error(R.drawable.ic_default_art)
+                                        .build()
                                 }
+                                AsyncImage(
+                                    model = miniLandscapeArtRequest,
+                                    contentDescription = "Обложка трека",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(52.dp)
+                                )
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))
@@ -300,7 +320,7 @@ fun MiniPlayer(
                             color = colorScheme.onSurfaceColor.copy(alpha = 0.08f),
                             modifier = Modifier
                                 .padding(horizontal = 8.dp)
-                                .graphicsLayer { alpha = miniControlsAlpha }
+                                .graphicsLayer { alpha = getMiniControlsAlpha() }
                                 .clickable { onClick() }
                         ) {
                             Text(
@@ -317,7 +337,7 @@ fun MiniPlayer(
                                 onClick = onToggleFavorite,
                                 modifier = Modifier
                                     .size(42.dp)
-                                    .graphicsLayer { alpha = miniControlsAlpha }
+                                    .graphicsLayer { alpha = getMiniControlsAlpha() }
                                     .testTag("mini_player_favorite")
                             ) {
                                 Icon(
@@ -333,7 +353,7 @@ fun MiniPlayer(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.graphicsLayer { alpha = miniControlsAlpha }
+                            modifier = Modifier.graphicsLayer { alpha = getMiniControlsAlpha() }
                         ) {
                             IconButton(
                                 onClick = onPreviousTrack,
@@ -359,11 +379,20 @@ fun MiniPlayer(
                                     .size(46.dp)
                                     .testTag("mini_player_play_pause")
                             ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                                    modifier = Modifier.size(26.dp)
-                                )
+                                AnimatedContent(
+                                    targetState = isPlaying,
+                                    transitionSpec = {
+                                        (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                            .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                    },
+                                    label = "mini_land_play_pause"
+                                ) { playing ->
+                                    Icon(
+                                        imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (playing) "Пауза" else "Воспроизведение",
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
                             }
 
                             IconButton(
@@ -410,23 +439,21 @@ fun MiniPlayer(
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (currentTrack.albumArtUri != null) {
-                                    AsyncImage(
-                                        model = currentTrack.albumArtUri,
-                                        contentDescription = "Обложка трека",
-                                        contentScale = ContentScale.Crop,
-                                        error = painterResource(id = R.drawable.ic_default_art),
-                                        placeholder = painterResource(id = R.drawable.ic_default_art),
-                                        modifier = Modifier.size(56.dp)
-                                    )
-                                } else {
-                                    AsyncImage(
-                                        model = R.drawable.ic_default_art,
-                                        contentDescription = "Обложка трека",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(56.dp)
-                                    )
+                                val miniPortraitArtRequest = remember(currentTrack.albumArtUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(currentTrack.albumArtUri ?: R.drawable.ic_default_art)
+                                        .size(160, 160)
+                                        .crossfade(150)
+                                        .placeholder(R.drawable.ic_default_art)
+                                        .error(R.drawable.ic_default_art)
+                                        .build()
                                 }
+                                AsyncImage(
+                                    model = miniPortraitArtRequest,
+                                    contentDescription = "Обложка трека",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(56.dp)
+                                )
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))
@@ -467,7 +494,7 @@ fun MiniPlayer(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.graphicsLayer { alpha = miniControlsAlpha }
+                            modifier = Modifier.graphicsLayer { alpha = getMiniControlsAlpha() }
                         ) {
                             // Previous track button
                             IconButton(
@@ -495,11 +522,20 @@ fun MiniPlayer(
                                     .size(48.dp)
                                     .testTag("mini_player_play_pause")
                             ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                                    modifier = Modifier.size(28.dp)
-                                )
+                                AnimatedContent(
+                                    targetState = isPlaying,
+                                    transitionSpec = {
+                                        (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                            .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                    },
+                                    label = "mini_port_play_pause"
+                                ) { playing ->
+                                    Icon(
+                                        imageVector = if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (playing) "Пауза" else "Воспроизведение",
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
                             }
 
                             // Next track button
