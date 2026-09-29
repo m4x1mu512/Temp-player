@@ -171,25 +171,9 @@ fun MiniPlayer(
             modifier = modifier
                 .fillMaxWidth()
                 .pointerInput(onClick) {
-                    var totalDragY = 0f
-                    var isTriggered = false
                     detectVerticalDragGestures(
-                        onDragStart = {
-                            totalDragY = 0f
-                            isTriggered = false
-                        },
-                        onDragEnd = {
-                            totalDragY = 0f
-                            isTriggered = false
-                        },
-                        onDragCancel = {
-                            totalDragY = 0f
-                            isTriggered = false
-                        },
                         onVerticalDrag = { change, dragAmount ->
-                            totalDragY += dragAmount
-                            if (!isTriggered && totalDragY < -18f) {
-                                isTriggered = true
+                            if (dragAmount < -8f) {
                                 change.consume()
                                 onClick()
                             }
@@ -251,6 +235,16 @@ fun MiniPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
+                                .pointerInput(onClick) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
+                                            }
+                                        }
+                                    )
+                                }
                                 .clickable { onClick() }
                         ) {
                             // Album art
@@ -436,6 +430,16 @@ fun MiniPlayer(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .weight(1f)
+                                .pointerInput(onClick) {
+                                    detectVerticalDragGestures(
+                                        onVerticalDrag = { change, dragAmount ->
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
+                                            }
+                                        }
+                                    )
+                                }
                                 .clickable { onClick() }
                         ) {
                             // Album art (taller: 56.dp)
