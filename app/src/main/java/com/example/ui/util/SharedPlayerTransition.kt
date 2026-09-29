@@ -1,6 +1,7 @@
 package com.example.ui.util
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.SharedTransitionScope.OverlayClip
@@ -32,14 +33,24 @@ fun Modifier.playerSharedBounds(
 ): Modifier {
     if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
     return with(sharedTransitionScope) {
-        sharedBounds(
-            sharedContentState = rememberSharedContentState(key = key),
-            animatedVisibilityScope = animatedVisibilityScope,
-            boundsTransform = { _, _ ->
-                tween(durationMillis = PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedEasing)
-            },
-            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) }
-        )
+        val sharedContentState = rememberSharedContentState(key = key)
+        val boundsTransform = BoundsTransform { _, _ ->
+            tween(durationMillis = PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedEasing)
+        }
+        if (clipShape != null) {
+            sharedBounds(
+                sharedContentState = sharedContentState,
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = boundsTransform,
+                clipInOverlayDuringTransition = OverlayClip(clipShape)
+            )
+        } else {
+            sharedBounds(
+                sharedContentState = sharedContentState,
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = boundsTransform
+            )
+        }
     }
 }
 
@@ -53,13 +64,23 @@ fun Modifier.playerSharedElement(
 ): Modifier {
     if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
     return with(sharedTransitionScope) {
-        sharedElement(
-            state = rememberSharedContentState(key = key),
-            animatedVisibilityScope = animatedVisibilityScope,
-            boundsTransform = { _, _ ->
-                tween(durationMillis = PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing)
-            },
-            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) }
-        )
+        val sharedContentState = rememberSharedContentState(key = key)
+        val boundsTransform = BoundsTransform { _, _ ->
+            tween(durationMillis = PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing)
+        }
+        if (clipShape != null) {
+            sharedElement(
+                sharedContentState = sharedContentState,
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = boundsTransform,
+                clipInOverlayDuringTransition = OverlayClip(clipShape)
+            )
+        } else {
+            sharedElement(
+                sharedContentState = sharedContentState,
+                animatedVisibilityScope = animatedVisibilityScope,
+                boundsTransform = boundsTransform
+            )
+        }
     }
 }
