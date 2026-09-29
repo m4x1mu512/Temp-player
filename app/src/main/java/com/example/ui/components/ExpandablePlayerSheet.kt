@@ -292,16 +292,29 @@ fun ExpandablePlayerSheet(
             }
         }
 
+        val expandProgress = if (maxDragPx > 0f) {
+            (1f - (offsetY.value / maxDragPx)).coerceIn(0f, 1f)
+        } else if (isExpanded) 1f else 0f
+
+        val settleToTarget: (velocityY: Float) -> Unit = { velocityY ->
+            val targetExpanded = when {
+                velocityY < -250f -> true // flick up
+                velocityY > 250f -> false // flick down
+                else -> expandProgress > 0.45f // dragged more than 45% -> expand
+            }
+            if (targetExpanded) {
+                expandToFull()
+            } else {
+                collapseToMini()
+            }
+        }
+
         // Listen for navigation-to-player requests from ViewModel or elsewhere
         LaunchedEffect(Unit) {
             viewModel.navigateToPlayerEvent.collect {
                 expandToFull()
             }
         }
-
-        val expandProgress = if (maxDragPx > 0f) {
-            (1f - (offsetY.value / maxDragPx)).coerceIn(0f, 1f)
-        } else if (isExpanded) 1f else 0f
 
         // BackHandler: collapses player when expanded
         BackHandler(enabled = isExpanded || expandProgress > 0.05f) {
@@ -334,6 +347,45 @@ fun ExpandablePlayerSheet(
                         } else BorderStroke(0.dp, Color.Transparent),
                         shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
                     )
+                    .pointerInput(maxDragPx) {
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var totalDragY = 0f
+                            var isDrag = false
+                            val pointerId = down.id
+                            var lastTime = SystemClock.uptimeMillis()
+                            var velocityY = 0f
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == pointerId }
+                                if (change == null || change.changedToUp() || change.isConsumed) {
+                                    if (isDrag) {
+                                        settleToTarget(velocityY)
+                                    }
+                                    break
+                                }
+                                val posChange = change.positionChange()
+                                if (posChange != Offset.Zero) {
+                                    val dy = posChange.y
+                                    totalDragY += dy
+                                    if (!isDrag && abs(totalDragY) > viewConfiguration.touchSlop) {
+                                        isDrag = true
+                                    }
+                                    if (isDrag) {
+                                        change.consume()
+                                        val now = SystemClock.uptimeMillis()
+                                        val dt = (now - lastTime).coerceAtLeast(1L)
+                                        velocityY = (dy / dt) * 1000f
+                                        lastTime = now
+                                        coroutineScope.launch {
+                                            offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
             ) {
                 // 1. ALBUM ARTWORK: Smoothly interpolates size, position, and corner radius!
@@ -393,63 +445,36 @@ fun ExpandablePlayerSheet(
                         )
                         .clip(RoundedCornerShape(currentArtCornerRadius))
                         .background(colorScheme.progressTrackColor)
-                        .pointerInput(maxDragPx, expandProgress) {
+                        .clickable(enabled = expandProgress < 0.2f) {
+                            expandToFull()
+                        }
+                        .pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 var totalDragX = 0f
                                 var totalDragY = 0f
-                                var isDrag = false
                                 var isHorizontal = false
-                                var isVertical = false
                                 val pointerId = down.id
-                                var lastTime = SystemClock.uptimeMillis()
-                                var velocityY = 0f
 
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == pointerId } ?: break
                                     if (change.changedToUp()) {
-                                        if (!isDrag) {
-                                            if (expandProgress < 0.2f) {
-                                                expandToFull()
-                                            }
-                                        } else if (isVertical) {
-                                            if (velocityY > 200f || totalDragY > 40f || expandProgress < 0.85f) {
-                                                collapseToMini()
-                                            } else {
-                                                expandToFull()
-                                            }
-                                        } else if (isHorizontal) {
-                                            if (totalDragX < -50f) viewModel.nextTrack()
-                                            else if (totalDragX > 50f) viewModel.previousTrack()
+                                        if (isHorizontal) {
+                                            if (totalDragX < -60f) viewModel.nextTrack()
+                                            else if (totalDragX > 60f) viewModel.previousTrack()
                                         }
                                         break
-                                    } else if (change.positionChange() != Offset.Zero) {
-                                        val dx = change.positionChange().x
-                                        val dy = change.positionChange().y
-                                        totalDragX += dx
-                                        totalDragY += dy
-                                        if (!isDrag) {
-                                            if (abs(totalDragX) > viewConfiguration.touchSlop || abs(totalDragY) > viewConfiguration.touchSlop) {
-                                                isDrag = true
-                                                if (abs(totalDragX) > abs(totalDragY)) {
-                                                    isHorizontal = true
-                                                } else {
-                                                    isVertical = true
-                                                }
-                                            }
+                                    }
+                                    val posChange = change.positionChange()
+                                    if (posChange != Offset.Zero) {
+                                        totalDragX += posChange.x
+                                        totalDragY += posChange.y
+                                        if (!isHorizontal && abs(totalDragX) > viewConfiguration.touchSlop && abs(totalDragX) > abs(totalDragY) * 1.5f) {
+                                            isHorizontal = true
                                         }
-                                        if (isDrag) {
+                                        if (isHorizontal) {
                                             change.consume()
-                                            if (isVertical) {
-                                                val now = SystemClock.uptimeMillis()
-                                                val dt = (now - lastTime).coerceAtLeast(1L)
-                                                velocityY = (dy / dt) * 1000f
-                                                lastTime = now
-                                                coroutineScope.launch {
-                                                    offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
-                                                }
-                                            }
                                         }
                                     }
                                 }
@@ -485,54 +510,14 @@ fun ExpandablePlayerSheet(
                         trackColor = colorScheme.progressTrackColor
                     )
 
-                    // Mini player clickable / draggable backdrop
+                    // Mini player clickable backdrop
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(miniBarHeight)
                             .graphicsLayer { alpha = miniAlpha }
-                            .pointerInput(maxDragPx) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = false)
-                                    var totalDragY = 0f
-                                    var isDrag = false
-                                    val pointerId = down.id
-                                    var lastTime = SystemClock.uptimeMillis()
-                                    var velocityY = 0f
-
-                                    while (true) {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                                        if (change.changedToUp()) {
-                                            if (!isDrag) {
-                                                expandToFull()
-                                            } else {
-                                                if (velocityY < -200f || totalDragY < -25f || expandProgress > 0.2f) {
-                                                    expandToFull()
-                                                } else {
-                                                    collapseToMini()
-                                                }
-                                            }
-                                            break
-                                        } else if (change.positionChange() != Offset.Zero) {
-                                            val dy = change.positionChange().y
-                                            totalDragY += dy
-                                            if (!isDrag && abs(totalDragY) > viewConfiguration.touchSlop) {
-                                                isDrag = true
-                                            }
-                                            if (isDrag) {
-                                                change.consume()
-                                                val now = SystemClock.uptimeMillis()
-                                                val dt = (now - lastTime).coerceAtLeast(1L)
-                                                velocityY = (dy / dt) * 1000f
-                                                lastTime = now
-                                                coroutineScope.launch {
-                                                    offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                            .clickable(enabled = expandProgress < 0.2f) {
+                                expandToFull()
                             }
                     ) {
                         // Title & Artist for MiniPlayer
@@ -655,47 +640,6 @@ fun ExpandablePlayerSheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .statusBarsPadding()
-                                .pointerInput(maxDragPx) {
-                                    awaitEachGesture {
-                                        val down = awaitFirstDown(requireUnconsumed = false)
-                                        var totalDragY = 0f
-                                        var isDrag = false
-                                        val pointerId = down.id
-                                        var lastTime = SystemClock.uptimeMillis()
-                                        var velocityY = 0f
-
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                                            if (change.changedToUp()) {
-                                                if (isDrag) {
-                                                    if (velocityY > 200f || totalDragY > 40f || expandProgress < 0.85f) {
-                                                        collapseToMini()
-                                                    } else {
-                                                        expandToFull()
-                                                    }
-                                                }
-                                                break
-                                            } else if (change.positionChange() != Offset.Zero) {
-                                                val dy = change.positionChange().y
-                                                totalDragY += dy
-                                                if (!isDrag && totalDragY > viewConfiguration.touchSlop) {
-                                                    isDrag = true
-                                                }
-                                                if (isDrag) {
-                                                    change.consume()
-                                                    val now = SystemClock.uptimeMillis()
-                                                    val dt = (now - lastTime).coerceAtLeast(1L)
-                                                    velocityY = (dy / dt) * 1000f
-                                                    lastTime = now
-                                                    coroutineScope.launch {
-                                                        offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
                         ) {
                             // Drag Handle Pill
                             Box(
@@ -849,48 +793,7 @@ fun ExpandablePlayerSheet(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(horizontal = 24.dp)
-                                    .padding(bottom = navBarsBottom + 8.dp)
-                                    .pointerInput(maxDragPx) {
-                                        awaitEachGesture {
-                                            val down = awaitFirstDown(requireUnconsumed = false)
-                                            var totalDragY = 0f
-                                            var isDrag = false
-                                            val pointerId = down.id
-                                            var lastTime = SystemClock.uptimeMillis()
-                                            var velocityY = 0f
-
-                                            while (true) {
-                                                val event = awaitPointerEvent()
-                                                val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                                                if (change.changedToUp()) {
-                                                    if (isDrag) {
-                                                        if (velocityY > 200f || totalDragY > 40f || expandProgress < 0.85f) {
-                                                            collapseToMini()
-                                                        } else {
-                                                            expandToFull()
-                                                        }
-                                                    }
-                                                    break
-                                                } else if (change.positionChange() != Offset.Zero) {
-                                                    val dy = change.positionChange().y
-                                                    totalDragY += dy
-                                                    if (!isDrag && totalDragY > viewConfiguration.touchSlop) {
-                                                        isDrag = true
-                                                    }
-                                                    if (isDrag) {
-                                                        change.consume()
-                                                        val now = SystemClock.uptimeMillis()
-                                                        val dt = (now - lastTime).coerceAtLeast(1L)
-                                                        velocityY = (dy / dt) * 1000f
-                                                        lastTime = now
-                                                        coroutineScope.launch {
-                                                            offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    },
+                                    .padding(bottom = navBarsBottom + 8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.SpaceBetween
                             ) {
