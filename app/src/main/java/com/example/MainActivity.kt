@@ -279,7 +279,12 @@ fun AppNavigation(viewModel: MainViewModel) {
                 route = "library",
                 enterTransition = {
                     if (initialState.destination.route == "player") {
-                        EnterTransition.None
+                        // Библиотека заезжает снизу под сворачивающийся плеер —
+                        // за плеером сразу появляется предыдущий экран
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Down,
+                            animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing)
+                        )
                     } else if (initialState.destination.route == "settings") {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
@@ -291,6 +296,8 @@ fun AppNavigation(viewModel: MainViewModel) {
                 },
                 exitTransition = {
                     if (targetState.destination.route == "player") {
+                        // При открытии библиотека остаётся на месте (None) —
+                        // иначе её слайд конфликтует с морфингом контейнера
                         ExitTransition.None
                     } else {
                         slideOutOfContainer(
@@ -301,7 +308,10 @@ fun AppNavigation(viewModel: MainViewModel) {
                 },
                 popEnterTransition = {
                     if (initialState.destination.route == "player") {
-                        EnterTransition.None
+                        slideIntoContainer(
+                            AnimatedContentTransitionScope.SlideDirection.Down,
+                            animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing)
+                        )
                     } else {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
@@ -323,6 +333,7 @@ fun AppNavigation(viewModel: MainViewModel) {
             composable(
                 route = "player",
                 enterTransition = {
+                    // Плеер заезжает снизу поверх библиотеки
                     slideIntoContainer(
                         towards = AnimatedContentTransitionScope.SlideDirection.Up,
                         animationSpec = tween(
@@ -332,10 +343,11 @@ fun AppNavigation(viewModel: MainViewModel) {
                     )
                 },
                 exitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    // Плеер остаётся на месте — его "уход" это slideIn библиотеки снизу.
+                    // Фейд убирает остатки UI в конце.
+                    fadeOut(
                         animationSpec = tween(
-                            durationMillis = PLAYER_COLLAPSE_DURATION,
+                            durationMillis = PLAYER_COLLAPSE_DURATION / 4,
                             easing = PlayerEmphasizedAccelerateEasing
                         )
                     )
@@ -350,10 +362,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     )
                 },
                 popExitTransition = {
-                    slideOutOfContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    fadeOut(
                         animationSpec = tween(
-                            durationMillis = PLAYER_COLLAPSE_DURATION,
+                            durationMillis = PLAYER_COLLAPSE_DURATION / 4,
                             easing = PlayerEmphasizedAccelerateEasing
                         )
                     )
