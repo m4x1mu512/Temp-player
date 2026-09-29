@@ -212,7 +212,7 @@ fun PlayerScreen(
         dragOffsetY.snapTo(0f)
     }
     val localDensity = LocalDensity.current
-    val dismissThresholdPx = with(localDensity) { 60.dp.toPx() }
+    val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
 
     var showVisualizerModeHint by remember { mutableStateOf(false) }
@@ -314,7 +314,7 @@ fun PlayerScreen(
                                 dragDistanceY = 0f
                             },
                             onDragEnd = {
-                                if (dragOffsetY.value > dismissThresholdPx || dragDistanceY > dismissThresholdPx) {
+                                if (dragOffsetY.value > dismissThresholdPx) {
                                     onNavigateBack()
                                 } else {
                                     coroutineScope.launch {
@@ -545,46 +545,32 @@ fun PlayerScreen(
                                     )
                                     .padding(horizontal = 8.dp)
                             ) {
-                                AnimatedContent(
-                                    targetState = track,
-                                    transitionSpec = {
-                                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) togetherWith
-                                        fadeOut(animationSpec = tween(160, easing = FastOutSlowInEasing))
-                                    },
-                                    label = "landscape_track_title_transition"
-                                ) { currentTrackItem ->
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(
-                                            text = currentTrackItem.title,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = currentTrackItem.artist,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (currentTrackItem.album.isNotBlank() && currentTrackItem.album != "Неизвестный альбом") {
-                                            Text(
-                                                text = currentTrackItem.album,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
+                                Text(
+                                    text = track.title,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = track.artist,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (track.album.isNotBlank() && track.album != "Неизвестный альбом") {
+                                    Text(
+                                        text = track.album,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
 
@@ -807,7 +793,7 @@ fun PlayerScreen(
                                         dragDistanceY = 0f
                                     },
                                     onDragEnd = {
-                                        if (abs(dragDistanceY) > abs(dragDistanceX) && (dragOffsetY.value > dismissThresholdPx || dragDistanceY > dismissThresholdPx)) {
+                                        if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
                                             onNavigateBack()
                                         } else {
                                             coroutineScope.launch {
@@ -922,46 +908,32 @@ fun PlayerScreen(
                             )
                             .padding(horizontal = 8.dp, vertical = if (isCompact) 1.dp else 3.dp)
                     ) {
-                        AnimatedContent(
-                            targetState = track,
-                            transitionSpec = {
-                                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) togetherWith
-                                fadeOut(animationSpec = tween(160, easing = FastOutSlowInEasing))
-                            },
-                            label = "portrait_track_title_transition"
-                        ) { currentTrackItem ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = currentTrackItem.title,
-                                    style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = currentTrackItem.artist,
-                                    style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (currentTrackItem.album.isNotBlank() && currentTrackItem.album != "Неизвестный альбом" && !isCompact) {
-                                    Text(
-                                        text = currentTrackItem.album,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                        Text(
+                            text = track.title,
+                            style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = track.artist,
+                            style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (track.album.isNotBlank() && track.album != "Неизвестный альбом" && !isCompact) {
+                            Text(
+                                text = track.album,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
 
