@@ -216,9 +216,12 @@ fun PlayerScreen(
     var dragVisualY by remember { mutableFloatStateOf(0f) }
     var isDraggingX by remember { mutableStateOf(false) }
     var isDraggingY by remember { mutableStateOf(false) }
+    // true когда свайп прошёл порог — экран остаётся на месте отпускания
+    // и фейдится, не пружиня обратно поверх анимации сворачивания
+    var isDismissing by remember { mutableStateOf(false) }
 
     val dragOffsetY by animateFloatAsState(
-        targetValue = if (isDraggingY) dragVisualY else 0f,
+        targetValue = if (isDraggingY || isDismissing) dragVisualY else 0f,
         animationSpec = if (isDraggingY) {
             snap()
         } else {
@@ -347,6 +350,7 @@ fun PlayerScreen(
                             onDragEnd = {
                                 isDraggingY = false
                                 if (dragVisualY > dismissThresholdPx) {
+                                    isDismissing = true
                                     onNavigateBack()
                                 }
                                 dragAccY = 0f
@@ -823,6 +827,7 @@ fun PlayerScreen(
                                         isDraggingX = false
                                         isDraggingY = false
                                         if (abs(dragAccY) > abs(dragAccX) && dragVisualY > dismissThresholdPx) {
+                                            isDismissing = true
                                             onNavigateBack()
                                         } else if (abs(dragAccX) > abs(dragAccY)) {
                                             if (dragAccX < -80f) {
