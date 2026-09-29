@@ -3,6 +3,7 @@ package com.example.ui.util
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -37,8 +38,7 @@ fun Modifier.playerSharedBounds(
             boundsTransform = { _, _ ->
                 tween(durationMillis = PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedEasing)
             },
-            // В новых версиях API параметр принимает Shape напрямую (старый OverlayClip убран)
-            clipInOverlayDuringTransition = clipShape
+            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) }
         )
     }
 }
@@ -59,7 +59,7 @@ fun Modifier.playerSharedElement(
             boundsTransform = { _, _ ->
                 tween(durationMillis = PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing)
             },
-            clipInOverlayDuringTransition = clipShape
+            clipInOverlayDuringTransition = clipShape?.let { OverlayClip(it) }
         )
     }
 }
