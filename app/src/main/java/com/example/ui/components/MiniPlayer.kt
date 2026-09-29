@@ -200,7 +200,7 @@ fun MiniPlayer(
                 }
                 .playerSharedBounds(
                     sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope,
+                    animatedVisibilityScope = this@AnimatedVisibility,
                     key = KEY_PLAYER_CONTAINER,
                     clipShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 )
@@ -288,7 +288,7 @@ fun MiniPlayer(
                                     .size(52.dp)
                                     .playerSharedElement(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        animatedVisibilityScope = this@AnimatedVisibility,
                                         key = KEY_PLAYER_ALBUM_ART,
                                         clipShape = RoundedCornerShape(12.dp)
                                     )
@@ -321,7 +321,7 @@ fun MiniPlayer(
                                     .weight(1f)
                                     .playerSharedBounds(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        animatedVisibilityScope = this@AnimatedVisibility,
                                         key = KEY_PLAYER_TRACK_TEXT
                                     ),
                                 verticalArrangement = Arrangement.Center
@@ -492,7 +492,7 @@ fun MiniPlayer(
                                     .size(56.dp)
                                     .playerSharedElement(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        animatedVisibilityScope = this@AnimatedVisibility,
                                         key = KEY_PLAYER_ALBUM_ART,
                                         clipShape = RoundedCornerShape(12.dp)
                                     )
@@ -525,7 +525,7 @@ fun MiniPlayer(
                                     .weight(1f)
                                     .playerSharedBounds(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        animatedVisibilityScope = this@AnimatedVisibility,
                                         key = KEY_PLAYER_TRACK_TEXT
                                     ),
                                 verticalArrangement = Arrangement.Center
