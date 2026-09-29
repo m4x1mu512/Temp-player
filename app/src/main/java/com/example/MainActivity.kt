@@ -312,7 +312,13 @@ fun AppNavigation(viewModel: MainViewModel) {
             ) {
                 LibraryScreen(
                     viewModel = viewModel,
-                    onNavigateToPlayer = { navController.navigate("player") },
+                    onNavigateToPlayer = {
+                        if (navController.currentDestination?.route != "player") {
+                            navController.navigate("player") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     onNavigateToSettings = { navController.navigate("settings") },
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
@@ -362,9 +368,12 @@ fun AppNavigation(viewModel: MainViewModel) {
                 PlayerScreen(
                     viewModel = viewModel,
                     onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate("library") {
-                                launchSingleTop = true
+                        val popped = navController.popBackStack("library", inclusive = false)
+                        if (!popped) {
+                            if (!navController.popBackStack()) {
+                                navController.navigate("library") {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     },
@@ -426,7 +435,13 @@ fun AppNavigation(viewModel: MainViewModel) {
                 SettingsScreen(
                     viewModel = viewModel,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToPlayer = { navController.navigate("player") },
+                    onNavigateToPlayer = {
+                        if (navController.currentDestination?.route != "player") {
+                            navController.navigate("player") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable
                 )

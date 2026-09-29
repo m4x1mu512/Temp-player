@@ -91,8 +91,10 @@ import com.example.ui.components.CreatePlaylistDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
+import com.example.ui.components.ScrollToCurrentTrackFab
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
+import com.example.ui.util.smoothScrollToTrackIndex
 import com.example.ui.viewmodel.MainViewModel
 
 @Composable
@@ -215,12 +217,7 @@ fun LibraryScreen(
             if (targetIndex >= 0) {
                 try {
                     delay(80)
-                    val currentFirst = queueListState.firstVisibleItemIndex
-                    if (kotlin.math.abs(currentFirst - targetIndex) > 15) {
-                        val preScroll = if (targetIndex > currentFirst) targetIndex - 8 else targetIndex + 8
-                        queueListState.scrollToItem(preScroll.coerceIn(0, queueToDisplay.lastIndex))
-                    }
-                    queueListState.animateScrollToItem(targetIndex)
+                    queueListState.smoothScrollToTrackIndex(targetIndex)
                 } catch (_: Exception) {
                     queueListState.scrollToItem(targetIndex)
                 }
@@ -518,27 +515,49 @@ fun LibraryScreen(
                                         onActionClick = null
                                     )
                                 } else {
-                                    LazyColumn(
-                                        state = queueListState,
-                                        contentPadding = PaddingValues(bottom = 80.dp),
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        items(queueToDisplay, key = { it.id }) { track ->
-                                            TrackListItem(
-                                                track = track,
-                                                isCurrent = currentTrack?.id == track.id,
-                                                isPlaying = isPlaying && currentTrack?.id == track.id,
-                                                isFavorite = favoriteIds.contains(track.id),
-                                                onClick = {
-                                                    viewModel.playTrack(
-                                                        track = track,
-                                                        queue = queueToDisplay
-                                                    )
-                                                },
-                                                onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                                onAddToPlaylist = { trackForPlaylistDialog = track }
-                                            )
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        LazyColumn(
+                                            state = queueListState,
+                                            contentPadding = PaddingValues(bottom = 80.dp),
+                                            modifier = Modifier.fillMaxSize()
+                                        ) {
+                                            items(
+                                                items = queueToDisplay,
+                                                key = { it.id },
+                                                contentType = { "track" }
+                                            ) { track ->
+                                                TrackListItem(
+                                                    track = track,
+                                                    isCurrent = currentTrack?.id == track.id,
+                                                    isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                    isFavorite = favoriteIds.contains(track.id),
+                                                    onClick = {
+                                                        viewModel.playTrack(
+                                                            track = track,
+                                                            queue = queueToDisplay
+                                                        )
+                                                    },
+                                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                                    onAddToPlaylist = { trackForPlaylistDialog = track }
+                                                )
+                                            }
                                         }
+
+                                        ScrollToCurrentTrackFab(
+                                            currentTrack = currentTrack,
+                                            isPlaying = isPlaying,
+                                            onClick = {
+                                                val targetIndex = queueToDisplay.indexOfFirst { it.id == currentTrack?.id }
+                                                if (targetIndex >= 0) {
+                                                    coroutineScope.launch {
+                                                        queueListState.smoothScrollToTrackIndex(targetIndex)
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(end = 16.dp, bottom = 16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -562,7 +581,13 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    favoriteIds = favoriteIds
+                                    favoriteIds = favoriteIds,
+                                    onNavigateToQueue = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(0)
+                                            scrollToCurrentTrackTrigger++
+                                        }
+                                    }
                                 )
                             }
 
@@ -590,7 +615,13 @@ fun LibraryScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
                                     getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
-                                    favoriteIds = favoriteIds
+                                    favoriteIds = favoriteIds,
+                                    onNavigateToQueue = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(0)
+                                            scrollToCurrentTrackTrigger++
+                                        }
+                                    }
                                 )
                             }
 
@@ -613,7 +644,13 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    favoriteIds = favoriteIds
+                                    favoriteIds = favoriteIds,
+                                    onNavigateToQueue = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(0)
+                                            scrollToCurrentTrackTrigger++
+                                        }
+                                    }
                                 )
                             }
 
@@ -636,7 +673,13 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    favoriteIds = favoriteIds
+                                    favoriteIds = favoriteIds,
+                                    onNavigateToQueue = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(0)
+                                            scrollToCurrentTrackTrigger++
+                                        }
+                                    }
                                 )
                             }
 
@@ -679,26 +722,55 @@ fun LibraryScreen(
                                             onActionClick = null
                                         )
                                     } else {
-                                        LazyColumn(
-                                            contentPadding = PaddingValues(bottom = 80.dp),
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            items(displayedTracks, key = { it.id }) { track ->
-                                                TrackListItem(
-                                                    track = track,
-                                                    isCurrent = currentTrack?.id == track.id,
-                                                    isPlaying = isPlaying && currentTrack?.id == track.id,
-                                                    isFavorite = favoriteIds.contains(track.id),
-                                                    onClick = {
-                                                        viewModel.playTrack(
-                                                            track = track,
-                                                            queue = displayedTracks
-                                                        )
-                                                    },
-                                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                                    onAddToPlaylist = { trackForPlaylistDialog = track }
-                                                )
+                                        val searchListState = rememberLazyListState()
+                                        Box(modifier = Modifier.fillMaxSize()) {
+                                            LazyColumn(
+                                                state = searchListState,
+                                                contentPadding = PaddingValues(bottom = 80.dp),
+                                                modifier = Modifier.fillMaxSize()
+                                            ) {
+                                                items(
+                                                    items = displayedTracks,
+                                                    key = { it.id },
+                                                    contentType = { "track" }
+                                                ) { track ->
+                                                    TrackListItem(
+                                                        track = track,
+                                                        isCurrent = currentTrack?.id == track.id,
+                                                        isPlaying = isPlaying && currentTrack?.id == track.id,
+                                                        isFavorite = favoriteIds.contains(track.id),
+                                                        onClick = {
+                                                            viewModel.playTrack(
+                                                                track = track,
+                                                                queue = displayedTracks
+                                                            )
+                                                        },
+                                                        onToggleFavorite = { viewModel.toggleFavorite(track.id) },
+                                                        onAddToPlaylist = { trackForPlaylistDialog = track }
+                                                    )
+                                                }
                                             }
+
+                                            ScrollToCurrentTrackFab(
+                                                currentTrack = currentTrack,
+                                                isPlaying = isPlaying,
+                                                onClick = {
+                                                    val targetIndex = displayedTracks.indexOfFirst { it.id == currentTrack?.id }
+                                                    if (targetIndex >= 0) {
+                                                        coroutineScope.launch {
+                                                            searchListState.smoothScrollToTrackIndex(targetIndex)
+                                                        }
+                                                    } else {
+                                                        coroutineScope.launch {
+                                                            pagerState.animateScrollToPage(0)
+                                                            scrollToCurrentTrackTrigger++
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(end = 16.dp, bottom = 16.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -791,7 +863,8 @@ private fun GroupedListSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
-    favoriteIds: Set<Long> = emptySet()
+    favoriteIds: Set<Long> = emptySet(),
+    onNavigateToQueue: () -> Unit = {}
 ) {
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
@@ -803,7 +876,7 @@ private fun GroupedListSection(
                 if (targetIndex >= 0) {
                     try {
                         delay(60)
-                        listState.scrollToItem(targetIndex)
+                        listState.smoothScrollToTrackIndex(targetIndex)
                     } catch (_: Exception) {}
                 }
             }
@@ -833,22 +906,47 @@ private fun GroupedListSection(
                 )
             }
 
-            LazyColumn(
-                state = listState,
-                contentPadding = PaddingValues(bottom = 80.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(tracks, key = { it.id }) { track ->
-                    TrackListItem(
-                        track = track,
-                        isCurrent = currentTrack?.id == track.id,
-                        isPlaying = isPlaying && currentTrack?.id == track.id,
-                        isFavorite = favoriteIds.contains(track.id),
-                        onClick = { onPlayTrack(track, tracks) },
-                        onToggleFavorite = { onToggleFavorite(track.id) },
-                        onAddToPlaylist = { onAddToPlaylist(track) }
-                    )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = tracks,
+                        key = { it.id },
+                        contentType = { "track" }
+                    ) { track ->
+                        TrackListItem(
+                            track = track,
+                            isCurrent = currentTrack?.id == track.id,
+                            isPlaying = isPlaying && currentTrack?.id == track.id,
+                            isFavorite = favoriteIds.contains(track.id),
+                            onClick = { onPlayTrack(track, tracks) },
+                            onToggleFavorite = { onToggleFavorite(track.id) },
+                            onAddToPlaylist = { onAddToPlaylist(track) }
+                        )
+                    }
                 }
+
+                val coroutineScope = rememberCoroutineScope()
+                ScrollToCurrentTrackFab(
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    onClick = {
+                        val targetIndex = tracks.indexOfFirst { it.id == currentTrack?.id }
+                        if (targetIndex >= 0) {
+                            coroutineScope.launch {
+                                listState.smoothScrollToTrackIndex(targetIndex)
+                            }
+                        } else {
+                            onNavigateToQueue()
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp)
+                )
             }
         }
     } else {
@@ -925,7 +1023,8 @@ private fun PlaylistsSection(
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>,
-    favoriteIds: Set<Long> = emptySet()
+    favoriteIds: Set<Long> = emptySet(),
+    onNavigateToQueue: () -> Unit = {}
 ) {
     if (selectedTitle != null) {
         // Show selected playlist / favorites / all tracks
@@ -949,7 +1048,7 @@ private fun PlaylistsSection(
                 if (targetIndex >= 0) {
                     try {
                         delay(60)
-                        listState.scrollToItem(targetIndex)
+                        listState.smoothScrollToTrackIndex(targetIndex)
                     } catch (_: Exception) {}
                 }
             }
@@ -987,22 +1086,47 @@ private fun PlaylistsSection(
                     onActionClick = null
                 )
             } else {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(tracks, key = { it.id }) { track ->
-                        TrackListItem(
-                            track = track,
-                            isCurrent = currentTrack?.id == track.id,
-                            isPlaying = isPlaying && currentTrack?.id == track.id,
-                            isFavorite = favoriteIds.contains(track.id),
-                            onClick = { onPlayTrack(track, tracks) },
-                            onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) }
-                        )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(bottom = 80.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(
+                            items = tracks,
+                            key = { it.id },
+                            contentType = { "track" }
+                        ) { track ->
+                            TrackListItem(
+                                track = track,
+                                isCurrent = currentTrack?.id == track.id,
+                                isPlaying = isPlaying && currentTrack?.id == track.id,
+                                isFavorite = favoriteIds.contains(track.id),
+                                onClick = { onPlayTrack(track, tracks) },
+                                onToggleFavorite = { onToggleFavorite(track.id) },
+                                onAddToPlaylist = { onAddToPlaylist(track) }
+                            )
+                        }
                     }
+
+                    val coroutineScope = rememberCoroutineScope()
+                    ScrollToCurrentTrackFab(
+                        currentTrack = currentTrack,
+                        isPlaying = isPlaying,
+                        onClick = {
+                            val targetIndex = tracks.indexOfFirst { it.id == currentTrack?.id }
+                            if (targetIndex >= 0) {
+                                coroutineScope.launch {
+                                    listState.smoothScrollToTrackIndex(targetIndex)
+                                }
+                            } else {
+                                onNavigateToQueue()
+                            }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 16.dp, bottom = 16.dp)
+                    )
                 }
             }
         }

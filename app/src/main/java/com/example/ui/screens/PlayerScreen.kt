@@ -38,7 +38,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -152,9 +151,6 @@ import com.example.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-// Быстрая, но мягкая пружина для кнопки play/pause
-private val PlayPauseSpring = spring<Float>(dampingRatio = 0.7f, stiffness = 900f)
-
 @Composable
 fun PlayerScreen(
     viewModel: MainViewModel,
@@ -207,37 +203,16 @@ fun PlayerScreen(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
-    // --- Drag state (swipe-down to dismiss, swipe-left/right to change track) ---
-    // Во время жеста значения снапятся за пальцем (snap), после отпускания
-    // мягко возвращаются пружиной — без спавна корутин на каждое событие drag.
-    var dragAccX by remember { mutableFloatStateOf(0f) }
-    var dragAccY by remember { mutableFloatStateOf(0f) }
-    var dragVisualX by remember { mutableFloatStateOf(0f) }
-    var dragVisualY by remember { mutableFloatStateOf(0f) }
-    var isDraggingX by remember { mutableStateOf(false) }
-    var isDraggingY by remember { mutableStateOf(false) }
+    var dragDistanceX by remember { mutableFloatStateOf(0f) }
+    var dragDistanceY by remember { mutableFloatStateOf(0f) }
 
-    val dragOffsetY by animateFloatAsState(
-        targetValue = if (isDraggingY) dragVisualY else 0f,
-        animationSpec = if (isDraggingY) {
-            snap()
-        } else {
-            spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
-        },
-        label = "player_drag_dismiss"
-    )
-    val artworkDragX by animateFloatAsState(
-        targetValue = if (isDraggingX) dragVisualX else 0f,
-        animationSpec = if (isDraggingX) {
-            snap()
-        } else {
-            spring(dampingRatio = 0.7f, stiffness = 500f)
-        },
-        label = "player_drag_x"
-    )
-
+    val coroutineScope = rememberCoroutineScope()
+    val dragOffsetY = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        dragOffsetY.snapTo(0f)
+    }
     val localDensity = LocalDensity.current
-    val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
+    val dismissThresholdPx = with(localDensity) { 60.dp.toPx() }
     val context = LocalContext.current
 
     var showVisualizerModeHint by remember { mutableStateOf(false) }
@@ -322,12 +297,7 @@ fun PlayerScreen(
                     }
                 )
                 .graphicsLayer {
-                    // Лёгкий fade + scale при свайпе вниз — как в Spotify/YouTube
-                    val dragProgress = (dragOffsetY / (dismissThresholdPx * 2.2f)).coerceIn(0f, 1f)
-                    translationY = dragOffsetY.coerceAtLeast(0f)
-                    alpha = 1f - dragProgress * 0.35f
-                    scaleX = 1f - dragProgress * 0.04f
-                    scaleY = 1f - dragProgress * 0.04f
+                    translationY = dragOffsetY.value.coerceAtLeast(0f)
                 }
                 .testTag("player_screen")
         ) {
@@ -341,25 +311,30 @@ fun PlayerScreen(
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
-                                dragAccY = 0f
-                                dragVisualY = 0f
+                                dragDistanceY = 0f
                             },
                             onDragEnd = {
-                                isDraggingY = false
-                                if (dragVisualY > dismissThresholdPx) {
+                                if (dragOffsetY.value > dismissThresholdPx || dragDistanceY > dismissThresholdPx) {
                                     onNavigateBack()
+                                } else {
+                                    coroutineScope.launch {
+                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                    }
                                 }
-                                dragAccY = 0f
+                                dragDistanceY = 0f
                             },
                             onDragCancel = {
-                                isDraggingY = false
-                                dragAccY = 0f
+                                coroutineScope.launch {
+                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                }
+                                dragDistanceY = 0f
                             },
                             onDrag = { _, dragAmount ->
-                                dragAccY += dragAmount.y
-                                if (dragAmount.y > 0f || dragVisualY > 0f) {
-                                    isDraggingY = true
-                                    dragVisualY = (dragVisualY + dragAmount.y).coerceAtLeast(0f)
+                                dragDistanceY += dragAmount.y
+                                if (dragAmount.y > 0 || dragOffsetY.value > 0f) {
+                                    coroutineScope.launch {
+                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                    }
                                 }
                             }
                         )
@@ -496,7 +471,7 @@ fun PlayerScreen(
                                     track = track,
                                     isPlaying = isPlaying,
                                     amplitudeFlow = viewModel.audioAmplitude,
-                                    dragDistanceXProvider = { artworkDragX },
+                                    dragDistanceXProvider = { dragDistanceX },
                                     isLandscape = true,
                                     isCompact = isCompact,
                                     isMedium = isMedium,
@@ -570,32 +545,46 @@ fun PlayerScreen(
                                     )
                                     .padding(horizontal = 8.dp)
                             ) {
-                                Text(
-                                    text = track.title,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = track.artist,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (track.album.isNotBlank() && track.album != "Неизвестный альбом") {
-                                    Text(
-                                        text = track.album,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                AnimatedContent(
+                                    targetState = track,
+                                    transitionSpec = {
+                                        fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) togetherWith
+                                        fadeOut(animationSpec = tween(160, easing = FastOutSlowInEasing))
+                                    },
+                                    label = "landscape_track_title_transition"
+                                ) { currentTrackItem ->
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = currentTrackItem.title,
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = currentTrackItem.artist,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (currentTrackItem.album.isNotBlank() && currentTrackItem.album != "Неизвестный альбом") {
+                                            Text(
+                                                text = currentTrackItem.album,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -638,8 +627,8 @@ fun PlayerScreen(
                                     val heartScale by animateFloatAsState(
                                         targetValue = if (isCurrentTrackFavorite) 1.2f else 1.0f,
                                         animationSpec = spring(
-                                            dampingRatio = 0.5f,
-                                            stiffness = 700f
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessLow
                                         ),
                                         label = "heartScale_land"
                                     )
@@ -750,8 +739,8 @@ fun PlayerScreen(
                                     AnimatedContent(
                                         targetState = isPlaying,
                                         transitionSpec = {
-                                            (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
-                                                .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
+                                            (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                                .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
                                         },
                                         label = "player_play_pause_land_anim"
                                     ) { playing ->
@@ -814,40 +803,41 @@ fun PlayerScreen(
                             .pointerInput(Unit) {
                                 detectDragGestures(
                                     onDragStart = {
-                                        dragAccX = 0f
-                                        dragAccY = 0f
-                                        dragVisualX = 0f
-                                        dragVisualY = 0f
+                                        dragDistanceX = 0f
+                                        dragDistanceY = 0f
                                     },
                                     onDragEnd = {
-                                        isDraggingX = false
-                                        isDraggingY = false
-                                        if (abs(dragAccY) > abs(dragAccX) && dragVisualY > dismissThresholdPx) {
+                                        if (abs(dragDistanceY) > abs(dragDistanceX) && (dragOffsetY.value > dismissThresholdPx || dragDistanceY > dismissThresholdPx)) {
                                             onNavigateBack()
-                                        } else if (abs(dragAccX) > abs(dragAccY)) {
-                                            if (dragAccX < -80f) {
-                                                viewModel.nextTrack()
-                                            } else if (dragAccX > 80f) {
-                                                viewModel.previousTrack()
+                                        } else {
+                                            coroutineScope.launch {
+                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                            }
+                                            if (abs(dragDistanceX) > abs(dragDistanceY)) {
+                                                if (dragDistanceX < -80f) {
+                                                    viewModel.nextTrack()
+                                                } else if (dragDistanceX > 80f) {
+                                                    viewModel.previousTrack()
+                                                }
                                             }
                                         }
-                                        dragAccX = 0f
-                                        dragAccY = 0f
+                                        dragDistanceX = 0f
+                                        dragDistanceY = 0f
                                     },
                                     onDragCancel = {
-                                        isDraggingX = false
-                                        isDraggingY = false
-                                        dragAccX = 0f
-                                        dragAccY = 0f
+                                        coroutineScope.launch {
+                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                        }
+                                        dragDistanceX = 0f
+                                        dragDistanceY = 0f
                                     },
                                     onDrag = { _, dragAmount ->
-                                        dragAccX += dragAmount.x
-                                        dragAccY += dragAmount.y
-                                        isDraggingX = true
-                                        dragVisualX = dragAccX.coerceIn(-360f, 360f)
-                                        if (dragAccY > 0f && abs(dragAccY) > abs(dragAccX)) {
-                                            isDraggingY = true
-                                            dragVisualY = (dragVisualY + dragAmount.y).coerceAtLeast(0f)
+                                        dragDistanceX += dragAmount.x
+                                        dragDistanceY += dragAmount.y
+                                        if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
+                                            coroutineScope.launch {
+                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                            }
                                         }
                                     }
                                 )
@@ -867,7 +857,7 @@ fun PlayerScreen(
                                 track = track,
                                 isPlaying = isPlaying,
                                 amplitudeFlow = viewModel.audioAmplitude,
-                                dragDistanceXProvider = { artworkDragX },
+                                dragDistanceXProvider = { dragDistanceX },
                                 isLandscape = false,
                                 isCompact = isCompact,
                                 isMedium = isMedium,
@@ -932,32 +922,46 @@ fun PlayerScreen(
                             )
                             .padding(horizontal = 8.dp, vertical = if (isCompact) 1.dp else 3.dp)
                     ) {
-                        Text(
-                            text = track.title,
-                            style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = track.artist,
-                            style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (track.album.isNotBlank() && track.album != "Неизвестный альбом" && !isCompact) {
-                            Text(
-                                text = track.album,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        AnimatedContent(
+                            targetState = track,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)) togetherWith
+                                fadeOut(animationSpec = tween(160, easing = FastOutSlowInEasing))
+                            },
+                            label = "portrait_track_title_transition"
+                        ) { currentTrackItem ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = currentTrackItem.title,
+                                    style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = currentTrackItem.artist,
+                                    style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (currentTrackItem.album.isNotBlank() && currentTrackItem.album != "Неизвестный альбом" && !isCompact) {
+                                    Text(
+                                        text = currentTrackItem.album,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -1001,8 +1005,8 @@ fun PlayerScreen(
                             val heartScale by animateFloatAsState(
                                 targetValue = if (isCurrentTrackFavorite) 1.2f else 1.0f,
                                 animationSpec = spring(
-                                    dampingRatio = 0.5f,
-                                    stiffness = 700f
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessLow
                                 ),
                                 label = "heartScale"
                             )
@@ -1120,8 +1124,8 @@ fun PlayerScreen(
                             AnimatedContent(
                                 targetState = isPlaying,
                                 transitionSpec = {
-                                    (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
-                                        .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
+                                    (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                        .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
                                 },
                                 label = "player_play_pause_button_anim"
                             ) { playing ->
