@@ -3,13 +3,16 @@ package com.example.ui.util
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.SharedTransitionScope.OverlayClip
+import androidx.compose.animation.SharedTransitionScope.RectangularClip
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.platform.LocalDensity
 
 const val KEY_PLAYER_CONTAINER = "player_container"
 const val KEY_PLAYER_ALBUM_ART = "player_album_art"
@@ -30,7 +33,26 @@ fun Modifier.playerSharedBounds(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     key: String,
     clipShape: Shape? = null
-): Modifier = this
+): Modifier {
+    if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
+    val density = LocalDensity.current
+    return with(sharedTransitionScope) {
+        sharedBounds(
+            sharedContentState = rememberSharedContentState(key = key),
+            animatedVisibilityScope = animatedVisibilityScope,
+            boundsTransform = { _, _ ->
+                tween(durationMillis = PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedEasing)
+            },
+            clipInOverlayDuringTransition = clipShape?.let { shape ->
+                OverlayClip { bounds, layoutDirection ->
+                    Path().apply {
+                        addOutline(shape.createOutline(bounds.size, layoutDirection, density))
+                    }
+                }
+            } ?: RectangularClip
+        )
+    }
+}
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -39,4 +61,23 @@ fun Modifier.playerSharedElement(
     animatedVisibilityScope: AnimatedVisibilityScope?,
     key: String,
     clipShape: Shape? = null
-): Modifier = this
+): Modifier {
+    if (sharedTransitionScope == null || animatedVisibilityScope == null) return this
+    val density = LocalDensity.current
+    return with(sharedTransitionScope) {
+        sharedElement(
+            state = rememberSharedContentState(key = key),
+            animatedVisibilityScope = animatedVisibilityScope,
+            boundsTransform = { _, _ ->
+                tween(durationMillis = PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing)
+            },
+            clipInOverlayDuringTransition = clipShape?.let { shape ->
+                OverlayClip { bounds, layoutDirection ->
+                    Path().apply {
+                        addOutline(shape.createOutline(bounds.size, layoutDirection, density))
+                    }
+                }
+            } ?: RectangularClip
+        )
+    }
+}
