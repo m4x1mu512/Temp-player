@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -144,21 +145,14 @@ fun SettingsScreen(
             )
         },
         bottomBar = {
-            MiniPlayer(
-                currentTrack = currentTrack,
-                isPlaying = isPlaying,
-                position = position,
-                duration = duration,
-                onTogglePlayPause = { viewModel.togglePlayPause() },
-                onNextTrack = { viewModel.nextTrack() },
-                onPreviousTrack = { viewModel.previousTrack() },
-                onClick = onNavigateToPlayer,
-                bgMode = miniPlayerBgMode,
-                customColor = miniPlayerCustomColor,
-                autoRotate = autoRotate,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope
-            )
+            if (currentTrack != null) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .navigationBarsPadding()
+                )
+            }
         }
     ) { paddingValues ->
         Column(

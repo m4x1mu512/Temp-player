@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -458,30 +459,14 @@ fun LibraryScreen(
             }
         },
         bottomBar = {
-            val isCurrentTrackFavorite = remember(favoriteIds, currentTrack?.id) {
-                val currentId = currentTrack?.id
-                if (currentId != null) {
-                    favoriteIds.contains(currentId)
-                } else false
+            if (currentTrack != null) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
+                        .navigationBarsPadding()
+                )
             }
-
-            MiniPlayer(
-                currentTrack = currentTrack,
-                isPlaying = isPlaying,
-                positionFlow = viewModel.playbackPosition,
-                duration = duration,
-                isFavorite = isCurrentTrackFavorite,
-                onToggleFavorite = { currentTrack?.let { viewModel.toggleFavorite(it.id) } },
-                onTogglePlayPause = { viewModel.togglePlayPause() },
-                onNextTrack = { viewModel.nextTrack() },
-                onPreviousTrack = { viewModel.previousTrack() },
-                onClick = onNavigateToPlayer,
-                bgMode = miniPlayerBgMode,
-                customColor = miniPlayerCustomColor,
-                autoRotate = autoRotate,
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope
-            )
         }
     ) { paddingValues ->
         Column(
