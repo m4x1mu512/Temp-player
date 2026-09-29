@@ -38,6 +38,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -151,6 +152,9 @@ import com.example.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+// Быстрая, но мягкая пружина для кнопки play/pause
+private val PlayPauseSpring = spring<Float>(dampingRatio = 0.7f, stiffness = 900f)
+
 @Composable
 fun PlayerScreen(
     viewModel: MainViewModel,
@@ -203,14 +207,35 @@ fun PlayerScreen(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
-    var dragDistanceX by remember { mutableFloatStateOf(0f) }
-    var dragDistanceY by remember { mutableFloatStateOf(0f) }
+    // --- Drag state (swipe-down to dismiss, swipe-left/right to change track) ---
+    // Во время жеста значения снапятся за пальцем (snap), после отпускания
+    // мягко возвращаются пружиной — без спавна корутин на каждое событие drag.
+    var dragAccX by remember { mutableFloatStateOf(0f) }
+    var dragAccY by remember { mutableFloatStateOf(0f) }
+    var dragVisualX by remember { mutableFloatStateOf(0f) }
+    var dragVisualY by remember { mutableFloatStateOf(0f) }
+    var isDraggingX by remember { mutableStateOf(false) }
+    var isDraggingY by remember { mutableStateOf(false) }
 
-    val coroutineScope = rememberCoroutineScope()
-    val dragOffsetY = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        dragOffsetY.snapTo(0f)
-    }
+    val dragOffsetY by animateFloatAsState(
+        targetValue = if (isDraggingY) dragVisualY else 0f,
+        animationSpec = if (isDraggingY) {
+            snap()
+        } else {
+            spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+        },
+        label = "player_drag_dismiss"
+    )
+    val artworkDragX by animateFloatAsState(
+        targetValue = if (isDraggingX) dragVisualX else 0f,
+        animationSpec = if (isDraggingX) {
+            snap()
+        } else {
+            spring(dampingRatio = 0.7f, stiffness = 500f)
+        },
+        label = "player_drag_x"
+    )
+
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
@@ -297,7 +322,12 @@ fun PlayerScreen(
                     }
                 )
                 .graphicsLayer {
-                    translationY = dragOffsetY.value.coerceAtLeast(0f)
+                    // Лёгкий fade + scale при свайпе вниз — как в Spotify/YouTube
+                    val dragProgress = (dragOffsetY / (dismissThresholdPx * 2.2f)).coerceIn(0f, 1f)
+                    translationY = dragOffsetY.coerceAtLeast(0f)
+                    alpha = 1f - dragProgress * 0.35f
+                    scaleX = 1f - dragProgress * 0.04f
+                    scaleY = 1f - dragProgress * 0.04f
                 }
                 .testTag("player_screen")
         ) {
@@ -311,30 +341,25 @@ fun PlayerScreen(
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragStart = {
-                                dragDistanceY = 0f
+                                dragAccY = 0f
+                                dragVisualY = 0f
                             },
                             onDragEnd = {
-                                if (dragOffsetY.value > dismissThresholdPx) {
+                                isDraggingY = false
+                                if (dragVisualY > dismissThresholdPx) {
                                     onNavigateBack()
-                                } else {
-                                    coroutineScope.launch {
-                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                    }
                                 }
-                                dragDistanceY = 0f
+                                dragAccY = 0f
                             },
                             onDragCancel = {
-                                coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                }
-                                dragDistanceY = 0f
+                                isDraggingY = false
+                                dragAccY = 0f
                             },
                             onDrag = { _, dragAmount ->
-                                dragDistanceY += dragAmount.y
-                                if (dragAmount.y > 0 || dragOffsetY.value > 0f) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
-                                    }
+                                dragAccY += dragAmount.y
+                                if (dragAmount.y > 0f || dragVisualY > 0f) {
+                                    isDraggingY = true
+                                    dragVisualY = (dragVisualY + dragAmount.y).coerceAtLeast(0f)
                                 }
                             }
                         )
@@ -471,7 +496,7 @@ fun PlayerScreen(
                                     track = track,
                                     isPlaying = isPlaying,
                                     amplitudeFlow = viewModel.audioAmplitude,
-                                    dragDistanceXProvider = { dragDistanceX },
+                                    dragDistanceXProvider = { artworkDragX },
                                     isLandscape = true,
                                     isCompact = isCompact,
                                     isMedium = isMedium,
@@ -613,8 +638,8 @@ fun PlayerScreen(
                                     val heartScale by animateFloatAsState(
                                         targetValue = if (isCurrentTrackFavorite) 1.2f else 1.0f,
                                         animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessLow
+                                            dampingRatio = 0.5f,
+                                            stiffness = 700f
                                         ),
                                         label = "heartScale_land"
                                     )
@@ -725,8 +750,8 @@ fun PlayerScreen(
                                     AnimatedContent(
                                         targetState = isPlaying,
                                         transitionSpec = {
-                                            (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
-                                                .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                            (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
+                                                .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
                                         },
                                         label = "player_play_pause_land_anim"
                                     ) { playing ->
@@ -789,41 +814,40 @@ fun PlayerScreen(
                             .pointerInput(Unit) {
                                 detectDragGestures(
                                     onDragStart = {
-                                        dragDistanceX = 0f
-                                        dragDistanceY = 0f
+                                        dragAccX = 0f
+                                        dragAccY = 0f
+                                        dragVisualX = 0f
+                                        dragVisualY = 0f
                                     },
                                     onDragEnd = {
-                                        if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
+                                        isDraggingX = false
+                                        isDraggingY = false
+                                        if (abs(dragAccY) > abs(dragAccX) && dragVisualY > dismissThresholdPx) {
                                             onNavigateBack()
-                                        } else {
-                                            coroutineScope.launch {
-                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                            }
-                                            if (abs(dragDistanceX) > abs(dragDistanceY)) {
-                                                if (dragDistanceX < -80f) {
-                                                    viewModel.nextTrack()
-                                                } else if (dragDistanceX > 80f) {
-                                                    viewModel.previousTrack()
-                                                }
+                                        } else if (abs(dragAccX) > abs(dragAccY)) {
+                                            if (dragAccX < -80f) {
+                                                viewModel.nextTrack()
+                                            } else if (dragAccX > 80f) {
+                                                viewModel.previousTrack()
                                             }
                                         }
-                                        dragDistanceX = 0f
-                                        dragDistanceY = 0f
+                                        dragAccX = 0f
+                                        dragAccY = 0f
                                     },
                                     onDragCancel = {
-                                        coroutineScope.launch {
-                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                        }
-                                        dragDistanceX = 0f
-                                        dragDistanceY = 0f
+                                        isDraggingX = false
+                                        isDraggingY = false
+                                        dragAccX = 0f
+                                        dragAccY = 0f
                                     },
                                     onDrag = { _, dragAmount ->
-                                        dragDistanceX += dragAmount.x
-                                        dragDistanceY += dragAmount.y
-                                        if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
-                                            coroutineScope.launch {
-                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
-                                            }
+                                        dragAccX += dragAmount.x
+                                        dragAccY += dragAmount.y
+                                        isDraggingX = true
+                                        dragVisualX = dragAccX.coerceIn(-360f, 360f)
+                                        if (dragAccY > 0f && abs(dragAccY) > abs(dragAccX)) {
+                                            isDraggingY = true
+                                            dragVisualY = (dragVisualY + dragAmount.y).coerceAtLeast(0f)
                                         }
                                     }
                                 )
@@ -843,7 +867,7 @@ fun PlayerScreen(
                                 track = track,
                                 isPlaying = isPlaying,
                                 amplitudeFlow = viewModel.audioAmplitude,
-                                dragDistanceXProvider = { dragDistanceX },
+                                dragDistanceXProvider = { artworkDragX },
                                 isLandscape = false,
                                 isCompact = isCompact,
                                 isMedium = isMedium,
@@ -977,8 +1001,8 @@ fun PlayerScreen(
                             val heartScale by animateFloatAsState(
                                 targetValue = if (isCurrentTrackFavorite) 1.2f else 1.0f,
                                 animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
+                                    dampingRatio = 0.5f,
+                                    stiffness = 700f
                                 ),
                                 label = "heartScale"
                             )
@@ -1096,8 +1120,8 @@ fun PlayerScreen(
                             AnimatedContent(
                                 targetState = isPlaying,
                                 transitionSpec = {
-                                    (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
-                                        .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
+                                    (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
+                                        .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
                                 },
                                 label = "player_play_pause_button_anim"
                             ) { playing ->
