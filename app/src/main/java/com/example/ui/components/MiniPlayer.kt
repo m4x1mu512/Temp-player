@@ -6,7 +6,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -55,12 +54,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,9 +86,6 @@ import com.example.ui.util.formatTime
 import com.example.ui.util.playerSharedBounds
 import com.example.ui.util.playerSharedElement
 import com.example.ui.util.rememberMiniPlayerColors
-
-// Быстрая, но мягкая пружина для кнопки play/pause (вместо sluggish stiffness = 400)
-private val PlayPauseSpring = spring<Float>(dampingRatio = 0.7f, stiffness = 900f)
 
 @Composable
 fun MiniPlayer(
@@ -174,33 +167,22 @@ fun MiniPlayer(
                 containerColor = if (colorScheme.isGradient) Color.Transparent else colorScheme.backgroundColor
             ),
             border = if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
             modifier = modifier
                 .fillMaxWidth()
                 .pointerInput(onClick) {
-                    // Свайп вверх открывает плеер только при осознанном жесте (~40dp),
-                    // а не от случайного движения пальцем на 8px
-                    val openThresholdPx = 40.dp.toPx()
-                    var accumulatedDrag = 0f
-                    var opened = false
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
-                            change.consume()
-                            if (!opened) {
-                                accumulatedDrag += dragAmount
-                                if (accumulatedDrag < -openThresholdPx) {
-                                    opened = true
-                                    onClick()
-                                }
+                            if (dragAmount < -8f) {
+                                change.consume()
+                                onClick()
                             }
-                        },
-                        onDragEnd = { opened = false; accumulatedDrag = 0f },
-                        onDragCancel = { opened = false; accumulatedDrag = 0f }
+                        }
                     )
                 }
                 .playerSharedBounds(
                     sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = this@AnimatedVisibility,
+                    animatedVisibilityScope = animatedVisibilityScope,
                     key = KEY_PLAYER_CONTAINER,
                     clipShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 )
@@ -220,19 +202,11 @@ fun MiniPlayer(
                 Column(modifier = Modifier.fillMaxWidth()) {
                 val getMiniControlsAlpha: () -> Float = { 1f }
 
-                // Smooth continuous progress line without 250ms jerkiness.
-                // При смене трека прогресс снапится в 0, а не «отматывается» анимацией.
+                // Smooth continuous progress line without 250ms jerkiness
                 val targetProgress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-                var lastTrackId by remember { mutableStateOf(currentTrack.id) }
-                val progressSpec: AnimationSpec<Float> = when {
-                    !isPlaying -> snap()
-                    lastTrackId != currentTrack.id -> snap()
-                    else -> tween(durationMillis = 250, easing = LinearEasing)
-                }
-                SideEffect { lastTrackId = currentTrack.id }
                 val animatedProgress by animateFloatAsState(
                     targetValue = targetProgress,
-                    animationSpec = progressSpec,
+                    animationSpec = if (isPlaying) tween(durationMillis = 250, easing = LinearEasing) else snap(),
                     label = "mini_player_animated_progress"
                 )
                 LinearProgressIndicator(
@@ -262,22 +236,13 @@ fun MiniPlayer(
                             modifier = Modifier
                                 .weight(1f)
                                 .pointerInput(onClick) {
-                                    val openThresholdPx = 40.dp.toPx()
-                                    var accumulatedDrag = 0f
-                                    var opened = false
                                     detectVerticalDragGestures(
                                         onVerticalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            if (!opened) {
-                                                accumulatedDrag += dragAmount
-                                                if (accumulatedDrag < -openThresholdPx) {
-                                                    opened = true
-                                                    onClick()
-                                                }
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
                                             }
-                                        },
-                                        onDragEnd = { opened = false; accumulatedDrag = 0f },
-                                        onDragCancel = { opened = false; accumulatedDrag = 0f }
+                                        }
                                     )
                                 }
                                 .clickable { onClick() }
@@ -288,7 +253,7 @@ fun MiniPlayer(
                                     .size(52.dp)
                                     .playerSharedElement(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = this@AnimatedVisibility,
+                                        animatedVisibilityScope = animatedVisibilityScope,
                                         key = KEY_PLAYER_ALBUM_ART,
                                         clipShape = RoundedCornerShape(12.dp)
                                     )
@@ -321,7 +286,7 @@ fun MiniPlayer(
                                     .weight(1f)
                                     .playerSharedBounds(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = this@AnimatedVisibility,
+                                        animatedVisibilityScope = animatedVisibilityScope,
                                         key = KEY_PLAYER_TRACK_TEXT
                                     ),
                                 verticalArrangement = Arrangement.Center
@@ -424,8 +389,8 @@ fun MiniPlayer(
                                 AnimatedContent(
                                     targetState = isPlaying,
                                     transitionSpec = {
-                                        (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
-                                            .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
+                                        (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                            .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
                                     },
                                     label = "mini_land_play_pause"
                                 ) { playing ->
@@ -466,22 +431,13 @@ fun MiniPlayer(
                             modifier = Modifier
                                 .weight(1f)
                                 .pointerInput(onClick) {
-                                    val openThresholdPx = 40.dp.toPx()
-                                    var accumulatedDrag = 0f
-                                    var opened = false
                                     detectVerticalDragGestures(
                                         onVerticalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            if (!opened) {
-                                                accumulatedDrag += dragAmount
-                                                if (accumulatedDrag < -openThresholdPx) {
-                                                    opened = true
-                                                    onClick()
-                                                }
+                                            if (dragAmount < -8f) {
+                                                change.consume()
+                                                onClick()
                                             }
-                                        },
-                                        onDragEnd = { opened = false; accumulatedDrag = 0f },
-                                        onDragCancel = { opened = false; accumulatedDrag = 0f }
+                                        }
                                     )
                                 }
                                 .clickable { onClick() }
@@ -492,7 +448,7 @@ fun MiniPlayer(
                                     .size(56.dp)
                                     .playerSharedElement(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = this@AnimatedVisibility,
+                                        animatedVisibilityScope = animatedVisibilityScope,
                                         key = KEY_PLAYER_ALBUM_ART,
                                         clipShape = RoundedCornerShape(12.dp)
                                     )
@@ -525,7 +481,7 @@ fun MiniPlayer(
                                     .weight(1f)
                                     .playerSharedBounds(
                                         sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = this@AnimatedVisibility,
+                                        animatedVisibilityScope = animatedVisibilityScope,
                                         key = KEY_PLAYER_TRACK_TEXT
                                     ),
                                 verticalArrangement = Arrangement.Center
@@ -586,8 +542,8 @@ fun MiniPlayer(
                                 AnimatedContent(
                                     targetState = isPlaying,
                                     transitionSpec = {
-                                        (scaleIn(PlayPauseSpring) + fadeIn(tween(90)))
-                                            .togetherWith(scaleOut(PlayPauseSpring) + fadeOut(tween(70)))
+                                        (scaleIn(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeIn(tween(140)))
+                                            .togetherWith(scaleOut(spring(dampingRatio = 0.6f, stiffness = 400f)) + fadeOut(tween(100)))
                                     },
                                     label = "mini_port_play_pause"
                                 ) { playing ->
@@ -621,3 +577,4 @@ fun MiniPlayer(
     }
 }
 }
+
