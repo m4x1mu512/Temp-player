@@ -70,14 +70,14 @@ fun Modifier.playerSharedElement(
         }
         if (clipShape != null) {
             sharedElement(
-                sharedContentState = sharedContentState,
+                state = sharedContentState,
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = boundsTransform,
                 clipInOverlayDuringTransition = OverlayClip(clipShape)
             )
         } else {
             sharedElement(
-                sharedContentState = sharedContentState,
+                state = sharedContentState,
                 animatedVisibilityScope = animatedVisibilityScope,
                 boundsTransform = boundsTransform
             )
