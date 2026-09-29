@@ -17,9 +17,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
@@ -28,6 +27,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,7 +37,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -53,10 +52,8 @@ import com.example.ui.screens.SettingsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.util.PLAYER_COLLAPSE_DURATION
 import com.example.ui.util.PLAYER_EXPAND_DURATION
-import com.example.ui.util.PLAYER_TRANSITION_DURATION
 import com.example.ui.util.PlayerEmphasizedAccelerateEasing
 import com.example.ui.util.PlayerEmphasizedDecelerateEasing
-import com.example.ui.util.PlayerEmphasizedEasing
 import com.example.ui.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -239,18 +236,21 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
 
+    // Полный плеер — оверлей поверх навигации, а не отдельный экран NavHost.
+    // Экран под ним (библиотека/настройки) остаётся composed:
+    //  - виден через полупрозрачность при свайпе вниз;
+    //  - bounds мини-плеера живы всё время → shared-переход плавный.
+    var showPlayer by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.navigateToPlayerEvent.collect {
-            if (navController.currentDestination?.route != "player") {
-                navController.navigate("player") {
-                    launchSingleTop = true
-                }
-            }
+            showPlayer = true
         }
     }
 
     LaunchedEffect(Unit) {
         viewModel.navigateToQueueEvent.collect {
+            showPlayer = false
             if (navController.currentDestination?.route != "library") {
                 val popped = navController.popBackStack("library", inclusive = false)
                 if (!popped) {
@@ -264,182 +264,106 @@ fun AppNavigation(viewModel: MainViewModel) {
     }
 
     SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
-        NavHost(
-            navController = navController,
-            startDestination = "library",
-            modifier = Modifier.fillMaxSize(),
-            enterTransition = {
-                fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedDecelerateEasing))
-            },
-            exitTransition = {
-                fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedAccelerateEasing))
-            }
-        ) {
-            composable(
-                route = "library",
-                enterTransition = {
-                    if (initialState.destination.route == "player") {
-                        // Библиотека заезжает снизу под сворачивающийся плеер —
-                        // за плеером сразу появляется предыдущий экран
-                        slideIntoContainer(
-                            AnimatedContentTransitionScope.SlideDirection.Down,
-                            animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing)
-                        )
-                    } else if (initialState.destination.route == "settings") {
-                        slideIntoContainer(
-                            AnimatedContentTransitionScope.SlideDirection.End,
-                            animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
-                        ) + fadeIn(animationSpec = tween(220))
-                    } else {
-                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedDecelerateEasing))
-                    }
-                },
-                exitTransition = {
-                    if (targetState.destination.route == "player") {
-                        // При открытии библиотека остаётся на месте (None) —
-                        // иначе её слайд конфликтует с морфингом контейнера
-                        ExitTransition.None
-                    } else {
+        Box(modifier = Modifier.fillMaxSize()) {
+            NavHost(
+                navController = navController,
+                startDestination = "library",
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(
+                    route = "library",
+                    enterTransition = {
+                        if (initialState.destination.route == "settings") {
+                            slideIntoContainer(
+                                AnimatedContentTransitionScope.SlideDirection.End,
+                                animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
+                            ) + fadeIn(animationSpec = tween(220))
+                        } else {
+                            fadeIn(animationSpec = tween(PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                        }
+                    },
+                    exitTransition = {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
                             animationSpec = tween(280, easing = PlayerEmphasizedAccelerateEasing)
                         ) + fadeOut(animationSpec = tween(220))
-                    }
-                },
-                popEnterTransition = {
-                    if (initialState.destination.route == "player") {
-                        slideIntoContainer(
-                            AnimatedContentTransitionScope.SlideDirection.Down,
-                            animationSpec = tween(PLAYER_COLLAPSE_DURATION, easing = PlayerEmphasizedDecelerateEasing)
-                        )
-                    } else {
+                    },
+                    popEnterTransition = {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
                             animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
                         ) + fadeIn(animationSpec = tween(220))
                     }
-                }
-            ) {
-                LibraryScreen(
-                    viewModel = viewModel,
-                    onNavigateToPlayer = { navController.navigate("player") },
-                    onNavigateToSettings = { navController.navigate("settings") },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@composable,
-                    modifier = Modifier.zIndex(0f)
-                )
-            }
-
-            composable(
-                route = "player",
-                enterTransition = {
-                    // Плеер заезжает снизу поверх библиотеки
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                        animationSpec = tween(
-                            durationMillis = PLAYER_EXPAND_DURATION,
-                            easing = PlayerEmphasizedDecelerateEasing
-                        )
-                    )
-                },
-                exitTransition = {
-                    // Плеер остаётся на месте — его "уход" это slideIn библиотеки снизу.
-                    // Фейд убирает остатки UI в конце.
-                    fadeOut(
-                        animationSpec = tween(
-                            durationMillis = PLAYER_COLLAPSE_DURATION / 4,
-                            easing = PlayerEmphasizedAccelerateEasing
-                        )
-                    )
-                },
-                popEnterTransition = {
-                    slideIntoContainer(
-                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
-                        animationSpec = tween(
-                            durationMillis = PLAYER_EXPAND_DURATION,
-                            easing = PlayerEmphasizedDecelerateEasing
-                        )
-                    )
-                },
-                popExitTransition = {
-                    fadeOut(
-                        animationSpec = tween(
-                            durationMillis = PLAYER_COLLAPSE_DURATION / 4,
-                            easing = PlayerEmphasizedAccelerateEasing
-                        )
+                ) {
+                    LibraryScreen(
+                        viewModel = viewModel,
+                        onNavigateToPlayer = { showPlayer = true },
+                        onNavigateToSettings = { navController.navigate("settings") },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable
                     )
                 }
-            ) {
-                PlayerScreen(
-                    viewModel = viewModel,
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate("library") {
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    onNavigateToQueue = {
-                        viewModel.openPlaybackQueue()
-                        val popped = navController.popBackStack("library", inclusive = false)
-                        if (!popped) {
-                            navController.navigate("library") {
-                                popUpTo("library") { inclusive = false }
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@composable,
-                    modifier = Modifier.zIndex(10f)
-                )
-            }
 
-            composable(
-                route = "settings",
-                enterTransition = {
-                    if (initialState.destination.route == "player") {
-                        EnterTransition.None
-                    } else {
+                composable(
+                    route = "settings",
+                    enterTransition = {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
                             animationSpec = tween(280, easing = FastOutSlowInEasing)
                         ) + fadeIn(animationSpec = tween(220))
-                    }
-                },
-                exitTransition = {
-                    if (targetState.destination.route == "player") {
-                        ExitTransition.None
-                    } else {
+                    },
+                    exitTransition = {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
                             animationSpec = tween(280, easing = FastOutSlowInEasing)
                         ) + fadeOut(animationSpec = tween(220))
-                    }
-                },
-                popEnterTransition = {
-                    if (initialState.destination.route == "player") {
-                        EnterTransition.None
-                    } else {
+                    },
+                    popEnterTransition = {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
                             animationSpec = tween(280, easing = FastOutSlowInEasing)
                         ) + fadeIn(animationSpec = tween(220))
+                    },
+                    popExitTransition = {
+                        slideOutOfContainer(
+                            AnimatedContentTransitionScope.SlideDirection.End,
+                            animationSpec = tween(280, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(220))
                     }
-                },
-                popExitTransition = {
-                    slideOutOfContainer(
-                        AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing)
-                    ) + fadeOut(animationSpec = tween(220))
+                ) {
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { navController.popBackStack() },
+                        onNavigateToPlayer = { showPlayer = true },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this@composable
+                    )
                 }
+            }
+
+            // Полноэкранный плеер — шторка поверх текущего экрана.
+            // Движением управляет shared-переход (bounds/element), экран только фейдится.
+            AnimatedVisibility(
+                visible = showPlayer,
+                enter = fadeIn(
+                    animationSpec = tween(PLAYER_EXPAND_DURATION, easing = PlayerEmphasizedDecelerateEasing)
+                ),
+                exit = fadeOut(
+                    animationSpec = tween(PLAYER_COLLAPSE_DURATION / 2, easing = PlayerEmphasizedAccelerateEasing)
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(10f)
             ) {
-                SettingsScreen(
+                PlayerScreen(
                     viewModel = viewModel,
-                    onNavigateBack = { navController.popBackStack() },
-                    onNavigateToPlayer = { navController.navigate("player") },
+                    onNavigateBack = { showPlayer = false },
+                    onNavigateToQueue = {
+                        showPlayer = false
+                        viewModel.openPlaybackQueue()
+                    },
                     sharedTransitionScope = this@SharedTransitionLayout,
-                    animatedVisibilityScope = this@composable
+                    animatedVisibilityScope = this@AnimatedVisibility
                 )
             }
         }
