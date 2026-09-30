@@ -21,6 +21,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -258,16 +259,26 @@ fun ExpandablePlayerSheet(
         val maxDragPx = (screenHeightPx - collapsedVisibleHeightPx).coerceAtLeast(0f)
 
         var isExpanded by rememberSaveable { mutableStateOf(false) }
-        val offsetY = remember { Animatable(maxDragPx) }
+        val animOffsetY = remember { Animatable(maxDragPx) }
+        var dragOffsetY by remember { mutableFloatStateOf(maxDragPx) }
+        var isDragging by remember { mutableStateOf(false) }
         var isInitialized by remember { mutableStateOf(false) }
+
+        val currentOffsetY = if (isDragging) dragOffsetY else animOffsetY.value
+        val expandProgress = if (maxDragPx > 0f) {
+            (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
+        } else if (isExpanded) 1f else 0f
 
         LaunchedEffect(maxDragPx) {
             if (maxDragPx > 0f) {
                 if (!isInitialized) {
                     isInitialized = true
-                    offsetY.snapTo(if (isExpanded) 0f else maxDragPx)
-                } else if (!isExpanded && !offsetY.isRunning) {
-                    offsetY.snapTo(maxDragPx)
+                    val target = if (isExpanded) 0f else maxDragPx
+                    dragOffsetY = target
+                    animOffsetY.snapTo(target)
+                } else if (!isExpanded && !isDragging && !animOffsetY.isRunning) {
+                    dragOffsetY = maxDragPx
+                    animOffsetY.snapTo(maxDragPx)
                 }
             }
         }
@@ -275,8 +286,9 @@ fun ExpandablePlayerSheet(
         // Expand / Collapse Helper functions
         val expandToFull: () -> Unit = {
             isExpanded = true
+            isDragging = false
             coroutineScope.launch {
-                offsetY.animateTo(
+                animOffsetY.animateTo(
                     targetValue = 0f,
                     animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
                 )
@@ -284,28 +296,31 @@ fun ExpandablePlayerSheet(
         }
         val collapseToMini: () -> Unit = {
             isExpanded = false
+            isDragging = false
             coroutineScope.launch {
-                offsetY.animateTo(
+                animOffsetY.animateTo(
                     targetValue = maxDragPx,
                     animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
                 )
             }
         }
 
-        val expandProgress = if (maxDragPx > 0f) {
-            (1f - (offsetY.value / maxDragPx)).coerceIn(0f, 1f)
-        } else if (isExpanded) 1f else 0f
-
         val settleToTarget: (velocityY: Float) -> Unit = { velocityY ->
             val targetExpanded = when {
-                velocityY < -250f -> true // flick up
-                velocityY > 250f -> false // flick down
-                else -> expandProgress > 0.45f // dragged more than 45% -> expand
+                velocityY < -350f -> true // flick up
+                velocityY > 350f -> false // flick down
+                else -> expandProgress > 0.40f // dragged more than 40% -> expand
             }
-            if (targetExpanded) {
-                expandToFull()
-            } else {
-                collapseToMini()
+            isExpanded = targetExpanded
+            coroutineScope.launch {
+                animOffsetY.snapTo(dragOffsetY)
+                isDragging = false
+                val targetValue = if (targetExpanded) 0f else maxDragPx
+                animOffsetY.animateTo(
+                    targetValue = targetValue,
+                    initialVelocity = velocityY,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                )
             }
         }
 
@@ -328,7 +343,7 @@ fun ExpandablePlayerSheet(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset { IntOffset(0, offsetY.value.roundToInt()) }
+                    .offset { IntOffset(0, currentOffsetY.roundToInt()) }
                     .shadow(
                         elevation = lerp(12.dp, 0.dp, expandProgress),
                         shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
@@ -350,37 +365,36 @@ fun ExpandablePlayerSheet(
                     .pointerInput(maxDragPx) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            val velocityTracker = VelocityTracker()
+                            velocityTracker.addPosition(down.uptimeMillis, down.position)
                             var totalDragY = 0f
-                            var isDrag = false
+                            var isDragActive = false
                             val pointerId = down.id
-                            var lastTime = SystemClock.uptimeMillis()
-                            var velocityY = 0f
 
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == pointerId }
-                                if (change == null || change.changedToUp() || change.isConsumed) {
-                                    if (isDrag) {
+                                if (change == null || !change.pressed) {
+                                    if (isDragActive) {
+                                        val velocityY = velocityTracker.calculateVelocity().y
                                         settleToTarget(velocityY)
                                     }
                                     break
                                 }
+
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
                                 val posChange = change.positionChange()
                                 if (posChange != Offset.Zero) {
                                     val dy = posChange.y
                                     totalDragY += dy
-                                    if (!isDrag && abs(totalDragY) > viewConfiguration.touchSlop) {
-                                        isDrag = true
+                                    if (!isDragActive && abs(totalDragY) > viewConfiguration.touchSlop) {
+                                        isDragActive = true
+                                        isDragging = true
+                                        dragOffsetY = animOffsetY.value
                                     }
-                                    if (isDrag) {
+                                    if (isDragActive) {
                                         change.consume()
-                                        val now = SystemClock.uptimeMillis()
-                                        val dt = (now - lastTime).coerceAtLeast(1L)
-                                        velocityY = (dy / dt) * 1000f
-                                        lastTime = now
-                                        coroutineScope.launch {
-                                            offsetY.snapTo((offsetY.value + dy).coerceIn(0f, maxDragPx))
-                                        }
+                                        dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
                                     }
                                 }
                             }
@@ -445,10 +459,11 @@ fun ExpandablePlayerSheet(
                         )
                         .clip(RoundedCornerShape(currentArtCornerRadius))
                         .background(colorScheme.progressTrackColor)
-                        .clickable(enabled = expandProgress < 0.2f) {
+                        .clickable(enabled = expandProgress < 0.35f) {
                             expandToFull()
                         }
-                        .pointerInput(Unit) {
+                        .pointerInput(expandProgress > 0.7f) {
+                            if (expandProgress <= 0.7f) return@pointerInput
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 var totalDragX = 0f
@@ -490,7 +505,7 @@ fun ExpandablePlayerSheet(
                 }
 
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)
-                val miniAlpha = (1f - expandProgress * 3.5f).coerceIn(0f, 1f)
+                val miniAlpha = (1f - expandProgress * 2.5f).coerceIn(0f, 1f)
                 if (miniAlpha > 0f) {
                     // Continuous thin progress line at top of mini player
                     val targetProgress = if (duration > 0) (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
@@ -516,7 +531,7 @@ fun ExpandablePlayerSheet(
                             .fillMaxWidth()
                             .height(miniBarHeight)
                             .graphicsLayer { alpha = miniAlpha }
-                            .clickable(enabled = expandProgress < 0.2f) {
+                            .clickable(enabled = expandProgress < 0.35f) {
                                 expandToFull()
                             }
                     ) {
@@ -628,7 +643,7 @@ fun ExpandablePlayerSheet(
                 }
 
                 // 3. FULL PLAYER ELEMENTS (Visible when expanded, fades in smoothly)
-                val fullAlpha = ((expandProgress - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                val fullAlpha = ((expandProgress - 0.20f) / 0.60f).coerceIn(0f, 1f)
                 if (fullAlpha > 0f) {
                     Column(
                         modifier = Modifier
@@ -657,13 +672,7 @@ fun ExpandablePlayerSheet(
                             }
 
                             CenterAlignedTopAppBar(
-                                title = {
-                                    Text(
-                                        text = "Сейчас играет",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                },
+                                title = {},
                                 navigationIcon = {
                                     IconButton(
                                         onClick = { collapseToMini() },
@@ -686,17 +695,6 @@ fun ExpandablePlayerSheet(
                                             imageVector = Icons.Default.Bedtime,
                                             contentDescription = "Таймер сна",
                                             tint = if (sleepTimerMode != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { viewModel.cycleVisualizerMode() },
-                                        modifier = Modifier.testTag("player_visualizer_mode_button")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.GraphicEq,
-                                            contentDescription = "Режим визуализатора: ${visualizerMode.displayName}",
-                                            tint = if (visualizerEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
 

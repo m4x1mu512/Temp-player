@@ -356,13 +356,7 @@ fun PlayerScreen(
                 }
 
                 CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            text = "Сейчас играет",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    },
+                    title = {},
                     navigationIcon = {
                         IconButton(
                             onClick = onNavigateBack,
@@ -385,17 +379,6 @@ fun PlayerScreen(
                                 imageVector = Icons.Default.Bedtime,
                                 contentDescription = "Таймер сна",
                                 tint = if (sleepTimerMode != 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.cycleVisualizerMode() },
-                            modifier = Modifier.testTag("player_visualizer_mode_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.GraphicEq,
-                                contentDescription = "Режим визуализатора: ${visualizerMode.displayName}",
-                                tint = if (visualizerEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
