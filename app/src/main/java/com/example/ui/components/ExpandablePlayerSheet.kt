@@ -307,9 +307,10 @@ fun ExpandablePlayerSheet(
 
         val settleToTarget: (velocityY: Float) -> Unit = { velocityY ->
             val targetExpanded = when {
-                velocityY < -350f -> true // flick up
-                velocityY > 350f -> false // flick down
-                else -> expandProgress > 0.40f // dragged more than 40% -> expand
+                velocityY < -180f -> true // light flick up -> expand
+                velocityY > 180f -> false // light flick down -> collapse
+                isExpanded -> expandProgress > 0.82f // when open, small swipe down (just ~18%) collapses
+                else -> expandProgress > 0.18f // when closed, small swipe up (just ~18%) opens
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
@@ -319,7 +320,7 @@ fun ExpandablePlayerSheet(
                 animOffsetY.animateTo(
                     targetValue = targetValue,
                     initialVelocity = velocityY,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
                 )
             }
         }
@@ -754,6 +755,7 @@ fun ExpandablePlayerSheet(
 
                                     // Progress Slider
                                     SheetProgressSection(
+                                        trackId = track.id,
                                         positionFlow = positionFlow,
                                         duration = duration,
                                         isPlaying = isPlaying,
@@ -857,6 +859,7 @@ fun ExpandablePlayerSheet(
 
                                 // Progress Slider & Timestamps
                                 SheetProgressSection(
+                                    trackId = track.id,
                                     positionFlow = positionFlow,
                                     duration = duration,
                                     isPlaying = isPlaying,
@@ -1057,6 +1060,7 @@ fun ExpandablePlayerSheet(
 
 @Composable
 private fun SheetProgressSection(
+    trackId: Long,
     positionFlow: StateFlow<Long>,
     duration: Long,
     isPlaying: Boolean,
@@ -1064,18 +1068,24 @@ private fun SheetProgressSection(
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
-    var isUserScrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableFloatStateOf(0f) }
+    var isUserScrubbing by remember(trackId) { mutableStateOf(false) }
+    var scrubPosition by remember(trackId) { mutableFloatStateOf(0f) }
 
-    val smoothAnimatedPos = remember { Animatable(rawPosition.toFloat()) }
+    val smoothAnimatedPos = remember(trackId) { Animatable(0f) }
 
-    LaunchedEffect(rawPosition, isPlaying, isUserScrubbing) {
+    LaunchedEffect(trackId) {
+        isUserScrubbing = false
+        scrubPosition = 0f
+        smoothAnimatedPos.snapTo(0f)
+    }
+
+    LaunchedEffect(rawPosition, isPlaying, isUserScrubbing, trackId) {
         if (!isUserScrubbing) {
             val rawFloat = rawPosition.toFloat()
             if (!isPlaying) {
                 smoothAnimatedPos.snapTo(rawFloat)
             } else {
-                if (abs(smoothAnimatedPos.value - rawFloat) > 1500f) {
+                if (abs(smoothAnimatedPos.value - rawFloat) > 1200f) {
                     smoothAnimatedPos.snapTo(rawFloat)
                 }
                 val target = if (duration > 0) minOf(duration.toFloat(), rawFloat + 250f) else rawFloat + 250f

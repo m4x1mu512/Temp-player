@@ -475,9 +475,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
             _currentTrack.value = track
             _duration.value = track.duration
-            if (!startPaused) {
-                _playbackPosition.value = 0
-            }
+            _playbackPosition.value = 0L
             visualizerController.resetBuffers()
             updateAudioSpecsForTrack(track, activePlayer)
 

@@ -559,6 +559,7 @@ fun PlayerScreen(
 
                             // Progress Slider & Timestamps
                             PlayerProgressSection(
+                                trackId = track.id,
                                 positionFlow = viewModel.playbackPosition,
                                 duration = duration,
                                 isPlaying = isPlaying,
@@ -922,6 +923,7 @@ fun PlayerScreen(
 
                     // Progress Slider & Timestamps
                     PlayerProgressSection(
+                        trackId = track.id,
                         positionFlow = viewModel.playbackPosition,
                         duration = duration,
                         isPlaying = isPlaying,
@@ -1471,6 +1473,7 @@ private fun PlayerArtworkCard(
 
 @Composable
 private fun PlayerProgressSection(
+    trackId: Long,
     positionFlow: StateFlow<Long>,
     duration: Long,
     isPlaying: Boolean,
@@ -1480,18 +1483,24 @@ private fun PlayerProgressSection(
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
-    var isUserScrubbing by remember { mutableStateOf(false) }
-    var scrubPosition by remember { mutableFloatStateOf(0f) }
+    var isUserScrubbing by remember(trackId) { mutableStateOf(false) }
+    var scrubPosition by remember(trackId) { mutableFloatStateOf(0f) }
 
-    val smoothAnimatedPos = remember { Animatable(rawPosition.toFloat()) }
+    val smoothAnimatedPos = remember(trackId) { Animatable(0f) }
 
-    LaunchedEffect(rawPosition, isPlaying, isUserScrubbing) {
+    LaunchedEffect(trackId) {
+        isUserScrubbing = false
+        scrubPosition = 0f
+        smoothAnimatedPos.snapTo(0f)
+    }
+
+    LaunchedEffect(rawPosition, isPlaying, isUserScrubbing, trackId) {
         if (!isUserScrubbing) {
             val rawFloat = rawPosition.toFloat()
             if (!isPlaying) {
                 smoothAnimatedPos.snapTo(rawFloat)
             } else {
-                if (abs(smoothAnimatedPos.value - rawFloat) > 1500f) {
+                if (abs(smoothAnimatedPos.value - rawFloat) > 1200f) {
                     smoothAnimatedPos.snapTo(rawFloat)
                 }
                 val target = if (duration > 0) minOf(duration.toFloat(), rawFloat + 250f) else rawFloat + 250f
