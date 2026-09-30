@@ -24,6 +24,7 @@ import androidx.media3.exoplayer.audio.AudioOffloadSupport
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -93,7 +94,10 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
+        val mediaSourceFactory = DefaultMediaSourceFactory(this, PlaybackManager.createExtractorsFactory())
+
         return ExoPlayer.Builder(this, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(audioAttributes, false) // Controlled at service level for simultaneous crossfade
             .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -172,12 +176,21 @@ class PlaybackService : MediaSessionService() {
                 playbackManager.previousTrack(autoPlayIfPaused = true)
             }
 
+            override fun seekTo(positionMs: Long) {
+                playbackManager.seekTo(positionMs)
+            }
+
+            override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+                playbackManager.seekTo(positionMs)
+            }
+
             override fun getAvailableCommands(): Player.Commands {
                 return super.getAvailableCommands().buildUpon()
                     .add(Player.COMMAND_SEEK_TO_NEXT)
                     .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS)
                     .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
                     .add(Player.COMMAND_STOP)
                     .add(Player.COMMAND_PLAY_PAUSE)
                     .build()
@@ -189,6 +202,7 @@ class PlaybackService : MediaSessionService() {
                     Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
                     Player.COMMAND_SEEK_TO_PREVIOUS,
                     Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+                    Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
                     Player.COMMAND_STOP,
                     Player.COMMAND_PLAY_PAUSE -> true
                     else -> super.isCommandAvailable(command)

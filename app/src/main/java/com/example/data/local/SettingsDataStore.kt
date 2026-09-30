@@ -15,6 +15,7 @@ import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
+import java.io.File
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -23,6 +24,52 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "te
 class SettingsDataStore(private val context: Context) {
 
     companion object {
+        private const val PREFS_CACHE_NAME = "app_theme_cache"
+        private const val KEY_CACHED_THEME_MODE = "cached_theme_mode"
+
+        fun getInitialThemeMode(context: Context): ThemeMode {
+            val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+            val name = prefs.getString(KEY_CACHED_THEME_MODE, null)
+            if (name != null) {
+                return try {
+                    ThemeMode.valueOf(name)
+                } catch (_: Exception) {
+                    ThemeMode.SYSTEM
+                }
+            }
+
+            // Fallback for existing installations: scan DataStore preferences file synchronously
+            try {
+                val dataStoreFile = File(context.filesDir, "datastore/temp_settings.preferences_pb")
+                if (dataStoreFile.exists()) {
+                    val content = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
+                    if (content.contains("theme_mode")) {
+                        val detected = when {
+                            content.contains("DARK") -> ThemeMode.DARK
+                            content.contains("LIGHT") -> ThemeMode.LIGHT
+                            content.contains("SYSTEM") -> ThemeMode.SYSTEM
+                            else -> null
+                        }
+                        if (detected != null) {
+                            saveCachedThemeMode(context, detected)
+                            return detected
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+
+            return ThemeMode.SYSTEM
+        }
+
+        fun saveCachedThemeMode(context: Context, mode: ThemeMode) {
+            try {
+                context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_CACHED_THEME_MODE, mode.name)
+                    .apply()
+            } catch (_: Exception) {}
+        }
+
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_VISUALIZER_ENABLED = booleanPreferencesKey("visualizer_enabled")
         private val KEY_VISUALIZER_MODE = stringPreferencesKey("visualizer_mode")
@@ -88,11 +135,17 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
-        val name = preferences[KEY_THEME_MODE] ?: ThemeMode.LIGHT.name
+        val name = preferences[KEY_THEME_MODE]
+        if (name != null) {
+            try {
+                saveCachedThemeMode(context, ThemeMode.valueOf(name))
+            } catch (_: Exception) {}
+        }
+        val currentName = name ?: getInitialThemeMode(context).name
         try {
-            ThemeMode.valueOf(name)
+            ThemeMode.valueOf(currentName)
         } catch (_: Exception) {
-            ThemeMode.LIGHT
+            ThemeMode.SYSTEM
         }
     }
 
@@ -157,6 +210,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
+        saveCachedThemeMode(context, mode)
         context.dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
         }

@@ -42,7 +42,7 @@ private val LightColorScheme =
 
 @Composable
 fun MyApplicationTheme(
-  themeMode: com.example.data.model.ThemeMode = com.example.data.model.ThemeMode.LIGHT,
+  themeMode: com.example.data.model.ThemeMode = com.example.data.model.ThemeMode.SYSTEM,
   darkTheme: Boolean = when (themeMode) {
     com.example.data.model.ThemeMode.LIGHT -> false
     com.example.data.model.ThemeMode.DARK -> true

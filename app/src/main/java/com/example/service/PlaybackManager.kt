@@ -13,8 +13,10 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -23,6 +25,11 @@ import androidx.media3.exoplayer.audio.AudioOffloadSupport
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.TeeAudioProcessor
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.amr.AmrExtractor
+import androidx.media3.extractor.mp3.Mp3Extractor
+import androidx.media3.extractor.ts.AdtsExtractor
 import com.example.data.local.AppDatabase
 import com.example.data.local.SettingsDataStore
 import com.example.data.model.AudioTrackSpecs
@@ -267,6 +274,37 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
+        override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            val player = if (isPlayerA) playerA else playerB
+            if (isThisPlayerActive && player != null) {
+                val realDuration = player.duration
+                if (realDuration > 0 && _duration.value != realDuration) {
+                    _duration.value = realDuration
+                    _currentTrack.value?.let { track ->
+                        if (track.duration != realDuration) {
+                            _currentTrack.value = track.copy(duration = realDuration)
+                            serviceScope.launch {
+                                repository.updateTrackDuration(track.id, realDuration)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int
+        ) {
+            val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
+            val player = if (isPlayerA) playerA else playerB
+            if (isThisPlayerActive && player != null) {
+                _playbackPosition.value = player.currentPosition
+            }
+        }
+
         override fun onMetadata(metadata: Metadata) {
             val isThisPlayerActive = (isPlayerA && activePlayerIndex == 0) || (!isPlayerA && activePlayerIndex == 1)
             if (isThisPlayerActive) {
@@ -402,7 +440,10 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
+        val mediaSourceFactory = DefaultMediaSourceFactory(context, createExtractorsFactory())
+
         val player = ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(audioAttributes, false) // Note: false to not compete for audio focus
             .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -474,7 +515,9 @@ class PlaybackManager private constructor(private val context: Context) {
             }
 
             _currentTrack.value = track
-            _duration.value = track.duration
+            _duration.value = if (track.duration > 0) track.duration else {
+                if (track.size > 0) (track.size * 8000L / 192_000L).coerceAtLeast(30_000L) else 0L
+            }
             _playbackPosition.value = 0L
             visualizerController.resetBuffers()
             updateAudioSpecsForTrack(track, activePlayer)
@@ -502,21 +545,43 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private fun createMediaItem(track: Track): MediaItem {
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setArtist(track.artist)
+            .setAlbumTitle(track.album)
+            .setArtworkUri(track.albumArtUri)
+            .build()
+
+        val mimeType = when {
+            track.path.endsWith(".aac", ignoreCase = true) ||
+                track.title.endsWith(".aac", ignoreCase = true) ||
+                track.uriString.endsWith(".aac", ignoreCase = true) ||
+                track.path.contains(".aac?", ignoreCase = true) -> MimeTypes.AUDIO_AAC
+            track.path.endsWith(".mp3", ignoreCase = true) || track.title.endsWith(".mp3", ignoreCase = true) -> MimeTypes.AUDIO_MPEG
+            track.path.endsWith(".flac", ignoreCase = true) || track.title.endsWith(".flac", ignoreCase = true) -> MimeTypes.AUDIO_FLAC
+            track.path.endsWith(".wav", ignoreCase = true) || track.title.endsWith(".wav", ignoreCase = true) -> MimeTypes.AUDIO_WAV
+            track.path.endsWith(".ogg", ignoreCase = true) || track.title.endsWith(".ogg", ignoreCase = true) -> MimeTypes.AUDIO_OGG
+            track.path.endsWith(".m4a", ignoreCase = true) || track.title.endsWith(".m4a", ignoreCase = true) -> MimeTypes.AUDIO_MP4
+            else -> null
+        }
+
+        return MediaItem.Builder()
+            .setMediaId(track.id.toString())
+            .setUri(track.uri)
+            .apply {
+                if (mimeType != null) {
+                    setMimeType(mimeType)
+                }
+            }
+            .setMediaMetadata(mediaMetadata)
+            .build()
+    }
+
     private fun executePlay(player: ExoPlayer, track: Track, startPaused: Boolean) {
         try {
             player.volume = 1f
-            val mediaMetadata = MediaMetadata.Builder()
-                .setTitle(track.title)
-                .setArtist(track.artist)
-                .setAlbumTitle(track.album)
-                .setArtworkUri(track.albumArtUri)
-                .build()
-
-            val mediaItem = MediaItem.Builder()
-                .setMediaId(track.id.toString())
-                .setUri(track.uri)
-                .setMediaMetadata(mediaMetadata)
-                .build()
+            val mediaItem = createMediaItem(track)
 
             replayGainController.attachPlayer(player)
             replayGainController.onTrackChanged(track)
@@ -618,10 +683,23 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun seekTo(positionMs: Long) {
         crossfadeController.cancelCrossfade()
-        val clamped = positionMs.coerceIn(0, _duration.value.coerceAtLeast(0))
+        val player = activePlayer
+        val trackDur = _currentTrack.value?.duration ?: 0L
+        val playerDur = player?.duration?.takeIf { it > 0 } ?: 0L
+        val stateDur = _duration.value.takeIf { it > 0 } ?: 0L
+        val effectiveDuration = maxOf(stateDur, playerDur, trackDur)
+
+        val clamped = if (effectiveDuration > 0) {
+            positionMs.coerceIn(0, effectiveDuration)
+        } else {
+            positionMs.coerceAtLeast(0)
+        }
         _playbackPosition.value = clamped
+        if (effectiveDuration > _duration.value) {
+            _duration.value = effectiveDuration
+        }
         visualizerController.resetBuffers()
-        activePlayer?.seekTo(clamped)
+        player?.seekTo(clamped)
     }
 
     fun seekForward10s() {
@@ -724,18 +802,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
         Log.d("PlaybackManager", "Triggering crossfade from index $_queueIndex to $nextIdx: ${nextTrack.title}")
 
-        val mediaMetadata = MediaMetadata.Builder()
-            .setTitle(nextTrack.title)
-            .setArtist(nextTrack.artist)
-            .setAlbumTitle(nextTrack.album)
-            .setArtworkUri(nextTrack.albumArtUri)
-            .build()
-
-        val mediaItem = MediaItem.Builder()
-            .setMediaId(nextTrack.id.toString())
-            .setUri(nextTrack.uri)
-            .setMediaMetadata(mediaMetadata)
-            .build()
+        val mediaItem = createMediaItem(nextTrack)
 
         // Prepare incoming player silently for equal-power fade-in
         incomingPlayer.volume = 0f
@@ -748,7 +815,9 @@ class PlaybackManager private constructor(private val context: Context) {
         activePlayerIndex = if (activePlayerIndex == 0) 1 else 0
         _currentTrack.value = nextTrack
         _queueIndex.value = nextIdx
-        _duration.value = nextTrack.duration
+        _duration.value = if (nextTrack.duration > 0) nextTrack.duration else {
+            if (nextTrack.size > 0) (nextTrack.size * 8000L / 192_000L).coerceAtLeast(30_000L) else 0L
+        }
         _playbackPosition.value = 0L
         updateAudioSpecsForTrack(nextTrack, incomingPlayer)
 
@@ -1156,6 +1225,26 @@ class PlaybackManager private constructor(private val context: Context) {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: PlaybackManager(context.applicationContext).also { INSTANCE = it }
             }
+        }
+
+        @OptIn(UnstableApi::class)
+        fun createExtractorsFactory(): DefaultExtractorsFactory {
+            return DefaultExtractorsFactory()
+                .setConstantBitrateSeekingEnabled(true)
+                .setConstantBitrateSeekingAlwaysEnabled(true)
+                .setAdtsExtractorFlags(
+                    AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING or
+                    AdtsExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING_ALWAYS
+                )
+                .setMp3ExtractorFlags(
+                    Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING or
+                    Mp3Extractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING_ALWAYS or
+                    Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING
+                )
+                .setAmrExtractorFlags(
+                    AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING or
+                    AmrExtractor.FLAG_ENABLE_CONSTANT_BITRATE_SEEKING_ALWAYS
+                )
         }
     }
 }

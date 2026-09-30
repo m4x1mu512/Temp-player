@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.SettingsDataStore
 import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
@@ -214,7 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val themeMode: StateFlow<ThemeMode> = settingsDataStore.themeModeFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = ThemeMode.LIGHT
+        initialValue = SettingsDataStore.getInitialThemeMode(application)
     )
 
     val visualizerEnabled: StateFlow<Boolean> = settingsDataStore.visualizerEnabledFlow.stateIn(

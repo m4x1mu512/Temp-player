@@ -177,7 +177,7 @@ class MusicRepository(
                     } else "Разное"
 
                     // If duration is 0, attempt metadata retriever extraction
-                    if (duration <= 0 && path.isNotBlank()) {
+                    if (duration <= 0) {
                         try {
                             MediaMetadataRetriever().use { mmr ->
                                 mmr.setDataSource(context, contentUri)
@@ -185,7 +185,15 @@ class MusicRepository(
                                 duration = durStr?.toLongOrNull() ?: 0L
                             }
                         } catch (_: Exception) {
-                            // Safe fallback
+                            if (path.isNotBlank()) {
+                                try {
+                                    MediaMetadataRetriever().use { mmr ->
+                                        mmr.setDataSource(path)
+                                        val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                        duration = durStr?.toLongOrNull() ?: 0L
+                                    }
+                                } catch (_: Exception) {}
+                            }
                         }
                     }
 
