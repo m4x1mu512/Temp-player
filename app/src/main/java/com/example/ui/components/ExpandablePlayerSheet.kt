@@ -132,6 +132,8 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private enum class SheetDragDirection { NONE, VERTICAL, HORIZONTAL }
+
 @Composable
 fun ExpandablePlayerSheet(
     viewModel: MainViewModel,
@@ -373,18 +375,46 @@ fun ExpandablePlayerSheet(
                             velocityTracker.addPosition(down.uptimeMillis, down.position)
                             var totalDragX = 0f
                             var totalDragY = 0f
-                            var isDragActive = false
+                            var dragDir = SheetDragDirection.NONE
                             val pointerId = down.id
 
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == pointerId }
                                 if (change == null || !change.pressed) {
-                                    val velocityY = velocityTracker.calculateVelocity().y
-                                    if (isDragActive || abs(totalDragY) > 10f || abs(velocityY) > 60f) {
+                                    val velocity = velocityTracker.calculateVelocity()
+                                    val velocityX = velocity.x
+                                    val velocityY = velocity.y
+
+                                    if (dragDir == SheetDragDirection.VERTICAL) {
                                         settleToTarget(velocityY, totalDragY)
+                                    } else if (dragDir == SheetDragDirection.HORIZONTAL) {
+                                        // Strictly handle track switching - NEVER collapse/expand on horizontal swipe!
+                                        if (totalDragX < -35f || velocityX < -400f) {
+                                            viewModel.nextTrack()
+                                        } else if (totalDragX > 35f || velocityX > 400f) {
+                                            viewModel.previousTrack()
+                                        }
+                                    } else {
+                                        // Quick flick with very little displacement
+                                        val isPredominantlyVertical = abs(velocityY) > abs(velocityX) * 1.5f && abs(velocityY) > 180f
+                                        val isPredominantlyHorizontal = abs(velocityX) > abs(velocityY) * 1.5f && abs(velocityX) > 300f
+
+                                        if (isPredominantlyVertical) {
+                                            settleToTarget(velocityY, totalDragY)
+                                        } else if (isPredominantlyHorizontal) {
+                                            if (totalDragX < -30f || velocityX < -300f) {
+                                                viewModel.nextTrack()
+                                            } else if (totalDragX > 30f || velocityX > 300f) {
+                                                viewModel.previousTrack()
+                                            }
+                                        }
                                     }
                                     break
+                                }
+
+                                if (change.isConsumed) {
+                                    continue
                                 }
 
                                 velocityTracker.addPosition(change.uptimeMillis, change.position)
@@ -393,15 +423,22 @@ fun ExpandablePlayerSheet(
                                     totalDragX += posChange.x
                                     val dy = posChange.y
                                     totalDragY += dy
-                                    // Start interactive drag quickly with low threshold (~10px)
-                                    if (!isDragActive && abs(totalDragY) > 10f && abs(totalDragY) >= abs(totalDragX) * 0.7f) {
-                                        isDragActive = true
-                                        isDragging = true
-                                        dragOffsetY = animOffsetY.value
+
+                                    if (dragDir == SheetDragDirection.NONE) {
+                                        if (abs(totalDragX) > 14f && abs(totalDragX) > abs(totalDragY) * 1.25f) {
+                                            dragDir = SheetDragDirection.HORIZONTAL
+                                        } else if (abs(totalDragY) > 12f && abs(totalDragY) > abs(totalDragX) * 1.25f) {
+                                            dragDir = SheetDragDirection.VERTICAL
+                                            isDragging = true
+                                            dragOffsetY = animOffsetY.value
+                                        }
                                     }
-                                    if (isDragActive) {
+
+                                    if (dragDir == SheetDragDirection.VERTICAL) {
                                         change.consume()
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
+                                    } else if (dragDir == SheetDragDirection.HORIZONTAL) {
+                                        change.consume()
                                     }
                                 }
                             }
@@ -459,59 +496,6 @@ fun ExpandablePlayerSheet(
                         .background(colorScheme.progressTrackColor)
                         .clickable(enabled = expandProgress < 0.35f) {
                             expandToFull()
-                        }
-                        .pointerInput(expandProgress > 0.7f, maxDragPx) {
-                            if (expandProgress <= 0.7f) return@pointerInput
-                            awaitEachGesture {
-                                val down = awaitFirstDown(requireUnconsumed = false)
-                                val velocityTracker = VelocityTracker()
-                                velocityTracker.addPosition(down.uptimeMillis, down.position)
-                                var totalDragX = 0f
-                                var totalDragY = 0f
-                                var isHorizontal: Boolean? = null
-                                val pointerId = down.id
-
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == pointerId }
-                                    if (change == null || !change.pressed) {
-                                        val velocityY = velocityTracker.calculateVelocity().y
-                                        if (isHorizontal == false) {
-                                            settleToTarget(velocityY, totalDragY)
-                                        } else if (isHorizontal == true) {
-                                            if (totalDragX < -35f) viewModel.nextTrack()
-                                            else if (totalDragX > 35f) viewModel.previousTrack()
-                                        } else if (abs(totalDragY) > 10f || abs(velocityY) > 60f) {
-                                            settleToTarget(velocityY, totalDragY)
-                                        }
-                                        break
-                                    }
-
-                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
-                                    val posChange = change.positionChange()
-                                    if (posChange != Offset.Zero) {
-                                        totalDragX += posChange.x
-                                        totalDragY += posChange.y
-
-                                        if (isHorizontal == null) {
-                                            if (abs(totalDragX) > 10f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
-                                                isHorizontal = true
-                                            } else if (abs(totalDragY) > 10f) {
-                                                isHorizontal = false
-                                                isDragging = true
-                                                dragOffsetY = animOffsetY.value
-                                            }
-                                        }
-
-                                        if (isHorizontal == true) {
-                                            change.consume()
-                                        } else if (isHorizontal == false) {
-                                            change.consume()
-                                            dragOffsetY = (dragOffsetY + posChange.y).coerceIn(0f, maxDragPx)
-                                        }
-                                    }
-                                }
-                            }
                         }
                 ) {
                     Crossfade(
