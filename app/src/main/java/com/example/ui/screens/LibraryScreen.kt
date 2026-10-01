@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +25,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -31,6 +35,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Bedtime
@@ -43,11 +48,14 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +66,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -79,11 +88,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.R
 import com.example.data.model.Playlist
 import com.example.data.model.SortOrder
 import com.example.data.model.Track
@@ -611,10 +625,9 @@ fun LibraryScreen(
                             }
 
                             3 -> {
-                                // 4. "Альбомы"
-                                GroupedListSection(
-                                    groups = albumGroups,
-                                    icon = Icons.Default.Album,
+                                // 4. "Альбомы" (с обложками альбомов)
+                                AlbumsSection(
+                                    albumGroups = albumGroups,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
                                     selectedTitle = selectedGroupTitle,
@@ -936,19 +949,24 @@ private fun GroupedListSection(
         }
     } else {
         val groupKeys = remember(groups) { groups.keys.toList() }
+        val context = LocalContext.current
         LazyColumn(
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             items(groupKeys, key = { it }) { groupKey ->
-                val count = groups[groupKey]?.size ?: 0
+                val groupTracks = groups[groupKey] ?: emptyList()
+                val count = groupTracks.size
+                val firstArtUri = remember(groupTracks) {
+                    groupTracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
+                }
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable { onSelectGroup(groupKey, groups[groupKey] ?: emptyList()) }
+                        .clickable { onSelectGroup(groupKey, groupTracks) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -956,16 +974,33 @@ private fun GroupedListSection(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(48.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
+                            if (firstArtUri != null) {
+                                val artRequest = remember(firstArtUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(firstArtUri)
+                                        .size(150, 150)
+                                        .crossfade(150)
+                                        .error(R.drawable.ic_default_art)
+                                        .build()
+                                }
+                                AsyncImage(
+                                    model = artRequest,
+                                    contentDescription = groupKey,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -983,6 +1018,341 @@ private fun GroupedListSection(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumsSection(
+    albumGroups: Map<String, List<Track>>,
+    currentTrack: Track?,
+    isPlaying: Boolean,
+    selectedTitle: String?,
+    onSelectGroup: (String, List<Track>) -> Unit,
+    onBackFromGroup: () -> Unit,
+    onPlayTrack: (Track, List<Track>) -> Unit,
+    onToggleFavorite: (Long) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    favoriteIds: Set<Long> = emptySet(),
+    onNavigateToQueue: () -> Unit = {}
+) {
+    val context = LocalContext.current
+
+    if (selectedTitle != null) {
+        val tracks = albumGroups[selectedTitle] ?: emptyList()
+        val listState = rememberLazyListState()
+        val albumArtUri = remember(tracks) {
+            tracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
+        }
+        val artistName = remember(tracks) {
+            tracks.firstOrNull { it.artist.isNotBlank() && it.artist != "Неизвестный исполнитель" }?.artist ?: "Различные исполнители"
+        }
+        val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
+        val formattedTotalDuration = remember(totalDurationMs) {
+            val totalSeconds = totalDurationMs / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            val hours = minutes / 60
+            if (hours > 0) {
+                String.format("%d ч %02d мин", hours, minutes % 60)
+            } else {
+                String.format("%d мин %02d сек", minutes, seconds)
+            }
+        }
+
+        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
+            if (currentTrack != null && tracks.isNotEmpty()) {
+                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
+                if (targetIndex >= 0) {
+                    try {
+                        delay(60)
+                        listState.smoothScrollToTrackIndex(targetIndex)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBackFromGroup() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Альбомы",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Hero Album Card with Cover, Title, Artist and Play Actions
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(92.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val coverRequest = remember(albumArtUri) {
+                            ImageRequest.Builder(context)
+                                .data(albumArtUri ?: R.drawable.ic_default_art)
+                                .size(260, 260)
+                                .crossfade(150)
+                                .error(R.drawable.ic_default_art)
+                                .build()
+                        }
+                        AsyncImage(
+                            model = coverRequest,
+                            contentDescription = "Обложка альбома $selectedTitle",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = artistName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (tracks.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { onPlayTrack(tracks.first(), tracks) },
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("play_album_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("shuffle_album_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Перемешать",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = tracks,
+                        key = { it.id },
+                        contentType = { "track" }
+                    ) { track ->
+                        TrackListItem(
+                            track = track,
+                            isCurrent = currentTrack?.id == track.id,
+                            isPlaying = isPlaying && currentTrack?.id == track.id,
+                            isFavorite = favoriteIds.contains(track.id),
+                            onClick = { onPlayTrack(track, tracks) },
+                            onToggleFavorite = { onToggleFavorite(track.id) },
+                            onAddToPlaylist = { onAddToPlaylist(track) }
+                        )
+                    }
+                }
+
+                val coroutineScope = rememberCoroutineScope()
+                ScrollToCurrentTrackFab(
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    onClick = {
+                        val targetIndex = tracks.indexOfFirst { it.id == currentTrack?.id }
+                        if (targetIndex >= 0) {
+                            coroutineScope.launch {
+                                listState.smoothScrollToTrackIndex(targetIndex)
+                            }
+                        } else {
+                            onNavigateToQueue()
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp)
+                )
+            }
+        }
+    } else {
+        if (albumGroups.isEmpty()) {
+            EmptyState(
+                title = "Нет альбомов",
+                message = "В медиатеке не найдены альбомы",
+                icon = Icons.Default.Album,
+                actionButtonText = null,
+                onActionClick = null
+            )
+        } else {
+            val albumKeys = remember(albumGroups) { albumGroups.keys.toList() }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 150.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("albums_grid")
+            ) {
+                items(albumKeys, key = { it }) { albumTitle ->
+                    val tracks = albumGroups[albumTitle] ?: emptyList()
+                    val albumArtUri = remember(tracks) {
+                        tracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
+                    }
+                    val artistName = remember(tracks) {
+                        tracks.firstOrNull { it.artist.isNotBlank() && it.artist != "Неизвестный исполнитель" }?.artist ?: "Различные исполнители"
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectGroup(albumTitle, tracks) }
+                            .testTag("album_card_$albumTitle")
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val coverRequest = remember(albumArtUri) {
+                                    ImageRequest.Builder(context)
+                                        .data(albumArtUri ?: R.drawable.ic_default_art)
+                                        .size(300, 300)
+                                        .crossfade(150)
+                                        .error(R.drawable.ic_default_art)
+                                        .build()
+                                }
+
+                                AsyncImage(
+                                    model = coverRequest,
+                                    contentDescription = "Обложка $albumTitle",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+
+                                if (tracks.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(8.dp)
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary)
+                                            .clickable { onPlayTrack(tracks.first(), tracks) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Слушать $albumTitle",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = albumTitle,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = artistName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Треков: ${tracks.size}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }
