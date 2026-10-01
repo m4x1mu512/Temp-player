@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -16,6 +17,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
@@ -101,6 +103,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -305,12 +308,12 @@ fun ExpandablePlayerSheet(
             }
         }
 
-        val settleToTarget: (velocityY: Float) -> Unit = { velocityY ->
+        val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
             val targetExpanded = when {
-                velocityY < -180f -> true // light flick up -> expand
-                velocityY > 180f -> false // light flick down -> collapse
-                isExpanded -> expandProgress > 0.82f // when open, small swipe down (just ~18%) collapses
-                else -> expandProgress > 0.18f // when closed, small swipe up (just ~18%) opens
+                velocityY < -60f -> true // light flick up -> expand
+                velocityY > 60f -> false // light flick down -> collapse
+                isExpanded -> !(totalDragY > 15f || expandProgress < 0.96f) // short swipe down (>15px) collapses
+                else -> totalDragY < -15f || expandProgress > 0.04f // short swipe up (< -15px) opens
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
@@ -368,6 +371,7 @@ fun ExpandablePlayerSheet(
                             val down = awaitFirstDown(requireUnconsumed = false)
                             val velocityTracker = VelocityTracker()
                             velocityTracker.addPosition(down.uptimeMillis, down.position)
+                            var totalDragX = 0f
                             var totalDragY = 0f
                             var isDragActive = false
                             val pointerId = down.id
@@ -376,9 +380,9 @@ fun ExpandablePlayerSheet(
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == pointerId }
                                 if (change == null || !change.pressed) {
-                                    if (isDragActive) {
-                                        val velocityY = velocityTracker.calculateVelocity().y
-                                        settleToTarget(velocityY)
+                                    val velocityY = velocityTracker.calculateVelocity().y
+                                    if (isDragActive || abs(totalDragY) > 10f || abs(velocityY) > 60f) {
+                                        settleToTarget(velocityY, totalDragY)
                                     }
                                     break
                                 }
@@ -386,9 +390,11 @@ fun ExpandablePlayerSheet(
                                 velocityTracker.addPosition(change.uptimeMillis, change.position)
                                 val posChange = change.positionChange()
                                 if (posChange != Offset.Zero) {
+                                    totalDragX += posChange.x
                                     val dy = posChange.y
                                     totalDragY += dy
-                                    if (!isDragActive && abs(totalDragY) > viewConfiguration.touchSlop) {
+                                    // Start interactive drag quickly with low threshold (~10px)
+                                    if (!isDragActive && abs(totalDragY) > 10f && abs(totalDragY) >= abs(totalDragX) * 0.7f) {
                                         isDragActive = true
                                         isDragging = true
                                         dragOffsetY = animOffsetY.value
@@ -405,15 +411,6 @@ fun ExpandablePlayerSheet(
             ) {
                 // 1. ALBUM ARTWORK: Smoothly interpolates size, position, and corner radius!
                 val context = LocalContext.current
-                val artRequest = remember(track.albumArtUri) {
-                    ImageRequest.Builder(context)
-                        .data(track.albumArtUri ?: R.drawable.ic_default_art)
-                        .crossfade(180)
-                        .placeholder(R.drawable.ic_default_art)
-                        .error(R.drawable.ic_default_art)
-                        .build()
-                }
-
                 val miniArtSize = if (isLandscape) 50.dp else 54.dp
                 val miniArtX = if (isLandscape) 20.dp else 14.dp
                 val miniArtY = if (isLandscape) 4.dp else 5.dp
@@ -463,46 +460,88 @@ fun ExpandablePlayerSheet(
                         .clickable(enabled = expandProgress < 0.35f) {
                             expandToFull()
                         }
-                        .pointerInput(expandProgress > 0.7f) {
+                        .pointerInput(expandProgress > 0.7f, maxDragPx) {
                             if (expandProgress <= 0.7f) return@pointerInput
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
+                                val velocityTracker = VelocityTracker()
+                                velocityTracker.addPosition(down.uptimeMillis, down.position)
                                 var totalDragX = 0f
                                 var totalDragY = 0f
-                                var isHorizontal = false
+                                var isHorizontal: Boolean? = null
                                 val pointerId = down.id
 
                                 while (true) {
                                     val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                                    if (change.changedToUp()) {
-                                        if (isHorizontal) {
-                                            if (totalDragX < -60f) viewModel.nextTrack()
-                                            else if (totalDragX > 60f) viewModel.previousTrack()
+                                    val change = event.changes.firstOrNull { it.id == pointerId }
+                                    if (change == null || !change.pressed) {
+                                        val velocityY = velocityTracker.calculateVelocity().y
+                                        if (isHorizontal == false) {
+                                            settleToTarget(velocityY, totalDragY)
+                                        } else if (isHorizontal == true) {
+                                            if (totalDragX < -35f) viewModel.nextTrack()
+                                            else if (totalDragX > 35f) viewModel.previousTrack()
+                                        } else if (abs(totalDragY) > 10f || abs(velocityY) > 60f) {
+                                            settleToTarget(velocityY, totalDragY)
                                         }
                                         break
                                     }
+
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
                                     val posChange = change.positionChange()
                                     if (posChange != Offset.Zero) {
                                         totalDragX += posChange.x
                                         totalDragY += posChange.y
-                                        if (!isHorizontal && abs(totalDragX) > viewConfiguration.touchSlop && abs(totalDragX) > abs(totalDragY) * 1.5f) {
-                                            isHorizontal = true
+
+                                        if (isHorizontal == null) {
+                                            if (abs(totalDragX) > 10f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
+                                                isHorizontal = true
+                                            } else if (abs(totalDragY) > 10f) {
+                                                isHorizontal = false
+                                                isDragging = true
+                                                dragOffsetY = animOffsetY.value
+                                            }
                                         }
-                                        if (isHorizontal) {
+
+                                        if (isHorizontal == true) {
                                             change.consume()
+                                        } else if (isHorizontal == false) {
+                                            change.consume()
+                                            dragOffsetY = (dragOffsetY + posChange.y).coerceIn(0f, maxDragPx)
                                         }
                                     }
                                 }
                             }
                         }
                 ) {
-                    AsyncImage(
-                        model = artRequest,
-                        contentDescription = "Обложка трека",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    Crossfade(
+                        targetState = track.albumArtUri,
+                        animationSpec = tween(durationMillis = 180),
+                        label = "expandable_player_art_crossfade"
+                    ) { artUri ->
+                        if (artUri == null) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_default_art),
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val artRequest = remember(artUri) {
+                                ImageRequest.Builder(context)
+                                    .data(artUri)
+                                    .crossfade(false)
+                                    .error(R.drawable.ic_default_art)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = artRequest,
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
 
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)

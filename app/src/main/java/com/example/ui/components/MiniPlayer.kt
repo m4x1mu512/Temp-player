@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -22,6 +23,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -261,21 +263,35 @@ fun MiniPlayer(
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val miniLandscapeArtRequest = remember(currentTrack.albumArtUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(currentTrack.albumArtUri ?: R.drawable.ic_default_art)
-                                        .size(160, 160)
-                                        .crossfade(150)
-                                        .placeholder(R.drawable.ic_default_art)
-                                        .error(R.drawable.ic_default_art)
-                                        .build()
+                                Crossfade(
+                                    targetState = currentTrack.albumArtUri,
+                                    animationSpec = tween(durationMillis = 180),
+                                    label = "mini_landscape_art_crossfade"
+                                ) { artUri ->
+                                    if (artUri == null) {
+                                        Image(
+                                            painter = painterResource(R.drawable.ic_default_art),
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(52.dp)
+                                        )
+                                    } else {
+                                        val miniLandscapeArtRequest = remember(artUri) {
+                                            ImageRequest.Builder(context)
+                                                .data(artUri)
+                                                .size(160, 160)
+                                                .crossfade(false)
+                                                .error(R.drawable.ic_default_art)
+                                                .build()
+                                        }
+                                        AsyncImage(
+                                            model = miniLandscapeArtRequest,
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(52.dp)
+                                        )
+                                    }
                                 }
-                                AsyncImage(
-                                    model = miniLandscapeArtRequest,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(52.dp)
-                                )
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))
@@ -456,21 +472,35 @@ fun MiniPlayer(
                                     .background(colorScheme.progressTrackColor),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val miniPortraitArtRequest = remember(currentTrack.albumArtUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(currentTrack.albumArtUri ?: R.drawable.ic_default_art)
-                                        .size(160, 160)
-                                        .crossfade(150)
-                                        .placeholder(R.drawable.ic_default_art)
-                                        .error(R.drawable.ic_default_art)
-                                        .build()
+                                Crossfade(
+                                    targetState = currentTrack.albumArtUri,
+                                    animationSpec = tween(durationMillis = 180),
+                                    label = "mini_portrait_art_crossfade"
+                                ) { artUri ->
+                                    if (artUri == null) {
+                                        Image(
+                                            painter = painterResource(R.drawable.ic_default_art),
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(56.dp)
+                                        )
+                                    } else {
+                                        val miniPortraitArtRequest = remember(artUri) {
+                                            ImageRequest.Builder(context)
+                                                .data(artUri)
+                                                .size(160, 160)
+                                                .crossfade(false)
+                                                .error(R.drawable.ic_default_art)
+                                                .build()
+                                        }
+                                        AsyncImage(
+                                            model = miniPortraitArtRequest,
+                                            contentDescription = "Обложка трека",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(56.dp)
+                                        )
+                                    }
                                 }
-                                AsyncImage(
-                                    model = miniPortraitArtRequest,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.size(56.dp)
-                                )
                             }
 
                             Spacer(modifier = Modifier.width(14.dp))

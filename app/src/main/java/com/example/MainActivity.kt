@@ -103,6 +103,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
         val initialTheme = SettingsDataStore.getInitialThemeMode(this)
         val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         val initialIsDark = when (initialTheme) {
@@ -110,6 +112,9 @@ class MainActivity : ComponentActivity() {
             ThemeMode.DARK -> true
             ThemeMode.SYSTEM -> isSystemDark
         }
+
+        val windowBgColor = if (initialIsDark) 0xFF121316.toInt() else 0xFFFDFCFF.toInt()
+        window.setBackgroundDrawable(ColorDrawable(windowBgColor))
 
         enableEdgeToEdge(
             statusBarStyle = if (initialIsDark) {
@@ -129,11 +134,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
-
-        val windowBgColor = if (initialIsDark) 0xFF121316.toInt() else 0xFFFDFCFF.toInt()
-        window.setBackgroundDrawable(ColorDrawable(windowBgColor))
-
-        super.onCreate(savedInstanceState)
 
         // Start PlaybackService via standard startService.
         // MediaSessionService automatically transitions to foreground when media playback begins.

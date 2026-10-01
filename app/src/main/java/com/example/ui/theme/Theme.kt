@@ -2,6 +2,7 @@ package com.example.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -66,6 +67,13 @@ fun MyApplicationTheme(
     }
   }
 
-  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+  MaterialTheme(colorScheme = colorScheme, typography = Typography) {
+    androidx.compose.material3.Surface(
+      modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+      color = colorScheme.background
+    ) {
+      content()
+    }
+  }
 }
 

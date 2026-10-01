@@ -66,7 +66,7 @@ class SettingsDataStore(private val context: Context) {
                 context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_CACHED_THEME_MODE, mode.name)
-                    .apply()
+                    .commit()
             } catch (_: Exception) {}
         }
 

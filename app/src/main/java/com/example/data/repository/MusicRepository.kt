@@ -161,12 +161,18 @@ class MusicRepository(
                     val albumId = if (albumIdCol != -1) cursor.getLong(albumIdCol) else -1L
 
                     val contentUri = ContentUris.withAppendedId(collection, id)
-                    val albumArtUri = if (albumId != -1L) {
-                        ContentUris.withAppendedId(
+                    var albumArtUri: String? = null
+                    if (albumId != -1L) {
+                        val legacyArtUri = ContentUris.withAppendedId(
                             Uri.parse("content://media/external/audio/albumart"),
                             albumId
-                        ).toString()
-                    } else null
+                        )
+                        try {
+                            context.contentResolver.openFileDescriptor(legacyArtUri, "r")?.use {
+                                albumArtUri = legacyArtUri.toString()
+                            }
+                        } catch (_: Exception) {}
+                    }
 
                     val folderName = if (path.isNotBlank()) {
                         try {
@@ -177,24 +183,50 @@ class MusicRepository(
                     } else "Разное"
 
                     // If duration is 0, attempt metadata retriever extraction
-                    if (duration <= 0) {
+                    if (duration <= 0 || albumArtUri == null) {
                         try {
                             MediaMetadataRetriever().use { mmr ->
                                 mmr.setDataSource(context, contentUri)
-                                val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                duration = durStr?.toLongOrNull() ?: 0L
+                                if (duration <= 0) {
+                                    val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                    duration = durStr?.toLongOrNull() ?: 0L
+                                }
+                                if (albumArtUri == null) {
+                                    val pictureBytes = mmr.embeddedPicture
+                                    if (pictureBytes != null && pictureBytes.isNotEmpty()) {
+                                        val artDir = File(context.cacheDir, "album_arts").apply { mkdirs() }
+                                        val artFile = File(artDir, "art_${id}.jpg")
+                                        artFile.writeBytes(pictureBytes)
+                                        albumArtUri = Uri.fromFile(artFile).toString()
+                                    }
+                                }
                             }
                         } catch (_: Exception) {
                             if (path.isNotBlank()) {
                                 try {
                                     MediaMetadataRetriever().use { mmr ->
                                         mmr.setDataSource(path)
-                                        val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                        duration = durStr?.toLongOrNull() ?: 0L
+                                        if (duration <= 0) {
+                                            val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                            duration = durStr?.toLongOrNull() ?: 0L
+                                        }
+                                        if (albumArtUri == null) {
+                                            val pictureBytes = mmr.embeddedPicture
+                                            if (pictureBytes != null && pictureBytes.isNotEmpty()) {
+                                                val artDir = File(context.cacheDir, "album_arts").apply { mkdirs() }
+                                                val artFile = File(artDir, "art_${id}.jpg")
+                                                artFile.writeBytes(pictureBytes)
+                                                albumArtUri = Uri.fromFile(artFile).toString()
+                                            }
+                                        }
                                     }
                                 } catch (_: Exception) {}
                             }
                         }
+                    }
+
+                    if (duration <= 0 && size > 0) {
+                        duration = (size * 8000L / 192_000L).coerceAtLeast(10_000L)
                     }
 
                     scannedTracks.add(

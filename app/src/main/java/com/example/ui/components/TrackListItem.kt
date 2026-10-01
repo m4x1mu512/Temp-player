@@ -92,7 +92,6 @@ fun TrackListItem(
                     .data(track.albumArtUri ?: R.drawable.ic_default_art)
                     .size(150, 150)
                     .crossfade(150)
-                    .placeholder(R.drawable.ic_default_art)
                     .error(R.drawable.ic_default_art)
                     .build()
             }
