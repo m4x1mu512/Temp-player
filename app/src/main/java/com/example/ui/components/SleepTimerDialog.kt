@@ -84,7 +84,15 @@ fun SleepTimerDialog(
                     )
                 } else if (currentMode == -1) {
                     Text(
-                        text = "Остановится после окончания песни",
+                        text = "Остановится после окончания трека",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                } else if (currentMode > 0) {
+                    Text(
+                        text = "Активен ($currentMode мин)",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
@@ -93,6 +101,8 @@ fun SleepTimerDialog(
                 }
 
                 val options = listOf(
+                    5 to "5 минут",
+                    10 to "10 минут",
                     15 to "15 минут",
                     30 to "30 минут",
                     45 to "45 минут",

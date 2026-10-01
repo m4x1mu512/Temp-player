@@ -311,11 +311,19 @@ fun ExpandablePlayerSheet(
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
+            // A collapse or expand must be a deliberate vertical motion, not an accidental slip
+            val thresholdDistance = (maxDragPx * 0.25f).coerceIn(140f, 360f)
             val targetExpanded = when {
-                velocityY < -60f -> true // light flick up -> expand
-                velocityY > 60f -> false // light flick down -> collapse
-                isExpanded -> !(totalDragY > 15f || expandProgress < 0.96f) // short swipe down (>15px) collapses
-                else -> totalDragY < -15f || expandProgress > 0.04f // short swipe up (< -15px) opens
+                velocityY < -700f -> true // deliberate flick up -> expand
+                velocityY > 700f -> false // deliberate flick down -> collapse
+                isExpanded -> {
+                    // Was expanded: require dragging down by at least thresholdDistance
+                    totalDragY < thresholdDistance && expandProgress > 0.65f
+                }
+                else -> {
+                    // Was collapsed (mini): require dragging up by at least thresholdDistance
+                    totalDragY < -thresholdDistance || expandProgress > 0.35f
+                }
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
@@ -386,27 +394,40 @@ fun ExpandablePlayerSheet(
                                     val velocityX = velocity.x
                                     val velocityY = velocity.y
 
-                                    if (dragDir == SheetDragDirection.VERTICAL) {
-                                        settleToTarget(velocityY, totalDragY)
-                                    } else if (dragDir == SheetDragDirection.HORIZONTAL) {
+                                    if (dragDir == SheetDragDirection.HORIZONTAL) {
                                         // Strictly handle track switching - NEVER collapse/expand on horizontal swipe!
-                                        if (totalDragX < -35f || velocityX < -400f) {
+                                        if (isDragging) {
+                                            isDragging = false
+                                            coroutineScope.launch {
+                                                animOffsetY.animateTo(if (isExpanded) 0f else maxDragPx)
+                                            }
+                                        }
+                                        if (totalDragX < -40f || velocityX < -350f) {
                                             viewModel.nextTrack()
-                                        } else if (totalDragX > 35f || velocityX > 400f) {
+                                        } else if (totalDragX > 40f || velocityX > 350f) {
                                             viewModel.previousTrack()
                                         }
+                                    } else if (dragDir == SheetDragDirection.VERTICAL) {
+                                        settleToTarget(velocityY, totalDragY)
                                     } else {
                                         // Quick flick with very little displacement
-                                        val isPredominantlyVertical = abs(velocityY) > abs(velocityX) * 1.5f && abs(velocityY) > 180f
-                                        val isPredominantlyHorizontal = abs(velocityX) > abs(velocityY) * 1.5f && abs(velocityX) > 300f
+                                        val isHorizontalFlick = abs(velocityX) > 350f && abs(velocityX) > abs(velocityY) * 1.5f
+                                        val isVerticalFlick = abs(velocityY) > 700f && abs(velocityY) > abs(velocityX) * 1.5f
 
-                                        if (isPredominantlyVertical) {
-                                            settleToTarget(velocityY, totalDragY)
-                                        } else if (isPredominantlyHorizontal) {
-                                            if (totalDragX < -30f || velocityX < -300f) {
+                                        if (isHorizontalFlick) {
+                                            if (totalDragX < -30f || velocityX < -350f) {
                                                 viewModel.nextTrack()
-                                            } else if (totalDragX > 30f || velocityX > 300f) {
+                                            } else if (totalDragX > 30f || velocityX > 350f) {
                                                 viewModel.previousTrack()
+                                            }
+                                        } else if (isVerticalFlick) {
+                                            settleToTarget(velocityY, totalDragY)
+                                        } else {
+                                            if (isDragging) {
+                                                isDragging = false
+                                                coroutineScope.launch {
+                                                    animOffsetY.animateTo(if (isExpanded) 0f else maxDragPx)
+                                                }
                                             }
                                         }
                                     }
@@ -425,12 +446,20 @@ fun ExpandablePlayerSheet(
                                     totalDragY += dy
 
                                     if (dragDir == SheetDragDirection.NONE) {
-                                        if (abs(totalDragX) > 14f && abs(totalDragX) > abs(totalDragY) * 1.25f) {
+                                        // Bias towards horizontal track switching to completely prevent accidental collapse
+                                        if (abs(totalDragX) > 18f && abs(totalDragX) >= abs(totalDragY)) {
                                             dragDir = SheetDragDirection.HORIZONTAL
-                                        } else if (abs(totalDragY) > 12f && abs(totalDragY) > abs(totalDragX) * 1.25f) {
+                                        } else if (abs(totalDragY) > 28f && abs(totalDragY) > abs(totalDragX) * 1.6f) {
                                             dragDir = SheetDragDirection.VERTICAL
                                             isDragging = true
                                             dragOffsetY = animOffsetY.value
+                                        }
+                                    } else if (dragDir == SheetDragDirection.VERTICAL) {
+                                        // If during vertical dragging horizontal motion clearly dominates, switch to horizontal!
+                                        if (abs(totalDragX) > 40f && abs(totalDragX) > abs(totalDragY) * 1.4f) {
+                                            dragDir = SheetDragDirection.HORIZONTAL
+                                            isDragging = false
+                                            dragOffsetY = if (isExpanded) 0f else maxDragPx
                                         }
                                     }
 

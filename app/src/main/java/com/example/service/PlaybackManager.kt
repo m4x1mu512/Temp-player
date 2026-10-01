@@ -5,7 +5,7 @@ import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
-import android.os.CountDownTimer
+import android.os.SystemClock
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -148,7 +148,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var positionProgressJob: Job? = null
-    private var sleepCountDownTimer: CountDownTimer? = null
+    private var sleepTimerJob: Job? = null
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
     init {
@@ -265,7 +265,10 @@ class PlaybackManager private constructor(private val context: Context) {
                         }
                     }
                     Player.STATE_ENDED -> {
-                        if (!crossfadeController.isCrossfading) {
+                        if (_sleepTimerMode.value == -1) {
+                            pause()
+                            cancelSleepTimer()
+                        } else if (!crossfadeController.isCrossfading) {
                             handleTrackEnded()
                         }
                     }
@@ -864,24 +867,28 @@ class PlaybackManager private constructor(private val context: Context) {
         _sleepTimerMode.value = minutes
 
         if (minutes > 0) {
-            val millis = minutes * 60 * 1000L
-            sleepCountDownTimer = object : CountDownTimer(millis, 1000L) {
-                override fun onTick(millisUntilFinished: Long) {
-                    _sleepTimerRemainingMillis.value = millisUntilFinished
+            val durationMillis = minutes * 60 * 1000L
+            val targetTime = SystemClock.elapsedRealtime() + durationMillis
+            _sleepTimerRemainingMillis.value = durationMillis
+            sleepTimerJob = serviceScope.launch {
+                while (isActive) {
+                    val remaining = targetTime - SystemClock.elapsedRealtime()
+                    if (remaining <= 0L) {
+                        _sleepTimerRemainingMillis.value = null
+                        _sleepTimerMode.value = 0
+                        pause()
+                        break
+                    }
+                    _sleepTimerRemainingMillis.value = remaining
+                    delay(500L)
                 }
-
-                override fun onFinish() {
-                    _sleepTimerRemainingMillis.value = null
-                    _sleepTimerMode.value = 0
-                    pause()
-                }
-            }.start()
+            }
         }
     }
 
     fun cancelSleepTimer() {
-        sleepCountDownTimer?.cancel()
-        sleepCountDownTimer = null
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
         _sleepTimerRemainingMillis.value = null
         _sleepTimerMode.value = 0
     }
@@ -956,7 +963,13 @@ class PlaybackManager private constructor(private val context: Context) {
                         _duration.value = player.duration
                     }
 
-                    if (crossfadeController.shouldTriggerCrossfade(
+                    if (_sleepTimerMode.value == -1) {
+                        // Stop on end of current track: do not crossfade, stop cleanly when track reaches end
+                        if (_duration.value > 0L && player.currentPosition >= _duration.value - 300L) {
+                            pause()
+                            cancelSleepTimer()
+                        }
+                    } else if (crossfadeController.shouldTriggerCrossfade(
                             currentPositionMs = player.currentPosition,
                             totalDurationMs = _duration.value,
                             hasNextTrack = hasNextTrack()
