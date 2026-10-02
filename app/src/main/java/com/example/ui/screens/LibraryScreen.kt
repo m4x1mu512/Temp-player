@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -88,11 +89,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -562,10 +565,9 @@ fun LibraryScreen(
                             }
 
                             1 -> {
-                                // 2. "Папки"
-                                GroupedListSection(
-                                    groups = folderGroups,
-                                    icon = Icons.Default.Folder,
+                                // 2. "Папки" (с коллажем обложек и верхней карточкой)
+                                FoldersSection(
+                                    folderGroups = folderGroups,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
                                     selectedTitle = selectedGroupTitle,
@@ -1027,6 +1029,395 @@ private fun GroupedListSection(
 }
 
 @Composable
+private fun FolderCoverCollage(
+    artUris: List<android.net.Uri>,
+    modifier: Modifier = Modifier,
+    size: Dp = 54.dp,
+    shape: Shape = RoundedCornerShape(12.dp)
+) {
+    val context = LocalContext.current
+    val distinctUris = remember(artUris) { artUris.distinct() }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            distinctUris.size >= 4 -> {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                        Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[2]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                        Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[3]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
+                }
+            }
+            distinctUris.size == 3 -> {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                        Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
+                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[2]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                        Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+                    }
+                }
+            }
+            distinctUris.size == 2 -> {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(distinctUris[0]).size(150, 150).crossfade(100).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                    Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(distinctUris[1]).size(150, 150).crossfade(100).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.weight(1f).fillMaxHeight()
+                    )
+                }
+            }
+            distinctUris.size == 1 -> {
+                AsyncImage(
+                    model = ImageRequest.Builder(context).data(distinctUris[0]).size(240, 240).crossfade(100).error(R.drawable.ic_default_art).build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            else -> {
+                Icon(
+                    imageVector = Icons.Default.Folder,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(size * 0.48f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FoldersSection(
+    folderGroups: Map<String, List<Track>>,
+    currentTrack: Track?,
+    isPlaying: Boolean,
+    selectedTitle: String?,
+    onSelectGroup: (String, List<Track>) -> Unit,
+    onBackFromGroup: () -> Unit,
+    onPlayTrack: (Track, List<Track>) -> Unit,
+    onToggleFavorite: (Long) -> Unit,
+    onAddToPlaylist: (Track) -> Unit,
+    favoriteIds: Set<Long> = emptySet(),
+    onNavigateToQueue: () -> Unit = {}
+) {
+    if (selectedTitle != null) {
+        val tracks = folderGroups[selectedTitle] ?: emptyList()
+        val listState = rememberLazyListState()
+        val distinctArtUris = remember(tracks) {
+            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+        }
+        val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
+        val formattedTotalDuration = remember(totalDurationMs) {
+            val totalSeconds = totalDurationMs / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            val hours = minutes / 60
+            if (hours > 0) {
+                String.format("%d ч %02d мин", hours, minutes % 60)
+            } else {
+                String.format("%d мин %02d сек", minutes, seconds)
+            }
+        }
+
+        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
+            if (currentTrack != null && tracks.isNotEmpty()) {
+                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
+                if (targetIndex >= 0) {
+                    try {
+                        delay(60)
+                        listState.smoothScrollToTrackIndex(targetIndex)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBackFromGroup() }
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Папки",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            // Hero Folder Card with Collage of covers, Title, Track count, Total duration and Play Actions
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    FolderCoverCollage(
+                        artUris = distinctArtUris,
+                        size = 92.dp,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Папка с музыкой",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (tracks.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { onPlayTrack(tracks.first(), tracks) },
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("play_folder_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("shuffle_folder_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Перемешать",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = tracks,
+                        key = { it.id },
+                        contentType = { "track" }
+                    ) { track ->
+                        TrackListItem(
+                            track = track,
+                            isCurrent = currentTrack?.id == track.id,
+                            isPlaying = isPlaying && currentTrack?.id == track.id,
+                            isFavorite = favoriteIds.contains(track.id),
+                            onClick = { onPlayTrack(track, tracks) },
+                            onToggleFavorite = { onToggleFavorite(track.id) },
+                            onAddToPlaylist = { onAddToPlaylist(track) }
+                        )
+                    }
+                }
+
+                val coroutineScope = rememberCoroutineScope()
+                ScrollToCurrentTrackFab(
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    onClick = {
+                        val targetIndex = tracks.indexOfFirst { it.id == currentTrack?.id }
+                        if (targetIndex >= 0) {
+                            coroutineScope.launch {
+                                listState.smoothScrollToTrackIndex(targetIndex)
+                            }
+                        } else {
+                            onNavigateToQueue()
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 16.dp)
+                )
+            }
+        }
+    } else {
+        if (folderGroups.isEmpty()) {
+            EmptyState(
+                title = "Нет папок",
+                message = "В медиатеке не найдены папки с аудио",
+                icon = Icons.Default.Folder,
+                actionButtonText = null,
+                onActionClick = null
+            )
+        } else {
+            val folderKeys = remember(folderGroups) { folderGroups.keys.toList() }
+            LazyColumn(
+                contentPadding = PaddingValues(bottom = 80.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(folderKeys, key = { it }) { folderName ->
+                    val folderTracks = folderGroups[folderName] ?: emptyList()
+                    val count = folderTracks.size
+                    val distinctArtUris = remember(folderTracks) {
+                        folderTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .clickable { onSelectGroup(folderName, folderTracks) }
+                            .testTag("folder_card_$folderName")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(14.dp)
+                        ) {
+                            FolderCoverCollage(
+                                artUris = distinctArtUris,
+                                size = 56.dp,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = folderName,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Треков: $count",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun AlbumsSection(
     albumGroups: Map<String, List<Track>>,
     currentTrack: Track?,
@@ -1383,17 +1774,18 @@ private fun PlaylistsSection(
 ) {
     if (selectedTitle != null) {
         // Show selected playlist / favorites / all tracks
+        val customPlaylist = remember(selectedTitle, playlists) {
+            playlists.find { it.name == selectedTitle }
+        }
+        val customPlaylistFlow = remember(customPlaylist?.id) {
+            customPlaylist?.let { getPlaylistTracks(it.id) }
+        }
+        val customPlaylistTracks by customPlaylistFlow?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyList()) }
+
         val tracks = when (selectedTitle) {
             "Все треки" -> allTracks
             "Избранное" -> favorites
-            else -> {
-                val pl = playlists.find { it.name == selectedTitle }
-                if (pl != null) {
-                    val flow = getPlaylistTracks(pl.id)
-                    val list by flow.collectAsStateWithLifecycle()
-                    list
-                } else emptyList()
-            }
+            else -> customPlaylistTracks
         }
         val listState = rememberLazyListState()
 

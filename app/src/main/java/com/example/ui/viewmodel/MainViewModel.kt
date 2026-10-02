@@ -389,6 +389,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deletePlaylist(id: Long) {
+        playlistTracksCache.remove(id)
         viewModelScope.launch {
             repository.deletePlaylist(id)
         }
@@ -406,14 +407,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val playlistTracksCache = mutableMapOf<Long, StateFlow<List<Track>>>()
+
     fun getPlaylistTracks(playlistId: Long): StateFlow<List<Track>> {
-        val flow = MutableStateFlow<List<Track>>(emptyList())
-        viewModelScope.launch {
-            repository.getTracksForPlaylist(playlistId).collect {
-                flow.value = it
+        return playlistTracksCache.getOrPut(playlistId) {
+            val flow = MutableStateFlow<List<Track>>(emptyList())
+            viewModelScope.launch {
+                repository.getTracksForPlaylist(playlistId).collect {
+                    flow.value = it
+                }
             }
+            flow.asStateFlow()
         }
-        return flow
     }
 
     fun setSleepTimer(minutes: Int) {
