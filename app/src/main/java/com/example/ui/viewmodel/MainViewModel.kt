@@ -411,13 +411,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getPlaylistTracks(playlistId: Long): StateFlow<List<Track>> {
         return playlistTracksCache.getOrPut(playlistId) {
-            val flow = MutableStateFlow<List<Track>>(emptyList())
-            viewModelScope.launch {
-                repository.getTracksForPlaylist(playlistId).collect {
-                    flow.value = it
-                }
-            }
-            flow.asStateFlow()
+            repository.getTracksForPlaylist(playlistId)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.Eagerly,
+                    initialValue = emptyList()
+                )
         }
     }
 

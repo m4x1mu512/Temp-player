@@ -64,7 +64,7 @@ class MusicRepository(
         }
     }.flowOn(Dispatchers.IO)
 
-    suspend fun getTracksForPlaylist(playlistId: Long): Flow<List<Track>> {
+    fun getTracksForPlaylist(playlistId: Long): Flow<List<Track>> {
         return combine(
             playlistDao.getTracksForPlaylist(playlistId),
             favoriteDao.getAllFavoriteIds()

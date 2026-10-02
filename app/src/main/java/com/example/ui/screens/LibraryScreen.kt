@@ -167,16 +167,17 @@ fun LibraryScreen(
     // Selected folder / artist / album filter drilldown
     var selectedGroupTitle by remember { mutableStateOf<String?>(null) }
     var selectedGroupTracks by remember { mutableStateOf<List<Track>?>(null) }
+    var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
     // Intercept back gesture when a folder (or any category group) is open to return to the all-folders overview
-    BackHandler(enabled = selectedGroupTitle != null) {
+    BackHandler(enabled = selectedGroupTitle != null || selectedPlaylist != null) {
         selectedGroupTitle = null
         selectedGroupTracks = null
+        selectedPlaylist = null
     }
 
     val coroutineScope = rememberCoroutineScope()
     val queueListState = rememberLazyListState()
-    var scrollToCurrentTrackTrigger by remember { mutableIntStateOf(0) }
     var lastHandledOpenQueue by remember { mutableIntStateOf(0) }
 
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
@@ -190,6 +191,7 @@ fun LibraryScreen(
     LaunchedEffect(pagerState.settledPage) {
         selectedGroupTitle = null
         selectedGroupTracks = null
+        selectedPlaylist = null
     }
 
     // Direct event from ViewModel to open playback queue (tab 0)
@@ -197,6 +199,7 @@ fun LibraryScreen(
         viewModel.navigateToQueueEvent.collect {
             selectedGroupTitle = null
             selectedGroupTracks = null
+            selectedPlaylist = null
             for (retry in 0..4) {
                 if (pagerState.currentPage != 0) {
                     try {
@@ -205,7 +208,6 @@ fun LibraryScreen(
                     delay(50)
                 }
             }
-            scrollToCurrentTrackTrigger++
         }
     }
 
@@ -215,29 +217,13 @@ fun LibraryScreen(
             lastHandledOpenQueue = openQueueEvent
             selectedGroupTitle = null
             selectedGroupTracks = null
+            selectedPlaylist = null
             for (retry in 0..4) {
                 if (pagerState.currentPage != 0) {
                     try {
                         pagerState.scrollToPage(0)
                     } catch (_: Exception) {}
                     delay(50)
-                }
-            }
-            scrollToCurrentTrackTrigger++
-        }
-    }
-
-    // Auto-scroll to currently playing / paused track when opening playback queue
-    LaunchedEffect(pagerState.currentPage, currentTrack?.id, scrollToCurrentTrackTrigger, currentQueue) {
-        if (pagerState.currentPage == 0 && currentTrack != null) {
-            val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
-            val targetIndex = queueToDisplay.indexOfFirst { it.id == currentTrack?.id }
-            if (targetIndex >= 0) {
-                try {
-                    delay(80)
-                    queueListState.smoothScrollToTrackIndex(targetIndex)
-                } catch (_: Exception) {
-                    queueListState.scrollToItem(targetIndex)
                 }
             }
         }
@@ -261,6 +247,7 @@ fun LibraryScreen(
         if (pagerState.currentPage != targetPage) {
             selectedGroupTitle = null
             selectedGroupTracks = null
+            selectedPlaylist = null
             coroutineScope.launch {
                 if (kotlin.math.abs(pagerState.currentPage - targetPage) > 1) {
                     val adjacent = if (targetPage > pagerState.currentPage) targetPage - 1 else targetPage + 1
@@ -299,7 +286,7 @@ fun LibraryScreen(
                         }
                         selectedGroupTitle = null
                         selectedGroupTracks = null
-                        scrollToCurrentTrackTrigger++
+                        selectedPlaylist = null
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -586,7 +573,6 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
-                                            scrollToCurrentTrackTrigger++
                                         }
                                     }
                                 )
@@ -600,14 +586,19 @@ fun LibraryScreen(
                                     playlists = playlists,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
-                                    selectedTitle = selectedGroupTitle,
-                                    onSelectGroup = { title, tracks ->
+                                    selectedCategoryTitle = selectedGroupTitle,
+                                    selectedPlaylist = selectedPlaylist,
+                                    onSelectCategory = { title ->
                                         selectedGroupTitle = title
-                                        selectedGroupTracks = tracks
+                                        selectedPlaylist = null
+                                    },
+                                    onSelectPlaylist = { pl ->
+                                        selectedPlaylist = pl
+                                        selectedGroupTitle = null
                                     },
                                     onBackFromGroup = {
                                         selectedGroupTitle = null
-                                        selectedGroupTracks = null
+                                        selectedPlaylist = null
                                     },
                                     onCreatePlaylist = { showCreatePlaylistDialog = true },
                                     onRenamePlaylist = { playlistToRename = it },
@@ -620,7 +611,6 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
-                                            scrollToCurrentTrackTrigger++
                                         }
                                     }
                                 )
@@ -648,7 +638,6 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
-                                            scrollToCurrentTrackTrigger++
                                         }
                                     }
                                 )
@@ -677,7 +666,6 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
-                                            scrollToCurrentTrackTrigger++
                                         }
                                     }
                                 )
@@ -763,7 +751,6 @@ fun LibraryScreen(
                                                     } else {
                                                         coroutineScope.launch {
                                                             pagerState.animateScrollToPage(0)
-                                                            scrollToCurrentTrackTrigger++
                                                         }
                                                     }
                                                 },
@@ -869,18 +856,6 @@ private fun GroupedListSection(
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
-
-        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
-            if (currentTrack != null && tracks.isNotEmpty()) {
-                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
-                if (targetIndex >= 0) {
-                    try {
-                        delay(60)
-                        listState.smoothScrollToTrackIndex(targetIndex)
-                    } catch (_: Exception) {}
-                }
-            }
-        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -1186,18 +1161,6 @@ private fun FoldersSection(
             }
         }
 
-        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
-            if (currentTrack != null && tracks.isNotEmpty()) {
-                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
-                if (targetIndex >= 0) {
-                    try {
-                        delay(60)
-                        listState.smoothScrollToTrackIndex(targetIndex)
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -1452,18 +1415,6 @@ private fun AlbumsSection(
                 String.format("%d ч %02d мин", hours, minutes % 60)
             } else {
                 String.format("%d мин %02d сек", minutes, seconds)
-            }
-        }
-
-        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
-            if (currentTrack != null && tracks.isNotEmpty()) {
-                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
-                if (targetIndex >= 0) {
-                    try {
-                        delay(60)
-                        listState.smoothScrollToTrackIndex(targetIndex)
-                    } catch (_: Exception) {}
-                }
             }
         }
 
@@ -1759,8 +1710,10 @@ private fun PlaylistsSection(
     playlists: List<Playlist>,
     currentTrack: Track?,
     isPlaying: Boolean,
-    selectedTitle: String?,
-    onSelectGroup: (String, List<Track>) -> Unit,
+    selectedCategoryTitle: String?,
+    selectedPlaylist: Playlist?,
+    onSelectCategory: (String) -> Unit,
+    onSelectPlaylist: (Playlist) -> Unit,
     onBackFromGroup: () -> Unit,
     onCreatePlaylist: () -> Unit,
     onRenamePlaylist: (Playlist) -> Unit,
@@ -1772,32 +1725,54 @@ private fun PlaylistsSection(
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {}
 ) {
-    if (selectedTitle != null) {
-        // Show selected playlist / favorites / all tracks
-        val customPlaylist = remember(selectedTitle, playlists) {
-            playlists.find { it.name == selectedTitle }
-        }
-        val customPlaylistFlow = remember(customPlaylist?.id) {
-            customPlaylist?.let { getPlaylistTracks(it.id) }
-        }
-        val customPlaylistTracks by customPlaylistFlow?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyList()) }
+    val isDrilldown = selectedCategoryTitle != null || selectedPlaylist != null
 
-        val tracks = when (selectedTitle) {
+    if (isDrilldown) {
+        val currentPlaylist = remember(selectedPlaylist?.id, playlists) {
+            if (selectedPlaylist != null) {
+                playlists.find { it.id == selectedPlaylist.id } ?: selectedPlaylist
+            } else null
+        }
+        val title = when {
+            selectedCategoryTitle == "Все треки" -> "Все треки"
+            selectedCategoryTitle == "Избранное" -> "Избранное"
+            currentPlaylist != null -> currentPlaylist.name
+            else -> ""
+        }
+        val subtitle = when {
+            selectedCategoryTitle == "Все треки" -> "Вся медиатека"
+            selectedCategoryTitle == "Избранное" -> "Любимые композиции"
+            else -> "Пользовательский плейлист"
+        }
+
+        val customPlaylistTracks = if (selectedPlaylist != null) {
+            val flow = remember(selectedPlaylist.id) { getPlaylistTracks(selectedPlaylist.id) }
+            val tracksState by flow.collectAsStateWithLifecycle()
+            tracksState
+        } else {
+            emptyList()
+        }
+
+        val tracks = when (selectedCategoryTitle) {
             "Все треки" -> allTracks
             "Избранное" -> favorites
             else -> customPlaylistTracks
         }
         val listState = rememberLazyListState()
 
-        LaunchedEffect(selectedTitle, tracks.size, currentTrack?.id) {
-            if (currentTrack != null && tracks.isNotEmpty()) {
-                val targetIndex = tracks.indexOfFirst { it.id == currentTrack.id }
-                if (targetIndex >= 0) {
-                    try {
-                        delay(60)
-                        listState.smoothScrollToTrackIndex(targetIndex)
-                    } catch (_: Exception) {}
-                }
+        val distinctArtUris = remember(tracks) {
+            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+        }
+        val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
+        val formattedTotalDuration = remember(totalDurationMs) {
+            val totalSeconds = totalDurationMs / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            val hours = minutes / 60
+            if (hours > 0) {
+                String.format("%d ч %02d мин", hours, minutes % 60)
+            } else {
+                String.format("%d мин %02d сек", minutes, seconds)
             }
         }
 
@@ -1807,33 +1782,149 @@ private fun PlaylistsSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onBackFromGroup() }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "← Назад",
+                    text = "Плейлисты",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "$selectedTitle (${tracks.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
-            if (tracks.isEmpty()) {
-                EmptyState(
-                    title = "Плейлист пуст",
-                    message = "В этом плейлисте пока нет добавленных треков",
-                    actionButtonText = null,
-                    onActionClick = null
-                )
-            } else {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Hero Playlist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    if (distinctArtUris.isNotEmpty()) {
+                        FolderCoverCollage(
+                            artUris = distinctArtUris,
+                            size = 92.dp,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(92.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(
+                                    if (selectedCategoryTitle == "Избранное") FavoriteRed.copy(alpha = 0.15f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = when (selectedCategoryTitle) {
+                                    "Избранное" -> Icons.Default.Favorite
+                                    "Все треки" -> Icons.Default.MusicNote
+                                    else -> Icons.Default.QueueMusic
+                                },
+                                contentDescription = null,
+                                tint = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(44.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (tracks.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { onPlayTrack(tracks.first(), tracks) },
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("play_playlist_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("shuffle_playlist_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Перемешать",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (tracks.isEmpty()) {
+                    EmptyState(
+                        title = if (selectedCategoryTitle == "Избранное") "Нет избранных треков" else "Плейлист пуст",
+                        message = if (selectedCategoryTitle == "Избранное") {
+                            "Нажмите на значок сердечка у любого трека, чтобы добавить его сюда"
+                        } else {
+                            "В этом плейлисте пока нет добавленных треков"
+                        },
+                        icon = if (selectedCategoryTitle == "Избранное") Icons.Default.Favorite else Icons.Default.QueueMusic,
+                        actionButtonText = null,
+                        onActionClick = null,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 80.dp),
@@ -1878,6 +1969,13 @@ private fun PlaylistsSection(
             }
         }
     } else {
+        val allTracksCollageUris = remember(allTracks) {
+            allTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+        }
+        val favoritesCollageUris = remember(favorites) {
+            favorites.mapNotNull { it.albumArtUri }.distinct().take(4)
+        }
+
         LazyColumn(
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
@@ -1892,25 +1990,33 @@ private fun PlaylistsSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable { onSelectGroup("Все треки", allTracks) }
+                        .clickable { onSelectCategory("Все треки") }
                         .testTag("all_tracks_card")
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MusicNote,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                        if (allTracksCollageUris.isNotEmpty()) {
+                            FolderCoverCollage(
+                                artUris = allTracksCollageUris,
+                                size = 44.dp,
+                                shape = RoundedCornerShape(12.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MusicNote,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -1941,25 +2047,33 @@ private fun PlaylistsSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable { onSelectGroup("Избранное", favorites) }
+                        .clickable { onSelectCategory("Избранное") }
                         .testTag("favorites_card")
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(FavoriteRed),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = null,
-                                tint = Color.White
+                        if (favoritesCollageUris.isNotEmpty()) {
+                            FolderCoverCollage(
+                                artUris = favoritesCollageUris,
+                                size = 44.dp,
+                                shape = RoundedCornerShape(12.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(FavoriteRed),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -2037,6 +2151,11 @@ private fun PlaylistsSection(
             // User Playlists
             items(playlists, key = { it.id }) { pl ->
                 var menuExpanded by remember { mutableStateOf(false) }
+                val plTracksFlow = remember(pl.id) { getPlaylistTracks(pl.id) }
+                val plTracks by plTracksFlow.collectAsStateWithLifecycle()
+                val plCollageUris = remember(plTracks) {
+                    plTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                }
 
                 Card(
                     shape = RoundedCornerShape(16.dp),
@@ -2044,24 +2163,32 @@ private fun PlaylistsSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
-                        .clickable { onSelectGroup(pl.name, emptyList()) }
+                        .clickable { onSelectPlaylist(pl) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(16.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.QueueMusic,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                        if (plCollageUris.isNotEmpty()) {
+                            FolderCoverCollage(
+                                artUris = plCollageUris,
+                                size = 44.dp,
+                                shape = RoundedCornerShape(10.dp)
                             )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QueueMusic,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(16.dp))
@@ -2075,7 +2202,7 @@ private fun PlaylistsSection(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "Пользовательский плейлист",
+                                text = "Треков: ${plTracks.size}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
