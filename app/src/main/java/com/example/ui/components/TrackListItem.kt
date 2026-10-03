@@ -67,6 +67,7 @@ fun TrackListItem(
     onAddToPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
     isFavorite: Boolean = track.isFavorite,
+    isDragging: Boolean = false,
     showReorderHandle: Boolean = false,
     reorderModifier: Modifier = Modifier,
     onMoveUp: (() -> Unit)? = null,
@@ -78,15 +79,22 @@ fun TrackListItem(
     val context = LocalContext.current
 
     val itemBgColor by animateColorAsState(
-        targetValue = if (isCurrent) MaterialTheme.colorScheme.primary.copy(alpha = 0.09f) else Color.Transparent,
-        animationSpec = tween(durationMillis = 200),
+        targetValue = when {
+            isDragging -> MaterialTheme.colorScheme.surfaceVariant
+            isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 150),
         label = "item_bg_${track.id}"
     )
+
+    val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
             .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -291,7 +299,7 @@ fun TrackListItem(
                 Icon(
                     imageVector = Icons.Default.DragHandle,
                     contentDescription = "Переместить трек",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(24.dp)
                 )
             }
