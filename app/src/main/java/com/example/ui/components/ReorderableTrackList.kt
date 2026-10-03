@@ -3,21 +3,13 @@ package com.example.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,17 +20,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.example.data.model.Track
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -63,10 +52,8 @@ fun ReorderableTrackList(
     val currentList = remember { mutableStateListOf<Track>().apply { addAll(tracks) } }
 
     var draggingTrackId by remember { mutableStateOf<Long?>(null) }
-    var draggingTrack by remember { mutableStateOf<Track?>(null) }
     var initialIndex by remember { mutableStateOf<Int?>(null) }
-    var floatingCardY by remember { mutableFloatStateOf(0f) }
-    var grabOffsetY by remember { mutableFloatStateOf(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var isDropping by remember { mutableStateOf(false) }
 
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -90,15 +77,35 @@ fun ReorderableTrackList(
     }
 
     // Dynamic item height estimation from measured layout info or fallback
-    val measuredItemHeight = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key != draggingTrackId }?.size?.toFloat()
+    val measuredItemHeight = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.toFloat()
     val itemHeightPx = measuredItemHeight ?: with(density) { 70.dp.toPx() }
-    val itemHeightDp = with(density) { itemHeightPx.toDp() }
 
-    // Controlled, comfortable auto-scroll when finger reaches or passes edges
+    // Helper functions for atomic, boundary-safe item swapping
+    fun tryMoveDown() {
+        val currentId = draggingTrackId ?: return
+        val idx = currentList.indexOfFirst { it.id == currentId }
+        if (idx != -1 && idx < currentList.lastIndex) {
+            val item = currentList.removeAt(idx)
+            currentList.add(idx + 1, item)
+            dragOffsetY -= itemHeightPx
+        }
+    }
+
+    fun tryMoveUp() {
+        val currentId = draggingTrackId ?: return
+        val idx = currentList.indexOfFirst { it.id == currentId }
+        if (idx > 0) {
+            val item = currentList.removeAt(idx)
+            currentList.add(idx - 1, item)
+            dragOffsetY += itemHeightPx
+        }
+    }
+
+    // Auto-scroll loop when finger is held near, at, or past the screen edges
     LaunchedEffect(draggingTrackId, isDropping) {
         if (draggingTrackId == null || isDropping) return@LaunchedEffect
         val scrollThresholdPx = with(density) { 80.dp.toPx() }
-        val maxScrollSpeedPx = with(density) { 8.dp.toPx() } // Smooth, readable, controlled speed (~480dp/s)
+        val maxScrollSpeedPx = with(density) { 6.dp.toPx() } // Smooth, calm, readable speed (~360dp/sec)
 
         while (isActive && draggingTrackId != null && !isDropping) {
             val touchY = currentTouchYInList
@@ -108,48 +115,34 @@ fun ReorderableTrackList(
 
                 val scrollDelta = when {
                     touchY < scrollThresholdPx -> {
-                        // Finger is near or above the top edge
-                        val factor = if (touchY <= 0f) 1.0f else ((scrollThresholdPx - touchY) / scrollThresholdPx).coerceIn(0.15f, 1f)
+                        val factor = if (touchY <= 0f) 1.2f else ((scrollThresholdPx - touchY) / scrollThresholdPx).coerceIn(0.15f, 1f)
                         -maxScrollSpeedPx * factor
                     }
                     touchY > listHeight - scrollThresholdPx -> {
-                        // Finger is near or below the bottom edge
                         val distFromEdge = touchY - (listHeight - scrollThresholdPx)
-                        val factor = if (touchY >= listHeight) 1.0f else (distFromEdge / scrollThresholdPx).coerceIn(0.15f, 1f)
+                        val factor = if (touchY >= listHeight) 1.2f else (distFromEdge / scrollThresholdPx).coerceIn(0.15f, 1f)
                         maxScrollSpeedPx * factor
                     }
                     else -> 0f
                 }
 
                 if (scrollDelta != 0f) {
-                    listState.scrollBy(scrollDelta)
+                    val consumed = listState.scrollBy(scrollDelta)
+                    // Correct physics: as list scrolls under stationary finger, relative offset shifts by consumed
+                    dragOffsetY += consumed
 
-                    // Re-check target slot as items scroll under the floating card
-                    val currentIdx = currentList.indexOfFirst { it.id == draggingTrackId }
-                    if (currentIdx != -1) {
-                        val cardCenterY = floatingCardY + itemHeightPx / 2f
-                        val hoveredItem = listState.layoutInfo.visibleItemsInfo.find { info ->
-                            cardCenterY >= info.offset && cardCenterY <= (info.offset + info.size)
-                        }
-                        if (hoveredItem != null) {
-                            val targetIdx = hoveredItem.index.coerceIn(0, currentList.lastIndex)
-                            if (targetIdx != -1 && currentIdx != targetIdx) {
-                                val item = currentList.removeAt(currentIdx)
-                                currentList.add(targetIdx, item)
-                            }
-                        } else if (scrollDelta < 0 && touchY <= 0f && currentIdx > 0) {
-                            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-                            if (currentIdx > firstVisible) {
-                                val item = currentList.removeAt(currentIdx)
-                                currentList.add(firstVisible, item)
-                            }
-                        } else if (scrollDelta > 0 && touchY >= listHeight && currentIdx < currentList.lastIndex) {
-                            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: currentList.lastIndex
-                            if (currentIdx < lastVisible) {
-                                val item = currentList.removeAt(currentIdx)
-                                currentList.add(lastVisible, item)
-                            }
-                        }
+                    // Continuously swap item slots as other tracks scroll past
+                    while (dragOffsetY > itemHeightPx * 0.5f) {
+                        val idx = currentList.indexOfFirst { it.id == draggingTrackId }
+                        if (idx != -1 && idx < currentList.lastIndex) {
+                            tryMoveDown()
+                        } else break
+                    }
+                    while (dragOffsetY < -itemHeightPx * 0.5f) {
+                        val idx = currentList.indexOfFirst { it.id == draggingTrackId }
+                        if (idx > 0) {
+                            tryMoveUp()
+                        } else break
                     }
                 }
             }
@@ -157,241 +150,189 @@ fun ReorderableTrackList(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = contentPadding,
-            modifier = Modifier
-                .fillMaxSize()
-                .onGloballyPositioned { listCoordinates = it }
-        ) {
-            itemsIndexed(
-                items = currentList,
-                key = { _, track -> track.id },
-                contentType = { _, _ -> "track" }
-            ) { index, track ->
-                val isBeingDragged = draggingTrackId == track.id
+    LazyColumn(
+        state = listState,
+        contentPadding = contentPadding,
+        modifier = modifier
+            .fillMaxSize()
+            .onGloballyPositioned { listCoordinates = it }
+    ) {
+        itemsIndexed(
+            items = currentList,
+            key = { _, track -> track.id },
+            contentType = { _, _ -> "track" }
+        ) { index, track ->
+            val isCurrentDragging = draggingTrackId == track.id
 
-                if (isBeingDragged) {
-                    // Slot placeholder in list: stays empty while item floats in overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(itemHeightDp)
-                            .animateItem()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                    )
-                } else {
-                    var handleCoordinates by remember(track.id) { mutableStateOf<LayoutCoordinates?>(null) }
+            var handleCoordinates by remember(track.id) { mutableStateOf<LayoutCoordinates?>(null) }
 
-                    val reorderModifier = Modifier
-                        .onGloballyPositioned { handleCoordinates = it }
-                        .pointerInput(track.id) {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    if (isDropping) return@detectDragGestures
-                                    val idx = currentList.indexOfFirst { it.id == track.id }
-                                    if (idx != -1) {
-                                        draggingTrackId = track.id
-                                        draggingTrack = track
-                                        initialIndex = idx
+            val reorderModifier = Modifier
+                .onGloballyPositioned { handleCoordinates = it }
+                .pointerInput(track.id) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            if (isDropping) return@detectDragGestures
+                            val idx = currentList.indexOfFirst { it.id == track.id }
+                            if (idx != -1) {
+                                draggingTrackId = track.id
+                                initialIndex = idx
+                                dragOffsetY = 0f
 
-                                        val lc = listCoordinates
-                                        val hc = handleCoordinates
-                                        val touchY = if (lc != null && hc != null && hc.isAttached && lc.isAttached) {
-                                            lc.localPositionOf(hc, offset).y
-                                        } else {
-                                            0f
+                                val lc = listCoordinates
+                                val hc = handleCoordinates
+                                if (lc != null && hc != null && hc.isAttached && lc.isAttached) {
+                                    currentTouchYInList = lc.localPositionOf(hc, offset).y
+                                }
+                            }
+                        },
+                        onDragEnd = {
+                            currentTouchYInList = null
+                            if (draggingTrackId == track.id) {
+                                isDropping = true
+                                coroutineScope.launch {
+                                    try {
+                                        Animatable(dragOffsetY).animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            )
+                                        ) {
+                                            dragOffsetY = value
                                         }
-                                        currentTouchYInList = touchY
-
-                                        val itemInfo = listState.layoutInfo.visibleItemsInfo.find { it.key == track.id }
-                                        val itemTop = itemInfo?.offset?.toFloat() ?: (touchY - itemHeightPx / 2f)
-                                        grabOffsetY = touchY - itemTop
-                                        floatingCardY = itemTop
-                                    }
-                                },
-                                onDragEnd = {
-                                    currentTouchYInList = null
-                                    if (draggingTrackId == track.id) {
-                                        isDropping = true
-                                        coroutineScope.launch {
-                                            try {
-                                                val targetItemInfo = listState.layoutInfo.visibleItemsInfo.find { it.key == track.id }
-                                                val targetY = targetItemInfo?.offset?.toFloat() ?: floatingCardY
-                                                Animatable(floatingCardY).animateTo(
-                                                    targetValue = targetY,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                        stiffness = Spring.StiffnessMediumLow
-                                                    )
-                                                ) {
-                                                    floatingCardY = value
-                                                }
-                                            } finally {
-                                                val from = initialIndex
-                                                val to = currentList.indexOfFirst { it.id == track.id }
-                                                if (from != null && to != -1 && from != to) {
-                                                    onMoveTrack(from, to)
-                                                }
-                                                draggingTrackId = null
-                                                draggingTrack = null
-                                                initialIndex = null
-                                                isDropping = false
-                                            }
+                                    } finally {
+                                        dragOffsetY = 0f
+                                        val from = initialIndex
+                                        val to = currentList.indexOfFirst { it.id == track.id }
+                                        if (from != null && to != -1 && from != to) {
+                                            onMoveTrack(from, to)
                                         }
-                                    }
-                                },
-                                onDragCancel = {
-                                    currentTouchYInList = null
-                                    if (draggingTrackId == track.id) {
-                                        isDropping = true
-                                        coroutineScope.launch {
-                                            try {
-                                                val targetItemInfo = listState.layoutInfo.visibleItemsInfo.find { it.key == track.id }
-                                                val targetY = targetItemInfo?.offset?.toFloat() ?: floatingCardY
-                                                Animatable(floatingCardY).animateTo(
-                                                    targetValue = targetY,
-                                                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
-                                                ) {
-                                                    floatingCardY = value
-                                                }
-                                            } finally {
-                                                val from = initialIndex
-                                                val to = currentList.indexOfFirst { it.id == track.id }
-                                                if (from != null && to != -1 && from != to) {
-                                                    onMoveTrack(from, to)
-                                                }
-                                                draggingTrackId = null
-                                                draggingTrack = null
-                                                initialIndex = null
-                                                isDropping = false
-                                            }
-                                        }
-                                    }
-                                },
-                                onDrag = { change, dragAmount ->
-                                    if (draggingTrackId != track.id || isDropping) return@detectDragGestures
-                                    change.consume()
-
-                                    val lc = listCoordinates
-                                    val hc = handleCoordinates
-                                    if (lc != null && hc != null && hc.isAttached && lc.isAttached) {
-                                        val touchY = lc.localPositionOf(hc, change.position).y
-                                        currentTouchYInList = touchY
-                                        val listHeight = lc.size.height.toFloat()
-                                        // Keep floating card always 100% visible on screen, even if finger leaves screen
-                                        floatingCardY = (touchY - grabOffsetY).coerceIn(0f, (listHeight - itemHeightPx).coerceAtLeast(0f))
-                                    } else {
-                                        floatingCardY += dragAmount.y
-                                    }
-
-                                    // Check hovered item in list to update target slot
-                                    val currentIdx = currentList.indexOfFirst { it.id == track.id }
-                                    if (currentIdx != -1) {
-                                        val cardCenterY = floatingCardY + itemHeightPx / 2f
-                                        val hoveredItem = listState.layoutInfo.visibleItemsInfo.find { info ->
-                                            cardCenterY >= info.offset && cardCenterY <= (info.offset + info.size)
-                                        }
-                                        if (hoveredItem != null) {
-                                            val targetIdx = hoveredItem.index.coerceIn(0, currentList.lastIndex)
-                                            if (targetIdx != -1 && currentIdx != targetIdx) {
-                                                val item = currentList.removeAt(currentIdx)
-                                                currentList.add(targetIdx, item)
-                                            }
-                                        }
+                                        draggingTrackId = null
+                                        initialIndex = null
+                                        isDropping = false
                                     }
                                 }
-                            )
+                            }
+                        },
+                        onDragCancel = {
+                            currentTouchYInList = null
+                            if (draggingTrackId == track.id) {
+                                isDropping = true
+                                coroutineScope.launch {
+                                    try {
+                                        Animatable(dragOffsetY).animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+                                        ) {
+                                            dragOffsetY = value
+                                        }
+                                    } finally {
+                                        dragOffsetY = 0f
+                                        val from = initialIndex
+                                        val to = currentList.indexOfFirst { it.id == track.id }
+                                        if (from != null && to != -1 && from != to) {
+                                            onMoveTrack(from, to)
+                                        }
+                                        draggingTrackId = null
+                                        initialIndex = null
+                                        isDropping = false
+                                    }
+                                }
+                            }
+                        },
+                        onDrag = { change, dragAmount ->
+                            if (draggingTrackId != track.id || isDropping) return@detectDragGestures
+                            change.consume()
+                            dragOffsetY += dragAmount.y
+
+                            val lc = listCoordinates
+                            val hc = handleCoordinates
+                            if (lc != null && hc != null && hc.isAttached && lc.isAttached) {
+                                currentTouchYInList = lc.localPositionOf(hc, change.position).y
+                            }
+
+                            // Dynamic multi-position swap while finger is moving
+                            while (dragOffsetY > itemHeightPx * 0.5f) {
+                                val idx = currentList.indexOfFirst { it.id == track.id }
+                                if (idx != -1 && idx < currentList.lastIndex) {
+                                    tryMoveDown()
+                                } else break
+                            }
+                            while (dragOffsetY < -itemHeightPx * 0.5f) {
+                                val idx = currentList.indexOfFirst { it.id == track.id }
+                                if (idx > 0) {
+                                    tryMoveUp()
+                                } else break
+                            }
                         }
-
-                    val itemModifier = if (hasCompletedInitialLayout) {
-                        Modifier
-                            .zIndex(1f)
-                            .animateItem()
-                    } else {
-                        Modifier.zIndex(1f)
-                    }
-
-                    TrackListItem(
-                        track = track,
-                        isCurrent = currentTrack?.id == track.id,
-                        isPlaying = isPlaying && currentTrack?.id == track.id,
-                        isFavorite = favoriteIds.contains(track.id),
-                        onClick = { onPlayTrack(track) },
-                        onToggleFavorite = { onToggleFavorite(track.id) },
-                        onAddToPlaylist = { onAddToPlaylist(track) },
-                        showReorderHandle = true,
-                        isDragging = false,
-                        reorderModifier = reorderModifier,
-                        onMoveUp = if (index > 0) {
-                            {
-                                val from = index
-                                val to = index - 1
-                                val item = currentList.removeAt(from)
-                                currentList.add(to, item)
-                                onMoveTrack(from, to)
-                            }
-                        } else null,
-                        onMoveDown = if (index < currentList.lastIndex) {
-                            {
-                                val from = index
-                                val to = index + 1
-                                val item = currentList.removeAt(from)
-                                currentList.add(to, item)
-                                onMoveTrack(from, to)
-                            }
-                        } else null,
-                        onMoveToTop = if (index > 0) {
-                            {
-                                val from = index
-                                val item = currentList.removeAt(from)
-                                currentList.add(0, item)
-                                onMoveTrack(from, 0)
-                            }
-                        } else null,
-                        onMoveToBottom = if (index < currentList.lastIndex) {
-                            {
-                                val from = index
-                                val to = currentList.lastIndex
-                                val item = currentList.removeAt(from)
-                                currentList.add(to, item)
-                                onMoveTrack(from, to)
-                            }
-                        } else null,
-                        modifier = itemModifier
                     )
                 }
-            }
-        }
 
-        // Overlay Floating Card: stays 100% visible on screen at all times, never disposed or clipped
-        if (draggingTrackId != null && draggingTrack != null) {
-            val track = draggingTrack!!
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .offset { IntOffset(0, floatingCardY.roundToInt()) }
-                    .zIndex(100f)
-                    .shadow(16.dp, RoundedCornerShape(16.dp))
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                TrackListItem(
-                    track = track,
-                    isCurrent = currentTrack?.id == track.id,
-                    isPlaying = isPlaying && currentTrack?.id == track.id,
-                    isFavorite = favoriteIds.contains(track.id),
-                    onClick = {},
-                    onToggleFavorite = {},
-                    onAddToPlaylist = {},
-                    showReorderHandle = true,
-                    isDragging = true,
-                    reorderModifier = Modifier
-                )
+            val itemModifier = if (isCurrentDragging) {
+                Modifier
+                    .zIndex(10f)
+                    .graphicsLayer {
+                        translationY = dragOffsetY
+                        shadowElevation = if (isDropping) 4.dp.toPx() else 10.dp.toPx()
+                        scaleX = if (isDropping) 1.0f else 1.02f
+                        scaleY = if (isDropping) 1.0f else 1.02f
+                    }
+            } else if (hasCompletedInitialLayout) {
+                Modifier
+                    .zIndex(1f)
+                    .animateItem()
+            } else {
+                Modifier.zIndex(1f)
             }
+
+            TrackListItem(
+                track = track,
+                isCurrent = currentTrack?.id == track.id,
+                isPlaying = isPlaying && currentTrack?.id == track.id,
+                isFavorite = favoriteIds.contains(track.id),
+                onClick = { onPlayTrack(track) },
+                onToggleFavorite = { onToggleFavorite(track.id) },
+                onAddToPlaylist = { onAddToPlaylist(track) },
+                showReorderHandle = true,
+                isDragging = isCurrentDragging,
+                reorderModifier = reorderModifier,
+                onMoveUp = if (index > 0) {
+                    {
+                        val from = index
+                        val to = index - 1
+                        val item = currentList.removeAt(from)
+                        currentList.add(to, item)
+                        onMoveTrack(from, to)
+                    }
+                } else null,
+                onMoveDown = if (index < currentList.lastIndex) {
+                    {
+                        val from = index
+                        val to = index + 1
+                        val item = currentList.removeAt(from)
+                        currentList.add(to, item)
+                        onMoveTrack(from, to)
+                    }
+                } else null,
+                onMoveToTop = if (index > 0) {
+                    {
+                        val from = index
+                        val item = currentList.removeAt(from)
+                        currentList.add(0, item)
+                        onMoveTrack(from, 0)
+                    }
+                } else null,
+                onMoveToBottom = if (index < currentList.lastIndex) {
+                    {
+                        val from = index
+                        val to = currentList.lastIndex
+                        val item = currentList.removeAt(from)
+                        currentList.add(to, item)
+                        onMoveTrack(from, to)
+                    }
+                } else null,
+                modifier = itemModifier
+            )
         }
     }
 }
