@@ -112,7 +112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -169,6 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
+            playbackManager.restoreSavedQueueAndTrack()
             rawTracks.collect { tracks ->
                 if (tracks.isNotEmpty() && currentQueue.value.isEmpty()) {
                     playbackManager.restoreSavedQueueAndTrack()

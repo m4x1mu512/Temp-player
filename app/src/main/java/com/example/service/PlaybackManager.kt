@@ -1031,10 +1031,20 @@ class PlaybackManager private constructor(private val context: Context) {
         try {
             if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
 
-            val savedQueueIds = settingsDataStore.queueTrackIdsFlow.first()
-            val savedQueueIndex = settingsDataStore.lastQueueIndexFlow.first()
-            val lastTrackId = settingsDataStore.lastTrackIdFlow.first()
-            val lastPos = settingsDataStore.lastPositionFlow.first()
+            val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
+                settingsDataStore.queueTrackIdsFlow.first()
+            }
+            val savedQueueIndex = if (settingsDataStore.getInitialLastQueueIndex() >= 0) {
+                settingsDataStore.getInitialLastQueueIndex()
+            } else {
+                settingsDataStore.lastQueueIndexFlow.first()
+            }
+            val lastTrackId = if (settingsDataStore.getInitialLastTrackId() > 0) {
+                settingsDataStore.getInitialLastTrackId()
+            } else {
+                settingsDataStore.lastTrackIdFlow.first()
+            }
+            val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
 
             val restoredQueue = if (savedQueueIds.isNotEmpty()) {
                 repository.getTracksByIds(savedQueueIds)
