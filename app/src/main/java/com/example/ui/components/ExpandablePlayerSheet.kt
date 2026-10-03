@@ -71,6 +71,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -924,14 +925,18 @@ fun ExpandablePlayerSheet(
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(
+                                    FilledTonalIconButton(
                                         onClick = { viewModel.toggleShuffle() },
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = if (isShuffle) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                            contentColor = if (isShuffle) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
                                         modifier = Modifier.testTag("player_shuffle_button")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Shuffle,
                                             contentDescription = "Перемешать",
-                                            tint = if (isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            modifier = Modifier.size(24.dp)
                                         )
                                     }
 

@@ -90,6 +90,22 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_CROSSFADE_DURATION_SECONDS = intPreferencesKey("crossfade_duration_seconds")
         private val KEY_QUEUE_TRACK_IDS = stringPreferencesKey("queue_track_ids")
         private val KEY_LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
+        private val KEY_CUSTOM_ALL_TRACKS_ORDER = stringPreferencesKey("custom_all_tracks_order")
+    }
+
+    val customAllTracksOrderFlow: Flow<List<Long>> = context.dataStore.data.map { preferences ->
+        val raw = preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] ?: ""
+        if (raw.isBlank()) {
+            emptyList()
+        } else {
+            raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+    }
+
+    suspend fun saveCustomAllTracksOrder(trackIds: List<Long>) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = trackIds.joinToString(",")
+        }
     }
 
     val queueTrackIdsFlow: Flow<List<Long>> = context.dataStore.data.map { preferences ->

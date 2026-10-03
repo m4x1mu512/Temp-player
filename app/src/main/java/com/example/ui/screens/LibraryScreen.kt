@@ -109,6 +109,7 @@ import com.example.ui.components.CreatePlaylistDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
+import com.example.ui.components.ReorderableTrackList
 import com.example.ui.components.ScrollToCurrentTrackFab
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
@@ -126,6 +127,7 @@ fun LibraryScreen(
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
@@ -505,32 +507,22 @@ fun LibraryScreen(
                                     )
                                 } else {
                                     Box(modifier = Modifier.fillMaxSize()) {
-                                        LazyColumn(
-                                            state = queueListState,
-                                            contentPadding = PaddingValues(bottom = 80.dp),
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            items(
-                                                items = queueToDisplay,
-                                                key = { it.id },
-                                                contentType = { "track" }
-                                            ) { track ->
-                                                TrackListItem(
+                                        ReorderableTrackList(
+                                            tracks = queueToDisplay,
+                                            currentTrack = currentTrack,
+                                            isPlaying = isPlaying,
+                                            favoriteIds = favoriteIds,
+                                            listState = queueListState,
+                                            onPlayTrack = { track ->
+                                                viewModel.playTrack(
                                                     track = track,
-                                                    isCurrent = currentTrack?.id == track.id,
-                                                    isPlaying = isPlaying && currentTrack?.id == track.id,
-                                                    isFavorite = favoriteIds.contains(track.id),
-                                                    onClick = {
-                                                        viewModel.playTrack(
-                                                            track = track,
-                                                            queue = queueToDisplay
-                                                        )
-                                                    },
-                                                    onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                                    onAddToPlaylist = { trackForPlaylistDialog = track }
+                                                    queue = queueToDisplay
                                                 )
-                                            }
-                                        }
+                                            },
+                                            onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                            onAddToPlaylist = { trackForPlaylistDialog = it },
+                                            onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) }
+                                        )
 
                                         ScrollToCurrentTrackFab(
                                             currentTrack = currentTrack,
@@ -574,6 +566,12 @@ fun LibraryScreen(
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
                                         }
+                                    },
+                                    onShuffleTracks = { tracks ->
+                                        viewModel.setShuffle(true)
+                                        if (tracks.isNotEmpty()) {
+                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                        }
                                     }
                                 )
                             }
@@ -581,7 +579,7 @@ fun LibraryScreen(
                             2 -> {
                                 // 3. "Плейлисты"
                                 PlaylistsSection(
-                                    allTracks = rawTracks,
+                                    allTracks = allTracksOrdered,
                                     favorites = favoriteTracks,
                                     playlists = playlists,
                                     currentTrack = currentTrack,
@@ -612,6 +610,15 @@ fun LibraryScreen(
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
                                         }
+                                    },
+                                    onMoveAllTracksTrack = { from, to -> viewModel.moveAllTracksTrack(from, to) },
+                                    onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
+                                    onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
+                                    onShuffleTracks = { tracks ->
+                                        viewModel.setShuffle(true)
+                                        if (tracks.isNotEmpty()) {
+                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                        }
                                     }
                                 )
                             }
@@ -638,6 +645,12 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
+                                        }
+                                    },
+                                    onShuffleTracks = { tracks ->
+                                        viewModel.setShuffle(true)
+                                        if (tracks.isNotEmpty()) {
+                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
                                         }
                                     }
                                 )
@@ -666,6 +679,12 @@ fun LibraryScreen(
                                     onNavigateToQueue = {
                                         coroutineScope.launch {
                                             pagerState.animateScrollToPage(0)
+                                        }
+                                    },
+                                    onShuffleTracks = { tracks ->
+                                        viewModel.setShuffle(true)
+                                        if (tracks.isNotEmpty()) {
+                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
                                         }
                                     }
                                 )
@@ -851,11 +870,27 @@ private fun GroupedListSection(
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
-    onNavigateToQueue: () -> Unit = {}
+    onNavigateToQueue: () -> Unit = {},
+    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
 ) {
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
+        val distinctArtUris = remember(tracks) {
+            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+        }
+        val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
+        val formattedTotalDuration = remember(totalDurationMs) {
+            val totalSeconds = totalDurationMs / 1000
+            val minutes = totalSeconds / 60
+            val seconds = totalSeconds % 60
+            val hours = minutes / 60
+            if (hours > 0) {
+                String.format("%d ч %02d мин", hours, minutes % 60)
+            } else {
+                String.format("%d мин %02d сек", minutes, seconds)
+            }
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
@@ -863,22 +898,121 @@ private fun GroupedListSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onBackFromGroup() }
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Назад",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "← Назад",
+                    text = "Исполнители",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "$selectedTitle (${tracks.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            }
+
+            // Hero Artist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    if (distinctArtUris.isNotEmpty()) {
+                        FolderCoverCollage(
+                            artUris = distinctArtUris,
+                            size = 92.dp,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(92.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(44.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = selectedTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Исполнитель",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (tracks.isNotEmpty()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(
+                                    onClick = { onPlayTrack(tracks.first(), tracks) },
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("play_artist_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
+                                }
+
+                                OutlinedButton(
+                                    onClick = { onShuffleTracks(tracks) },
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier
+                                        .height(34.dp)
+                                        .testTag("shuffle_artist_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Shuffle,
+                                        contentDescription = "Перемешать",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -1140,7 +1274,8 @@ private fun FoldersSection(
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
-    onNavigateToQueue: () -> Unit = {}
+    onNavigateToQueue: () -> Unit = {},
+    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
 ) {
     if (selectedTitle != null) {
         val tracks = folderGroups[selectedTitle] ?: emptyList()
@@ -1249,7 +1384,7 @@ private fun FoldersSection(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    onClick = { onShuffleTracks(tracks) },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .height(34.dp)
@@ -1392,7 +1527,8 @@ private fun AlbumsSection(
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
-    onNavigateToQueue: () -> Unit = {}
+    onNavigateToQueue: () -> Unit = {},
+    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
 ) {
     val context = LocalContext.current
 
@@ -1523,7 +1659,7 @@ private fun AlbumsSection(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    onClick = { onShuffleTracks(tracks) },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .height(34.dp)
@@ -1723,7 +1859,11 @@ private fun PlaylistsSection(
     onAddToPlaylist: (Track) -> Unit,
     getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>,
     favoriteIds: Set<Long> = emptySet(),
-    onNavigateToQueue: () -> Unit = {}
+    onNavigateToQueue: () -> Unit = {},
+    onMoveAllTracksTrack: (Int, Int) -> Unit = { _, _ -> },
+    onMoveFavoriteTrack: (Int, Int) -> Unit = { _, _ -> },
+    onMovePlaylistTrack: (Long, Int, Int) -> Unit = { _, _, _ -> },
+    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.shuffled().first(), list.shuffled()) }
 ) {
     val isDrilldown = selectedCategoryTitle != null || selectedPlaylist != null
 
@@ -1888,7 +2028,7 @@ private fun PlaylistsSection(
                                 }
 
                                 OutlinedButton(
-                                    onClick = { onPlayTrack(tracks.shuffled().first(), tracks.shuffled()) },
+                                    onClick = { onShuffleTracks(tracks) },
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier
                                         .height(34.dp)
@@ -1925,27 +2065,26 @@ private fun PlaylistsSection(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(bottom = 80.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(
-                            items = tracks,
-                            key = { it.id },
-                            contentType = { "track" }
-                        ) { track ->
-                            TrackListItem(
-                                track = track,
-                                isCurrent = currentTrack?.id == track.id,
-                                isPlaying = isPlaying && currentTrack?.id == track.id,
-                                isFavorite = favoriteIds.contains(track.id),
-                                onClick = { onPlayTrack(track, tracks) },
-                                onToggleFavorite = { onToggleFavorite(track.id) },
-                                onAddToPlaylist = { onAddToPlaylist(track) }
-                            )
+                    val onMoveItem: (Int, Int) -> Unit = { from, to ->
+                        when {
+                            selectedCategoryTitle == "Все треки" -> onMoveAllTracksTrack(from, to)
+                            selectedCategoryTitle == "Избранное" -> onMoveFavoriteTrack(from, to)
+                            selectedPlaylist != null -> onMovePlaylistTrack(selectedPlaylist.id, from, to)
                         }
                     }
+
+                    ReorderableTrackList(
+                        tracks = tracks,
+                        currentTrack = currentTrack,
+                        isPlaying = isPlaying,
+                        favoriteIds = favoriteIds,
+                        listState = listState,
+                        onPlayTrack = { track -> onPlayTrack(track, tracks) },
+                        onToggleFavorite = { onToggleFavorite(it) },
+                        onAddToPlaylist = { onAddToPlaylist(it) },
+                        onMoveTrack = onMoveItem,
+                        modifier = Modifier.fillMaxSize()
+                    )
 
                     val coroutineScope = rememberCoroutineScope()
                     ScrollToCurrentTrackFab(

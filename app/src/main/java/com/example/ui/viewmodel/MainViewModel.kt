@@ -94,11 +94,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
     val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
 
-    val favoriteTracks: StateFlow<List<Track>> = combine(
+    val favoriteTracks: StateFlow<List<Track>> = repository.favoriteTracks.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val allTracksOrdered: StateFlow<List<Track>> = combine(
         rawTracks,
-        _favoriteIds
-    ) { tracks, favIds ->
-        tracks.filter { favIds.contains(it.id) }
+        settingsDataStore.customAllTracksOrderFlow
+    ) { tracks, customOrder ->
+        if (customOrder.isEmpty()) {
+            tracks
+        } else {
+            val orderMap = customOrder.withIndex().associate { it.value to it.index }
+            tracks.sortedBy { orderMap[it.id] ?: (Int.MAX_VALUE - 1000 + it.id.toInt().mod(1000)) }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -417,6 +428,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     started = SharingStarted.Eagerly,
                     initialValue = emptyList()
                 )
+        }
+    }
+
+    fun setShuffle(enabled: Boolean) {
+        playbackManager.setShuffle(enabled)
+    }
+
+    fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
+        if (playbackManager.queue.value.isEmpty() && rawTracks.value.isNotEmpty()) {
+            playbackManager.setQueue(rawTracks.value)
+        }
+        playbackManager.moveQueueTrack(fromIndex, toIndex)
+    }
+
+    fun movePlaylistTrack(playlistId: Long, fromIndex: Int, toIndex: Int) {
+        val flow = getPlaylistTracks(playlistId)
+        val current = flow.value.toMutableList()
+        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        viewModelScope.launch {
+            repository.reorderPlaylistTracks(playlistId, current.map { it.id })
+        }
+    }
+
+    fun moveFavoriteTrack(fromIndex: Int, toIndex: Int) {
+        val current = favoriteTracks.value.toMutableList()
+        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        viewModelScope.launch {
+            repository.reorderFavorites(current.map { it.id })
+        }
+    }
+
+    fun moveAllTracksTrack(fromIndex: Int, toIndex: Int) {
+        val current = allTracksOrdered.value.toMutableList()
+        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        viewModelScope.launch {
+            settingsDataStore.saveCustomAllTracksOrder(current.map { it.id })
         }
     }
 

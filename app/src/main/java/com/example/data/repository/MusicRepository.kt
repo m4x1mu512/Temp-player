@@ -50,8 +50,9 @@ class MusicRepository(
         favoriteDao.getAllFavoriteIdsDirect()
     }
 
-    val favoriteTracks: Flow<List<Track>> = allTracks.map { tracks ->
-        tracks.filter { it.isFavorite }
+    val favoriteTracks: Flow<List<Track>> = combine(allTracks, favoriteDao.getAllFavoriteIds()) { tracks, favIds ->
+        val trackMap = tracks.associateBy { it.id }
+        favIds.mapNotNull { trackMap[it] }
     }.flowOn(Dispatchers.IO)
 
     val playlists: Flow<List<Playlist>> = playlistDao.getAllPlaylists().map { entities ->
@@ -287,14 +288,30 @@ class MusicRepository(
         playlistDao.deletePlaylist(playlistId)
     }
 
+    suspend fun reorderFavorites(orderedTrackIds: List<Long>) = withContext(Dispatchers.IO) {
+        val baseTime = System.currentTimeMillis()
+        val count = orderedTrackIds.size
+        orderedTrackIds.forEachIndexed { index, trackId ->
+            val timestamp = baseTime + (count - index) * 1000L
+            favoriteDao.updateFavoriteOrder(trackId, timestamp)
+        }
+    }
+
     suspend fun addTrackToPlaylist(playlistId: Long, trackId: Long) = withContext(Dispatchers.IO) {
+        val maxPos = playlistDao.getMaxPosition(playlistId) ?: -1
         playlistDao.addTrackToPlaylist(
             PlaylistTrackCrossRef(
                 playlistId = playlistId,
                 trackId = trackId,
-                position = System.currentTimeMillis().toInt()
+                position = maxPos + 1
             )
         )
+    }
+
+    suspend fun reorderPlaylistTracks(playlistId: Long, orderedTrackIds: List<Long>) = withContext(Dispatchers.IO) {
+        orderedTrackIds.forEachIndexed { index, trackId ->
+            playlistDao.updateTrackPosition(playlistId, trackId, index)
+        }
     }
 
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) = withContext(Dispatchers.IO) {

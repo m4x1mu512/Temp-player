@@ -55,6 +55,9 @@ interface FavoriteDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavorite(favorite: FavoriteEntity)
 
+    @Query("UPDATE favorites SET addedAt = :addedAt WHERE trackId = :trackId")
+    suspend fun updateFavoriteOrder(trackId: Long, addedAt: Long)
+
     @Query("DELETE FROM favorites WHERE trackId = :trackId")
     suspend fun removeFavorite(trackId: Long)
 }
@@ -81,6 +84,12 @@ interface PlaylistDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addTrackToPlaylist(crossRef: PlaylistTrackCrossRef)
+
+    @Query("SELECT MAX(position) FROM playlist_track_cross_ref WHERE playlistId = :playlistId")
+    suspend fun getMaxPosition(playlistId: Long): Int?
+
+    @Query("UPDATE playlist_track_cross_ref SET position = :position WHERE playlistId = :playlistId AND trackId = :trackId")
+    suspend fun updateTrackPosition(playlistId: Long, trackId: Long, position: Int)
 
     @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId AND trackId = :trackId")
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long)

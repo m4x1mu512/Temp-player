@@ -856,10 +856,42 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun toggleShuffle() {
         val newValue = !_isShuffle.value
-        _isShuffle.value = newValue
+        setShuffle(newValue)
+    }
+
+    fun setShuffle(enabled: Boolean) {
+        _isShuffle.value = enabled
         serviceScope.launch {
-            settingsDataStore.setShuffleEnabled(newValue)
+            settingsDataStore.setShuffleEnabled(enabled)
         }
+    }
+
+    fun setQueue(newQueue: List<Track>) {
+        _queue.value = newQueue
+        val currentPlaying = _currentTrack.value
+        if (currentPlaying != null) {
+            val idx = newQueue.indexOfFirst { it.id == currentPlaying.id }
+            if (idx >= 0) {
+                _queueIndex.value = idx
+            }
+        }
+        saveCurrentState()
+    }
+
+    fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
+        val current = _queue.value.toMutableList()
+        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
+        val currentPlaying = _currentTrack.value
+        val item = current.removeAt(fromIndex)
+        current.add(toIndex, item)
+        _queue.value = current
+        if (currentPlaying != null) {
+            val newIdx = current.indexOfFirst { it.id == currentPlaying.id }
+            if (newIdx >= 0) {
+                _queueIndex.value = newIdx
+            }
+        }
+        saveCurrentState()
     }
 
     fun setSleepTimer(minutes: Int) {
