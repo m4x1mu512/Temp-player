@@ -55,6 +55,7 @@ fun ReorderableTrackList(
     var initialIndex by remember { mutableStateOf<Int?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
     var isDropping by remember { mutableStateOf(false) }
+    var pendingMoveConfirmation by remember { mutableStateOf(false) }
 
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var currentTouchYInList by remember { mutableStateOf<Float?>(null) }
@@ -69,7 +70,13 @@ fun ReorderableTrackList(
     // Keep currentList in sync with external tracks when not dragging
     LaunchedEffect(tracks) {
         if (draggingTrackId == null && !isDropping) {
-            if (currentList.map { it.id } != tracks.map { it.id }) {
+            val trackIds = tracks.map { it.id }
+            val currentIds = currentList.map { it.id }
+            if (pendingMoveConfirmation) {
+                if (trackIds == currentIds) {
+                    pendingMoveConfirmation = false
+                }
+            } else if (currentIds != trackIds) {
                 currentList.clear()
                 currentList.addAll(tracks)
             }
@@ -113,12 +120,16 @@ fun ReorderableTrackList(
             if (touchY != null && lc != null && lc.isAttached) {
                 val listHeight = lc.size.height.toFloat()
 
+                val curIdx = currentList.indexOfFirst { it.id == draggingTrackId }
+                val canMoveHigher = curIdx > 0 || listState.canScrollBackward
+                val canMoveLower = (curIdx != -1 && curIdx < currentList.lastIndex) || listState.canScrollForward
+
                 val scrollDelta = when {
-                    touchY < scrollThresholdPx -> {
+                    touchY < scrollThresholdPx && canMoveHigher -> {
                         val factor = if (touchY <= 0f) 1.2f else ((scrollThresholdPx - touchY) / scrollThresholdPx).coerceIn(0.15f, 1f)
                         -maxScrollSpeedPx * factor
                     }
-                    touchY > listHeight - scrollThresholdPx -> {
+                    touchY > listHeight - scrollThresholdPx && canMoveLower -> {
                         val distFromEdge = touchY - (listHeight - scrollThresholdPx)
                         val factor = if (touchY >= listHeight) 1.2f else (distFromEdge / scrollThresholdPx).coerceIn(0.15f, 1f)
                         maxScrollSpeedPx * factor
@@ -143,6 +154,14 @@ fun ReorderableTrackList(
                         if (idx > 0) {
                             tryMoveUp()
                         } else break
+                    }
+
+                    // Boundary protection: clamp offset at extremes
+                    val postIdx = currentList.indexOfFirst { it.id == draggingTrackId }
+                    if (postIdx == 0 && dragOffsetY < 0f) {
+                        dragOffsetY = dragOffsetY.coerceAtLeast(-16f)
+                    } else if (postIdx == currentList.lastIndex && dragOffsetY > 0f) {
+                        dragOffsetY = dragOffsetY.coerceAtMost(16f)
                     }
                 }
             }
@@ -205,6 +224,7 @@ fun ReorderableTrackList(
                                         val from = initialIndex
                                         val to = currentList.indexOfFirst { it.id == track.id }
                                         if (from != null && to != -1 && from != to) {
+                                            pendingMoveConfirmation = true
                                             onMoveTrack(from, to)
                                         }
                                         draggingTrackId = null
@@ -231,6 +251,7 @@ fun ReorderableTrackList(
                                         val from = initialIndex
                                         val to = currentList.indexOfFirst { it.id == track.id }
                                         if (from != null && to != -1 && from != to) {
+                                            pendingMoveConfirmation = true
                                             onMoveTrack(from, to)
                                         }
                                         draggingTrackId = null
@@ -263,6 +284,14 @@ fun ReorderableTrackList(
                                 if (idx > 0) {
                                     tryMoveUp()
                                 } else break
+                            }
+
+                            // Boundary clamping: prevent escaping boundaries or accumulating unbounded offsets
+                            val curIdx = currentList.indexOfFirst { it.id == track.id }
+                            if (curIdx == 0 && dragOffsetY < 0f) {
+                                dragOffsetY = dragOffsetY.coerceAtLeast(-16f)
+                            } else if (curIdx == currentList.lastIndex && dragOffsetY > 0f) {
+                                dragOffsetY = dragOffsetY.coerceAtMost(16f)
                             }
                         }
                     )
@@ -302,6 +331,7 @@ fun ReorderableTrackList(
                         val to = index - 1
                         val item = currentList.removeAt(from)
                         currentList.add(to, item)
+                        pendingMoveConfirmation = true
                         onMoveTrack(from, to)
                     }
                 } else null,
@@ -311,6 +341,7 @@ fun ReorderableTrackList(
                         val to = index + 1
                         val item = currentList.removeAt(from)
                         currentList.add(to, item)
+                        pendingMoveConfirmation = true
                         onMoveTrack(from, to)
                     }
                 } else null,
@@ -319,7 +350,11 @@ fun ReorderableTrackList(
                         val from = index
                         val item = currentList.removeAt(from)
                         currentList.add(0, item)
+                        pendingMoveConfirmation = true
                         onMoveTrack(from, 0)
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(0)
+                        }
                     }
                 } else null,
                 onMoveToBottom = if (index < currentList.lastIndex) {
@@ -328,7 +363,11 @@ fun ReorderableTrackList(
                         val to = currentList.lastIndex
                         val item = currentList.removeAt(from)
                         currentList.add(to, item)
+                        pendingMoveConfirmation = true
                         onMoveTrack(from, to)
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(currentList.lastIndex)
+                        }
                     }
                 } else null,
                 modifier = itemModifier

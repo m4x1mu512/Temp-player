@@ -58,6 +58,15 @@ interface FavoriteDao {
     @Query("UPDATE favorites SET addedAt = :addedAt WHERE trackId = :trackId")
     suspend fun updateFavoriteOrder(trackId: Long, addedAt: Long)
 
+    @Transaction
+    suspend fun reorderFavorites(orderedTrackIds: List<Long>, baseTime: Long) {
+        val count = orderedTrackIds.size
+        orderedTrackIds.forEachIndexed { index, trackId ->
+            val timestamp = baseTime + (count - index) * 1000L
+            updateFavoriteOrder(trackId, timestamp)
+        }
+    }
+
     @Query("DELETE FROM favorites WHERE trackId = :trackId")
     suspend fun removeFavorite(trackId: Long)
 }
@@ -90,6 +99,13 @@ interface PlaylistDao {
 
     @Query("UPDATE playlist_track_cross_ref SET position = :position WHERE playlistId = :playlistId AND trackId = :trackId")
     suspend fun updateTrackPosition(playlistId: Long, trackId: Long, position: Int)
+
+    @Transaction
+    suspend fun reorderPlaylistTracks(playlistId: Long, orderedTrackIds: List<Long>) {
+        orderedTrackIds.forEachIndexed { index, trackId ->
+            updateTrackPosition(playlistId, trackId, index)
+        }
+    }
 
     @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId AND trackId = :trackId")
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long)

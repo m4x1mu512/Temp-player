@@ -450,7 +450,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         viewModelScope.launch {
-            repository.reorderPlaylistTracks(playlistId, current.map { it.id })
+            try {
+                repository.reorderPlaylistTracks(playlistId, current.map { it.id })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -460,7 +464,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         viewModelScope.launch {
-            repository.reorderFavorites(current.map { it.id })
+            try {
+                repository.reorderFavorites(current.map { it.id })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -470,7 +478,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         viewModelScope.launch {
-            settingsDataStore.saveCustomAllTracksOrder(current.map { it.id })
+            try {
+                settingsDataStore.saveCustomAllTracksOrder(current.map { it.id })
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

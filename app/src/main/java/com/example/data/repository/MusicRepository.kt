@@ -289,11 +289,8 @@ class MusicRepository(
     }
 
     suspend fun reorderFavorites(orderedTrackIds: List<Long>) = withContext(Dispatchers.IO) {
-        val baseTime = System.currentTimeMillis()
-        val count = orderedTrackIds.size
-        orderedTrackIds.forEachIndexed { index, trackId ->
-            val timestamp = baseTime + (count - index) * 1000L
-            favoriteDao.updateFavoriteOrder(trackId, timestamp)
+        if (orderedTrackIds.isNotEmpty()) {
+            favoriteDao.reorderFavorites(orderedTrackIds, System.currentTimeMillis())
         }
     }
 
@@ -309,8 +306,8 @@ class MusicRepository(
     }
 
     suspend fun reorderPlaylistTracks(playlistId: Long, orderedTrackIds: List<Long>) = withContext(Dispatchers.IO) {
-        orderedTrackIds.forEachIndexed { index, trackId ->
-            playlistDao.updateTrackPosition(playlistId, trackId, index)
+        if (orderedTrackIds.isNotEmpty()) {
+            playlistDao.reorderPlaylistTracks(playlistId, orderedTrackIds)
         }
     }
 
