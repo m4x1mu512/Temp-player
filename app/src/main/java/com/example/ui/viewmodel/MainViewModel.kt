@@ -94,16 +94,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
     val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
 
-    val favoriteTracks: StateFlow<List<Track>> = repository.favoriteTracks.stateIn(
+    private val _inMemoryFavoriteOrder = MutableStateFlow<List<Long>?>(null)
+
+    val favoriteTracks: StateFlow<List<Track>> = combine(
+        repository.favoriteTracks,
+        _inMemoryFavoriteOrder
+    ) { tracks, memOrder ->
+        if (memOrder != null) {
+            val map = tracks.associateBy { it.id }
+            memOrder.mapNotNull { map[it] }
+        } else {
+            tracks
+        }
+    }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
+    private val _inMemoryAllTracksOrder = MutableStateFlow<List<Long>?>(null)
+
     val allTracksOrdered: StateFlow<List<Track>> = combine(
         rawTracks,
-        settingsDataStore.customAllTracksOrderFlow
-    ) { tracks, customOrder ->
+        settingsDataStore.customAllTracksOrderFlow,
+        _inMemoryAllTracksOrder
+    ) { tracks, diskOrder, memOrder ->
+        val customOrder = memOrder ?: diskOrder
         if (customOrder.isEmpty()) {
             tracks
         } else {
@@ -420,15 +436,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val playlistTracksCache = mutableMapOf<Long, StateFlow<List<Track>>>()
+    private val _inMemoryPlaylistOrder = mutableMapOf<Long, MutableStateFlow<List<Long>?>>()
 
     fun getPlaylistTracks(playlistId: Long): StateFlow<List<Track>> {
         return playlistTracksCache.getOrPut(playlistId) {
-            repository.getTracksForPlaylist(playlistId)
-                .stateIn(
-                    scope = viewModelScope,
-                    started = SharingStarted.Eagerly,
-                    initialValue = emptyList()
-                )
+            val memFlow = _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }
+            combine(
+                repository.getTracksForPlaylist(playlistId),
+                memFlow
+            ) { tracks, memOrder ->
+                if (memOrder != null) {
+                    val map = tracks.associateBy { it.id }
+                    memOrder.mapNotNull { map[it] }
+                } else {
+                    tracks
+                }
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = emptyList()
+            )
         }
     }
 
@@ -449,6 +476,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
+        _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }.value = current.map { it.id }
         viewModelScope.launch {
             try {
                 repository.reorderPlaylistTracks(playlistId, current.map { it.id })
@@ -463,6 +491,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
+        _inMemoryFavoriteOrder.value = current.map { it.id }
         viewModelScope.launch {
             try {
                 repository.reorderFavorites(current.map { it.id })
@@ -477,6 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
+        _inMemoryAllTracksOrder.value = current.map { it.id }
         viewModelScope.launch {
             try {
                 settingsDataStore.saveCustomAllTracksOrder(current.map { it.id })
