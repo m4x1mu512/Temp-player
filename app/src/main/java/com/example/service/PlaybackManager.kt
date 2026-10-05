@@ -103,6 +103,29 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _isShuffle = MutableStateFlow(false)
     val isShuffle: StateFlow<Boolean> = _isShuffle.asStateFlow()
 
+    private var shuffleIndices: MutableList<Int> = mutableListOf()
+    private var shufflePosition: Int = -1
+
+    private fun rebuildShuffleOrder(startIndex: Int = _queueIndex.value) {
+        val q = _queue.value
+        if (q.isEmpty()) {
+            shuffleIndices.clear()
+            shufflePosition = -1
+            return
+        }
+        val indices = q.indices.toMutableList()
+        if (startIndex in indices) {
+            indices.remove(startIndex)
+            indices.shuffle()
+            indices.add(0, startIndex)
+            shufflePosition = 0
+        } else {
+            indices.shuffle()
+            shufflePosition = 0
+        }
+        shuffleIndices = indices
+    }
+
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
 
@@ -489,8 +512,14 @@ class PlaybackManager private constructor(private val context: Context) {
                 nextTrack(autoPlayIfPaused = true)
             }
             RepeatMode.OFF -> {
-                val nextIdx = _queueIndex.value + 1
-                if (nextIdx < _queue.value.size) {
+                val nextIdx = getNextTrackIndex()
+                if (nextIdx != null) {
+                    if (_isShuffle.value && shuffleIndices.isNotEmpty()) {
+                        val nextShufflePos = shufflePosition + 1
+                        if (nextShufflePos in shuffleIndices.indices) {
+                            shufflePosition = nextShufflePos
+                        }
+                    }
                     playTrackAtIndex(nextIdx, autoPlay = true)
                 } else {
                     // Reached end of queue
@@ -503,6 +532,13 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    fun playWithShuffle(tracks: List<Track>, startTrack: Track? = null) {
+        if (tracks.isEmpty()) return
+        val chosenTrack = startTrack ?: tracks.random()
+        setShuffle(true)
+        playTrack(track = chosenTrack, newQueue = tracks)
+    }
+
     fun playTrack(track: Track, newQueue: List<Track>? = null, startIndex: Int = -1, startPaused: Boolean = false) {
         try {
             crossfadeController.cancelCrossfade()
@@ -510,11 +546,25 @@ class PlaybackManager private constructor(private val context: Context) {
             if (newQueue != null && newQueue.isNotEmpty()) {
                 _queue.value = newQueue
                 _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
+                if (_isShuffle.value) {
+                    rebuildShuffleOrder(_queueIndex.value)
+                }
             } else if (!_queue.value.any { it.id == track.id }) {
                 _queue.value = listOf(track)
                 _queueIndex.value = 0
+                if (_isShuffle.value) {
+                    rebuildShuffleOrder(0)
+                }
             } else {
                 _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
+                if (_isShuffle.value) {
+                    val pos = shuffleIndices.indexOf(_queueIndex.value)
+                    if (pos >= 0) {
+                        shufflePosition = pos
+                    } else {
+                        rebuildShuffleOrder(_queueIndex.value)
+                    }
+                }
             }
 
             _currentTrack.value = track
@@ -722,11 +772,22 @@ class PlaybackManager private constructor(private val context: Context) {
         val shouldPlay = if (autoPlayIfPaused) true else _isPlaying.value
 
         val nextIdx = if (_isShuffle.value && q.size > 1) {
-            var randomIdx = (q.indices).random()
-            while (randomIdx == currentIdx) {
-                randomIdx = (q.indices).random()
+            if (shuffleIndices.isEmpty() || shuffleIndices.size != q.size) {
+                rebuildShuffleOrder(currentIdx)
             }
-            randomIdx
+            val nextShufflePos = shufflePosition + 1
+            if (nextShufflePos in shuffleIndices.indices) {
+                shufflePosition = nextShufflePos
+                shuffleIndices[nextShufflePos]
+            } else if (_repeatMode.value == RepeatMode.ALL) {
+                rebuildShuffleOrder(startIndex = -1)
+                shufflePosition = 0
+                shuffleIndices.getOrNull(0) ?: 0
+            } else {
+                rebuildShuffleOrder(startIndex = -1)
+                shufflePosition = 0
+                shuffleIndices.getOrNull(0) ?: 0
+            }
         } else {
             if (currentIdx + 1 < q.size) currentIdx + 1 else 0
         }
@@ -748,7 +809,16 @@ class PlaybackManager private constructor(private val context: Context) {
             return
         }
 
-        val prevIdx = if (currentIdx - 1 >= 0) currentIdx - 1 else q.size - 1
+        val prevIdx = if (_isShuffle.value && q.size > 1) {
+            if (shuffleIndices.isNotEmpty() && shufflePosition > 0) {
+                shufflePosition--
+                shuffleIndices[shufflePosition]
+            } else {
+                if (currentIdx - 1 >= 0) currentIdx - 1 else q.size - 1
+            }
+        } else {
+            if (currentIdx - 1 >= 0) currentIdx - 1 else q.size - 1
+        }
         playTrackAtIndex(prevIdx, autoPlay = shouldPlay)
     }
 
@@ -772,11 +842,17 @@ class PlaybackManager private constructor(private val context: Context) {
         if (_repeatMode.value == RepeatMode.ONE) return null
         val currentIdx = _queueIndex.value
         return if (_isShuffle.value && q.size > 1) {
-            var randomIdx = (q.indices).random()
-            while (randomIdx == currentIdx) {
-                randomIdx = (q.indices).random()
+            if (shuffleIndices.isEmpty() || shuffleIndices.size != q.size) {
+                rebuildShuffleOrder(currentIdx)
             }
-            randomIdx
+            val nextShufflePos = shufflePosition + 1
+            if (nextShufflePos in shuffleIndices.indices) {
+                shuffleIndices[nextShufflePos]
+            } else if (_repeatMode.value == RepeatMode.ALL) {
+                shuffleIndices.getOrNull(0)
+            } else {
+                null
+            }
         } else {
             if (currentIdx + 1 < q.size) {
                 currentIdx + 1
@@ -818,6 +894,12 @@ class PlaybackManager private constructor(private val context: Context) {
         activePlayerIndex = if (activePlayerIndex == 0) 1 else 0
         _currentTrack.value = nextTrack
         _queueIndex.value = nextIdx
+        if (_isShuffle.value && shuffleIndices.isNotEmpty()) {
+            val pos = shuffleIndices.indexOf(nextIdx)
+            if (pos >= 0) {
+                shufflePosition = pos
+            }
+        }
         _duration.value = if (nextTrack.duration > 0) nextTrack.duration else {
             if (nextTrack.size > 0) (nextTrack.size * 8000L / 192_000L).coerceAtLeast(30_000L) else 0L
         }
@@ -861,6 +943,12 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun setShuffle(enabled: Boolean) {
         _isShuffle.value = enabled
+        if (enabled) {
+            rebuildShuffleOrder(_queueIndex.value)
+        } else {
+            shuffleIndices.clear()
+            shufflePosition = -1
+        }
         serviceScope.launch {
             settingsDataStore.setShuffleEnabled(enabled)
         }
@@ -874,6 +962,9 @@ class PlaybackManager private constructor(private val context: Context) {
             if (idx >= 0) {
                 _queueIndex.value = idx
             }
+        }
+        if (_isShuffle.value) {
+            rebuildShuffleOrder(_queueIndex.value)
         }
         saveCurrentState()
     }
@@ -890,6 +981,9 @@ class PlaybackManager private constructor(private val context: Context) {
             if (newIdx >= 0) {
                 _queueIndex.value = newIdx
             }
+        }
+        if (_isShuffle.value) {
+            rebuildShuffleOrder(_queueIndex.value)
         }
         saveCurrentState()
     }

@@ -568,9 +568,8 @@ fun LibraryScreen(
                                         }
                                     },
                                     onShuffleTracks = { tracks ->
-                                        viewModel.setShuffle(true)
                                         if (tracks.isNotEmpty()) {
-                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                            viewModel.playWithShuffle(tracks)
                                         }
                                     }
                                 )
@@ -615,9 +614,8 @@ fun LibraryScreen(
                                     onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
                                     onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
                                     onShuffleTracks = { tracks ->
-                                        viewModel.setShuffle(true)
                                         if (tracks.isNotEmpty()) {
-                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                            viewModel.playWithShuffle(tracks)
                                         }
                                     }
                                 )
@@ -648,9 +646,8 @@ fun LibraryScreen(
                                         }
                                     },
                                     onShuffleTracks = { tracks ->
-                                        viewModel.setShuffle(true)
                                         if (tracks.isNotEmpty()) {
-                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                            viewModel.playWithShuffle(tracks)
                                         }
                                     }
                                 )
@@ -682,9 +679,8 @@ fun LibraryScreen(
                                         }
                                     },
                                     onShuffleTracks = { tracks ->
-                                        viewModel.setShuffle(true)
                                         if (tracks.isNotEmpty()) {
-                                            viewModel.playTrack(tracks.shuffled().first(), tracks.shuffled())
+                                            viewModel.playWithShuffle(tracks)
                                         }
                                     }
                                 )
@@ -871,7 +867,7 @@ private fun GroupedListSection(
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
-    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
+    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     if (selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
@@ -1275,7 +1271,7 @@ private fun FoldersSection(
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
-    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
+    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     if (selectedTitle != null) {
         val tracks = folderGroups[selectedTitle] ?: emptyList()
@@ -1528,7 +1524,7 @@ private fun AlbumsSection(
     onAddToPlaylist: (Track) -> Unit,
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
-    onShuffleTracks: (List<Track>) -> Unit = { list -> onPlayTrack(list.shuffled().first(), list.shuffled()) }
+    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     val context = LocalContext.current
 
@@ -1863,7 +1859,7 @@ private fun PlaylistsSection(
     onMoveAllTracksTrack: (Int, Int) -> Unit = { _, _ -> },
     onMoveFavoriteTrack: (Int, Int) -> Unit = { _, _ -> },
     onMovePlaylistTrack: (Long, Int, Int) -> Unit = { _, _, _ -> },
-    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.shuffled().first(), list.shuffled()) }
+    onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     val isDrilldown = selectedCategoryTitle != null || selectedPlaylist != null
 

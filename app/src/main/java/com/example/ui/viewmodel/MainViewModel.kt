@@ -463,6 +463,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.setShuffle(enabled)
     }
 
+    fun playWithShuffle(tracks: List<Track>, startTrack: Track? = null) {
+        playbackManager.playWithShuffle(tracks, startTrack)
+    }
+
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
         if (playbackManager.queue.value.isEmpty() && rawTracks.value.isNotEmpty()) {
             playbackManager.setQueue(rawTracks.value)
