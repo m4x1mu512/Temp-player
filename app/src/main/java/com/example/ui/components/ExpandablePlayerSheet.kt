@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -352,6 +353,40 @@ fun ExpandablePlayerSheet(
             collapseToMini()
         }
 
+        val screenWidthPx = with(density) { screenWidth.toPx() }
+        val trackSwipeOffset = remember { Animatable(0f) }
+        var isTrackSwiping by remember { mutableStateOf(false) }
+
+        val onSwipeNextTrack: () -> Unit = {
+            coroutineScope.launch {
+                trackSwipeOffset.animateTo(
+                    targetValue = -screenWidthPx * 0.45f,
+                    animationSpec = tween(durationMillis = 150, easing = FastOutLinearInEasing)
+                )
+                viewModel.nextTrack()
+                trackSwipeOffset.snapTo(screenWidthPx * 0.45f)
+                trackSwipeOffset.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+        }
+
+        val onSwipePreviousTrack: () -> Unit = {
+            coroutineScope.launch {
+                trackSwipeOffset.animateTo(
+                    targetValue = screenWidthPx * 0.45f,
+                    animationSpec = tween(durationMillis = 150, easing = FastOutLinearInEasing)
+                )
+                viewModel.previousTrack()
+                trackSwipeOffset.snapTo(-screenWidthPx * 0.45f)
+                trackSwipeOffset.animateTo(
+                    targetValue = 0f,
+                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+        }
+
         val sheetCornerRadius = lerp(20.dp, 0.dp, expandProgress)
 
         // Sheet Container with real-time translationY revealing whatever screen is underneath
@@ -400,22 +435,45 @@ fun ExpandablePlayerSheet(
                                     if (isDraggingSheet) {
                                         settleToTarget(velocityY, totalDragY)
                                     } else if (isHorizontalTrackSwipe) {
-                                        if (totalDragX < -30f || velocityX < -200f) {
-                                            viewModel.nextTrack()
-                                        } else if (totalDragX > 30f || velocityX > 200f) {
-                                            viewModel.previousTrack()
-                                        }
-                                    } else {
-                                        val isHorizontalFlick = abs(velocityX) > 200f && abs(velocityX) > abs(velocityY)
-                                        val isVerticalFlick = abs(velocityY) > 180f && abs(velocityY) > abs(velocityX)
-                                        if (isHorizontalFlick) {
-                                            if (totalDragX < -20f || velocityX < -200f) {
+                                        val swipeThresholdPx = screenWidthPx * 0.22f
+                                        val minFlingVelocity = 750f
+
+                                        if (totalDragX < -swipeThresholdPx || (velocityX < -minFlingVelocity && totalDragX < -20f)) {
+                                            coroutineScope.launch {
+                                                trackSwipeOffset.animateTo(
+                                                    targetValue = -screenWidthPx,
+                                                    animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+                                                )
                                                 viewModel.nextTrack()
-                                            } else if (totalDragX > 20f || velocityX > 200f) {
-                                                viewModel.previousTrack()
+                                                trackSwipeOffset.snapTo(screenWidthPx * 0.7f)
+                                                trackSwipeOffset.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                                isTrackSwiping = false
                                             }
-                                        } else if (isVerticalFlick) {
-                                            settleToTarget(velocityY, totalDragY)
+                                        } else if (totalDragX > swipeThresholdPx || (velocityX > minFlingVelocity && totalDragX > 20f)) {
+                                            coroutineScope.launch {
+                                                trackSwipeOffset.animateTo(
+                                                    targetValue = screenWidthPx,
+                                                    animationSpec = tween(durationMillis = 180, easing = FastOutLinearInEasing)
+                                                )
+                                                viewModel.previousTrack()
+                                                trackSwipeOffset.snapTo(-screenWidthPx * 0.7f)
+                                                trackSwipeOffset.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                                isTrackSwiping = false
+                                            }
+                                        } else {
+                                            coroutineScope.launch {
+                                                trackSwipeOffset.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                                isTrackSwiping = false
+                                            }
                                         }
                                     }
                                     break
@@ -430,22 +488,24 @@ fun ExpandablePlayerSheet(
 
                                     if (!isDraggingSheet && !isHorizontalTrackSwipe) {
                                         if (isExpanded) {
-                                            // When expanded: light downward gesture immediately collapses player!
-                                            if (totalDragY > 10f && totalDragY > abs(totalDragX) * 0.6f) {
+                                            // When expanded: downward swipe collapses sheet
+                                            if (totalDragY > 22f && totalDragY > abs(totalDragX) * 1.35f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
-                                            } else if (abs(totalDragX) > 18f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
+                                            } else if (abs(totalDragX) > 24f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
                                                 isHorizontalTrackSwipe = true
+                                                isTrackSwiping = true
                                             }
                                         } else {
-                                            // When collapsed (mini player): light upward gesture immediately expands player!
-                                            if (totalDragY < -10f && abs(totalDragY) > abs(totalDragX) * 0.6f) {
+                                            // When collapsed: upward swipe expands sheet
+                                            if (totalDragY < -20f && abs(totalDragY) > abs(totalDragX) * 1.35f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
-                                            } else if (abs(totalDragX) > 18f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
+                                            } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
                                                 isHorizontalTrackSwipe = true
+                                                isTrackSwiping = true
                                             }
                                         }
                                     }
@@ -455,6 +515,9 @@ fun ExpandablePlayerSheet(
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
                                     } else if (isHorizontalTrackSwipe) {
                                         change.consume()
+                                        coroutineScope.launch {
+                                            trackSwipeOffset.snapTo(totalDragX)
+                                        }
                                     }
                                 }
                             }
@@ -502,6 +565,16 @@ fun ExpandablePlayerSheet(
                     modifier = Modifier
                         .offset(x = currentArtX, y = currentArtY)
                         .size(currentArtSize)
+                        .graphicsLayer {
+                            val swipe = trackSwipeOffset.value
+                            translationX = swipe * (if (expandProgress > 0.4f) 1f else 0.4f)
+                            if (expandProgress > 0.4f) {
+                                rotationZ = (swipe / 75f).coerceIn(-6.5f, 6.5f)
+                                val dragRatio = (abs(swipe) / (screenWidth.value * 2.2f)).coerceIn(0f, 0.12f)
+                                scaleX = 1f - dragRatio
+                                scaleY = 1f - dragRatio
+                            }
+                        }
                         .shadow(
                             elevation = lerp(2.dp, 24.dp, expandProgress),
                             shape = RoundedCornerShape(currentArtCornerRadius),
@@ -584,6 +657,11 @@ fun ExpandablePlayerSheet(
                             modifier = Modifier
                                 .offset(x = textStartX, y = if (isLandscape) 8.dp else 12.dp)
                                 .width(textWidth)
+                                .graphicsLayer {
+                                    if (expandProgress < 0.35f) {
+                                        translationX = trackSwipeOffset.value * 0.45f
+                                    }
+                                }
                         ) {
                             Text(
                                 text = track.title,
@@ -626,7 +704,7 @@ fun ExpandablePlayerSheet(
                             }
 
                             IconButton(
-                                onClick = { viewModel.previousTrack() },
+                                onClick = onSwipePreviousTrack,
                                 modifier = Modifier
                                     .size(38.dp)
                                     .testTag("mini_player_previous")
@@ -666,7 +744,7 @@ fun ExpandablePlayerSheet(
                             }
 
                             IconButton(
-                                onClick = { viewModel.nextTrack() },
+                                onClick = onSwipeNextTrack,
                                 modifier = Modifier
                                     .size(38.dp)
                                     .testTag("mini_player_next")
@@ -807,7 +885,7 @@ fun ExpandablePlayerSheet(
                                         horizontalArrangement = Arrangement.SpaceEvenly,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        IconButton(onClick = { viewModel.previousTrack() }, modifier = Modifier.testTag("player_prev_button")) {
+                                        IconButton(onClick = onSwipePreviousTrack, modifier = Modifier.testTag("player_prev_button")) {
                                             Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий", modifier = Modifier.size(30.dp))
                                         }
                                         FilledIconButton(
@@ -820,7 +898,7 @@ fun ExpandablePlayerSheet(
                                                 modifier = Modifier.size(32.dp)
                                             )
                                         }
-                                        IconButton(onClick = { viewModel.nextTrack() }, modifier = Modifier.testTag("player_next_button")) {
+                                        IconButton(onClick = onSwipeNextTrack, modifier = Modifier.testTag("player_next_button")) {
                                             Icon(Icons.Default.SkipNext, contentDescription = "Следующий", modifier = Modifier.size(30.dp))
                                         }
                                     }
@@ -864,7 +942,14 @@ fun ExpandablePlayerSheet(
                                 // Track Title & Artist
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp)
+                                        .graphicsLayer {
+                                            val swipe = trackSwipeOffset.value
+                                            translationX = swipe * 0.65f
+                                            alpha = (1f - (abs(swipe) / (screenWidth.value * 1.5f))).coerceIn(0.2f, 1f)
+                                        }
                                 ) {
                                     Text(
                                         text = track.title,
@@ -988,7 +1073,7 @@ fun ExpandablePlayerSheet(
                                     }
 
                                     IconButton(
-                                        onClick = { viewModel.previousTrack() },
+                                        onClick = onSwipePreviousTrack,
                                         modifier = Modifier.size(52.dp).testTag("player_prev_button")
                                     ) {
                                         Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", modifier = Modifier.size(34.dp))
@@ -1022,7 +1107,7 @@ fun ExpandablePlayerSheet(
                                     }
 
                                     IconButton(
-                                        onClick = { viewModel.nextTrack() },
+                                        onClick = onSwipeNextTrack,
                                         modifier = Modifier.size(52.dp).testTag("player_next_button")
                                     ) {
                                         Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", modifier = Modifier.size(34.dp))

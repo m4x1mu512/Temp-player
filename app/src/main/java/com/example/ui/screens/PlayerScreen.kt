@@ -1430,8 +1430,8 @@ private fun PlayerArtworkCard(
                     scaleX = scale
                     scaleY = scale
                     val dragX = dragDistanceXProvider()
-                    rotationY = (dragX / 25f).coerceIn(-18f, 18f)
-                    translationX = (dragX / 3.5f).coerceIn(-60f, 60f)
+                    rotationZ = (dragX / 75f).coerceIn(-6.5f, 6.5f)
+                    translationX = dragX
                     cameraDistance = 14f * density
                 },
             contentAlignment = Alignment.Center
