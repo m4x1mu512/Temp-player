@@ -89,6 +89,29 @@ class MusicRepository(
         }
     }
 
+    fun getTracksByIdsDirect(ids: List<Long>): List<Track> {
+        val entities = trackDao.getTracksByIdsDirect(ids)
+        val favoriteIds = try {
+            favoriteDao.getAllFavoriteIdsSync().toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+        val entityMap = entities.associateBy { it.id }
+        return ids.mapNotNull { id ->
+            entityMap[id]?.toTrack(isFavorite = favoriteIds.contains(id))
+        }
+    }
+
+    fun getAllTracksDirect(): List<Track> {
+        val entities = trackDao.getAllTracksDirect()
+        val favoriteIds = try {
+            favoriteDao.getAllFavoriteIdsSync().toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+        return entities.map { it.toTrack(isFavorite = favoriteIds.contains(it.id)) }
+    }
+
     suspend fun scanLocalMusic(): Int = withContext(Dispatchers.IO) {
         val scannedTracks = mutableListOf<TrackEntity>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

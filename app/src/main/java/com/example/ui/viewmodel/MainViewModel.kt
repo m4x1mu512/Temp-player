@@ -358,6 +358,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.stop()
     }
 
+    fun playTrackAtIndex(index: Int) {
+        playbackManager.playTrackAtIndex(index, autoPlay = isPlaying.value)
+    }
+
     fun nextTrack() {
         playbackManager.nextTrack()
     }

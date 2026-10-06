@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -93,7 +94,7 @@ fun TrackListItem(
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(start = 16.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
@@ -168,136 +169,143 @@ fun TrackListItem(
             )
         }
 
-        // Favorite Button
-        val heartScale by animateFloatAsState(
-            targetValue = if (isFavorite) 1.25f else 1.0f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium
-            ),
-            label = "heartScale_${track.id}"
-        )
-        IconButton(
-            onClick = onToggleFavorite,
-            modifier = Modifier
-                .size(44.dp)
-                .testTag("favorite_button_${track.id}")
+        // Action buttons grouped closely together near the right edge
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Icon(
-                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
-                tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .size(22.dp)
-                    .graphicsLayer {
-                        scaleX = heartScale
-                        scaleY = heartScale
-                    }
+            // Favorite Button
+            val heartScale by animateFloatAsState(
+                targetValue = if (isFavorite) 1.25f else 1.0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                ),
+                label = "heartScale_${track.id}"
             )
-        }
-
-        // More options dropdown
-        Box {
             IconButton(
-                onClick = { menuExpanded = true },
+                onClick = onToggleFavorite,
                 modifier = Modifier
-                    .size(44.dp)
-                    .testTag("more_button_${track.id}")
+                    .size(36.dp)
+                    .testTag("favorite_button_${track.id}")
             ) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Опции трека",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
+                    tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .graphicsLayer {
+                            scaleX = heartScale
+                            scaleY = heartScale
+                        }
                 )
             }
 
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Добавить в плейлист") },
-                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
-                    onClick = {
-                        menuExpanded = false
-                        onAddToPlaylist()
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text(if (isFavorite) "Удалить из избранного" else "В избранное") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    onClick = {
-                        menuExpanded = false
-                        onToggleFavorite()
-                    }
-                )
+            // More options dropdown
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .testTag("more_button_${track.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Опции трека",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
-                if (onMoveUp != null || onMoveDown != null || onMoveToTop != null || onMoveToBottom != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    if (onMoveUp != null) {
-                        DropdownMenuItem(
-                            text = { Text("Переместить выше") },
-                            leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onMoveUp()
-                            }
-                        )
-                    }
-                    if (onMoveDown != null) {
-                        DropdownMenuItem(
-                            text = { Text("Переместить ниже") },
-                            leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onMoveDown()
-                            }
-                        )
-                    }
-                    if (onMoveToTop != null) {
-                        DropdownMenuItem(
-                            text = { Text("В самое начало") },
-                            leadingIcon = { Icon(Icons.Default.VerticalAlignTop, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onMoveToTop()
-                            }
-                        )
-                    }
-                    if (onMoveToBottom != null) {
-                        DropdownMenuItem(
-                            text = { Text("В самый конец") },
-                            leadingIcon = { Icon(Icons.Default.VerticalAlignBottom, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onMoveToBottom()
-                            }
-                        )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Добавить в плейлист") },
+                        leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            onAddToPlaylist()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isFavorite) "Удалить из избранного" else "В избранное") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleFavorite()
+                        }
+                    )
+
+                    if (onMoveUp != null || onMoveDown != null || onMoveToTop != null || onMoveToBottom != null) {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        if (onMoveUp != null) {
+                            DropdownMenuItem(
+                                text = { Text("Переместить выше") },
+                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveUp()
+                                }
+                            )
+                        }
+                        if (onMoveDown != null) {
+                            DropdownMenuItem(
+                                text = { Text("Переместить ниже") },
+                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveDown()
+                                }
+                            )
+                        }
+                        if (onMoveToTop != null) {
+                            DropdownMenuItem(
+                                text = { Text("В самое начало") },
+                                leadingIcon = { Icon(Icons.Default.VerticalAlignTop, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveToTop()
+                                }
+                            )
+                        }
+                        if (onMoveToBottom != null) {
+                            DropdownMenuItem(
+                                text = { Text("В самый конец") },
+                                leadingIcon = { Icon(Icons.Default.VerticalAlignBottom, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onMoveToBottom()
+                                }
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Drag Handle for moving track
-        if (showReorderHandle) {
-            Box(
-                modifier = reorderModifier
-                    .size(44.dp)
-                    .testTag("reorder_handle_${track.id}"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = "Переместить трек",
-                    tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(24.dp)
-                )
+            // Drag Handle for moving track
+            if (showReorderHandle) {
+                Box(
+                    modifier = reorderModifier
+                        .size(36.dp)
+                        .testTag("reorder_handle_${track.id}"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DragHandle,
+                        contentDescription = "Переместить трек",
+                        tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
         }
     }

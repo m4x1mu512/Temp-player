@@ -42,6 +42,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -203,8 +207,49 @@ fun PlayerScreen(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
-    var dragDistanceX by remember { mutableFloatStateOf(0f) }
     var dragDistanceY by remember { mutableFloatStateOf(0f) }
+
+    val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
+    val currentQueueIndex by viewModel.currentQueueIndex.collectAsStateWithLifecycle()
+
+    val pagerTracks = remember(currentQueue, currentTrack) {
+        if (currentQueue.isNotEmpty()) currentQueue else listOfNotNull(currentTrack)
+    }
+
+    val activeIndex = remember(pagerTracks, currentTrack, currentQueueIndex) {
+        if (currentQueueIndex in pagerTracks.indices) {
+            currentQueueIndex
+        } else {
+            val idx = pagerTracks.indexOfFirst { it.id == currentTrack?.id }
+            if (idx >= 0) idx else 0
+        }
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = activeIndex.coerceIn(0, (pagerTracks.size - 1).coerceAtLeast(0))
+    ) {
+        pagerTracks.size.coerceAtLeast(1)
+    }
+
+    // Keep pager in sync with active track when track changes externally (e.g. playback completed)
+    LaunchedEffect(activeIndex, pagerTracks.size) {
+        if (activeIndex in pagerTracks.indices && pagerState.currentPage != activeIndex && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(
+                page = activeIndex,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+            )
+        }
+    }
+
+    // When user scrolls/swipes to a new page and it settles, change track smoothly (Auxio style)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }
+            .collect { settledPage ->
+                if (settledPage in pagerTracks.indices && settledPage != activeIndex) {
+                    viewModel.playTrackAtIndex(settledPage)
+                }
+            }
+    }
 
     val coroutineScope = rememberCoroutineScope()
     val dragOffsetY = remember { Animatable(0f) }
@@ -450,18 +495,27 @@ fun PlayerScreen(
                                     .fillMaxWidth(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                PlayerArtworkCard(
-                                    track = track,
-                                    isPlaying = isPlaying,
-                                    amplitudeFlow = viewModel.audioAmplitude,
-                                    dragDistanceXProvider = { dragDistanceX },
-                                    isLandscape = true,
-                                    isCompact = isCompact,
-                                    isMedium = isMedium,
+                                HorizontalPager(
+                                    state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
-                                    sharedTransitionScope = sharedTransitionScope,
-                                    animatedVisibilityScope = animatedVisibilityScope
-                                )
+                                    pageSpacing = 16.dp,
+                                    key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                                ) { page ->
+                                    val pageTrack = pagerTracks.getOrNull(page)
+                                    if (pageTrack != null) {
+                                        PlayerArtworkCard(
+                                            track = pageTrack,
+                                            isPlaying = isPlaying && page == activeIndex,
+                                            amplitudeFlow = viewModel.audioAmplitude,
+                                            isLandscape = true,
+                                            isCompact = isCompact,
+                                            isMedium = isMedium,
+                                            modifier = Modifier.fillMaxSize(),
+                                            sharedTransitionScope = if (page == activeIndex) sharedTransitionScope else null,
+                                            animatedVisibilityScope = if (page == activeIndex) animatedVisibilityScope else null
+                                        )
+                                    }
+                                }
                             }
 
                             if (visualizerEnabled) {
@@ -682,7 +736,18 @@ fun PlayerScreen(
                                 }
 
                                 IconButton(
-                                    onClick = { viewModel.previousTrack() },
+                                    onClick = {
+                                        if (pagerTracks.size > 1 && pagerState.currentPage > 0) {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    page = pagerState.currentPage - 1,
+                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                            }
+                                        } else {
+                                            viewModel.previousTrack()
+                                        }
+                                    },
                                     modifier = Modifier
                                         .size(48.dp)
                                         .testTag("player_prev_button_landscape")
@@ -723,7 +788,18 @@ fun PlayerScreen(
                                 }
 
                                 IconButton(
-                                    onClick = { viewModel.nextTrack() },
+                                    onClick = {
+                                        if (pagerTracks.size > 1 && pagerState.currentPage < pagerTracks.size - 1) {
+                                            coroutineScope.launch {
+                                                pagerState.animateScrollToPage(
+                                                    page = pagerState.currentPage + 1,
+                                                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                                )
+                                            }
+                                        } else {
+                                            viewModel.nextTrack()
+                                        }
+                                    },
                                     modifier = Modifier
                                         .size(48.dp)
                                         .testTag("player_next_button_landscape")
@@ -771,42 +847,31 @@ fun PlayerScreen(
                             .padding(horizontal = if (isCompact) 16.dp else 24.dp)
                             .padding(top = 2.dp, bottom = if (isCompact) 4.dp else 8.dp)
                             .pointerInput(Unit) {
-                                detectDragGestures(
+                                detectVerticalDragGestures(
                                     onDragStart = {
-                                        dragDistanceX = 0f
                                         dragDistanceY = 0f
                                     },
                                     onDragEnd = {
-                                        if (abs(dragDistanceY) > abs(dragDistanceX) && dragOffsetY.value > dismissThresholdPx) {
+                                        if (dragOffsetY.value > dismissThresholdPx) {
                                             onNavigateBack()
                                         } else {
                                             coroutineScope.launch {
                                                 dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                             }
-                                            if (abs(dragDistanceX) > abs(dragDistanceY)) {
-                                                if (dragDistanceX < -80f) {
-                                                    viewModel.nextTrack()
-                                                } else if (dragDistanceX > 80f) {
-                                                    viewModel.previousTrack()
-                                                }
-                                            }
                                         }
-                                        dragDistanceX = 0f
                                         dragDistanceY = 0f
                                     },
                                     onDragCancel = {
                                         coroutineScope.launch {
                                             dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
                                         }
-                                        dragDistanceX = 0f
                                         dragDistanceY = 0f
                                     },
-                                    onDrag = { _, dragAmount ->
-                                        dragDistanceX += dragAmount.x
-                                        dragDistanceY += dragAmount.y
-                                        if (dragDistanceY > 0f && abs(dragDistanceY) > abs(dragDistanceX)) {
+                                    onVerticalDrag = { _, dragAmount ->
+                                        dragDistanceY += dragAmount
+                                        if (dragAmount > 0f || dragOffsetY.value > 0f) {
                                             coroutineScope.launch {
-                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
+                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount).coerceAtLeast(0f))
                                             }
                                         }
                                     }
@@ -823,18 +888,27 @@ fun PlayerScreen(
                                 .padding(vertical = if (isCompact) 2.dp else 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            PlayerArtworkCard(
-                                track = track,
-                                isPlaying = isPlaying,
-                                amplitudeFlow = viewModel.audioAmplitude,
-                                dragDistanceXProvider = { dragDistanceX },
-                                isLandscape = false,
-                                isCompact = isCompact,
-                                isMedium = isMedium,
+                            HorizontalPager(
+                                state = pagerState,
                                 modifier = Modifier.fillMaxSize(),
-                                sharedTransitionScope = sharedTransitionScope,
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
+                                pageSpacing = 16.dp,
+                                key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                            ) { page ->
+                                val pageTrack = pagerTracks.getOrNull(page)
+                                if (pageTrack != null) {
+                                    PlayerArtworkCard(
+                                        track = pageTrack,
+                                        isPlaying = isPlaying && page == activeIndex,
+                                        amplitudeFlow = viewModel.audioAmplitude,
+                                        isLandscape = false,
+                                        isCompact = isCompact,
+                                        isMedium = isMedium,
+                                        modifier = Modifier.fillMaxSize(),
+                                        sharedTransitionScope = if (page == activeIndex) sharedTransitionScope else null,
+                                        animatedVisibilityScope = if (page == activeIndex) animatedVisibilityScope else null
+                                    )
+                                }
+                            }
                         }
 
                     // Visualizer Canvas View (scaled to fit screen height)
@@ -1053,7 +1127,18 @@ fun PlayerScreen(
 
                         // Previous Track
                         IconButton(
-                            onClick = { viewModel.previousTrack() },
+                            onClick = {
+                                if (pagerTracks.size > 1 && pagerState.currentPage > 0) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            page = pagerState.currentPage - 1,
+                                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                        )
+                                    }
+                                } else {
+                                    viewModel.previousTrack()
+                                }
+                            },
                             modifier = Modifier
                                 .size(if (isCompact) 46.dp else 52.dp)
                                 .testTag("player_prev_button")
@@ -1096,7 +1181,18 @@ fun PlayerScreen(
 
                         // Next Track
                         IconButton(
-                            onClick = { viewModel.nextTrack() },
+                            onClick = {
+                                if (pagerTracks.size > 1 && pagerState.currentPage < pagerTracks.size - 1) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(
+                                            page = pagerState.currentPage + 1,
+                                            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+                                        )
+                                    }
+                                } else {
+                                    viewModel.nextTrack()
+                                }
+                            },
                             modifier = Modifier
                                 .size(if (isCompact) 46.dp else 52.dp)
                                 .testTag("player_next_button")
@@ -1373,7 +1469,6 @@ private fun PlayerArtworkCard(
     track: Track,
     isPlaying: Boolean,
     amplitudeFlow: StateFlow<Float>,
-    dragDistanceXProvider: () -> Float,
     isLandscape: Boolean,
     isCompact: Boolean,
     isMedium: Boolean,
@@ -1429,9 +1524,6 @@ private fun PlayerArtworkCard(
                     val scale = pulseScaleState.value * ampPulse * playbackStateScaleState.value
                     scaleX = scale
                     scaleY = scale
-                    val dragX = dragDistanceXProvider()
-                    rotationZ = (dragX / 75f).coerceIn(-6.5f, 6.5f)
-                    translationX = dragX
                     cameraDistance = 14f * density
                 },
             contentAlignment = Alignment.Center

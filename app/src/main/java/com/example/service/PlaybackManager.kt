@@ -231,6 +231,44 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
+        // Synchronously restore initial queue and track from persistent cache so UI never flashes empty or unsorted
+        try {
+            val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
+                settingsDataStore.getInitialCustomAllTracksOrder()
+            }
+            if (savedQueueIds.isNotEmpty()) {
+                val directTracks = repository.getTracksByIdsDirect(savedQueueIds)
+                if (directTracks.isNotEmpty()) {
+                    _queue.value = directTracks
+                    val savedQueueIndex = settingsDataStore.getInitialLastQueueIndex()
+                    val lastTrackId = settingsDataStore.getInitialLastTrackId()
+                    val targetIndex = if (savedQueueIndex in directTracks.indices) {
+                        savedQueueIndex
+                    } else if (lastTrackId > 0) {
+                        directTracks.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
+                    } else {
+                        0
+                    }
+                    _queueIndex.value = targetIndex
+                    val trackToRestore = if (lastTrackId > 0) {
+                        directTracks.find { it.id == lastTrackId } ?: directTracks.getOrNull(targetIndex)
+                    } else {
+                        directTracks.getOrNull(targetIndex)
+                    }
+                    if (trackToRestore != null) {
+                        _currentTrack.value = trackToRestore
+                        _duration.value = trackToRestore.duration
+                        val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
+                        if (lastPos > 0 && lastPos < trackToRestore.duration) {
+                            _playbackPosition.value = lastPos
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("PlaybackManager", "Initial sync queue restore notice: ${e.message}")
+        }
+
         serviceScope.launch {
             restoreSavedQueueAndTrack()
         }

@@ -13,11 +13,17 @@ interface TrackDao {
     @Query("SELECT * FROM tracks ORDER BY title COLLATE NOCASE ASC")
     fun getAllTracks(): Flow<List<TrackEntity>>
 
+    @Query("SELECT * FROM tracks ORDER BY title COLLATE NOCASE ASC")
+    fun getAllTracksDirect(): List<TrackEntity>
+
     @Query("SELECT * FROM tracks WHERE id = :id LIMIT 1")
     suspend fun getTrackById(id: Long): TrackEntity?
 
     @Query("SELECT * FROM tracks WHERE id IN (:ids)")
     suspend fun getTracksByIds(ids: List<Long>): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE id IN (:ids)")
+    fun getTracksByIdsDirect(ids: List<Long>): List<TrackEntity>
 
     @Query("SELECT * FROM tracks WHERE uriString = :uriString LIMIT 1")
     suspend fun getTrackByUri(uriString: String): TrackEntity?
@@ -51,6 +57,9 @@ interface FavoriteDao {
 
     @Query("SELECT trackId FROM favorites")
     suspend fun getAllFavoriteIdsDirect(): List<Long>
+
+    @Query("SELECT trackId FROM favorites")
+    fun getAllFavoriteIdsSync(): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFavorite(favorite: FavoriteEntity)
