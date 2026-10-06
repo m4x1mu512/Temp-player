@@ -202,13 +202,15 @@ fun LibraryScreen(
             selectedGroupTitle = null
             selectedGroupTracks = null
             selectedPlaylist = null
-            for (retry in 0..4) {
-                if (pagerState.currentPage != 0) {
-                    try {
-                        pagerState.scrollToPage(0)
-                    } catch (_: Exception) {}
-                    delay(50)
-                }
+            if (pagerState.currentPage != 0) {
+                try {
+                    pagerState.animateScrollToPage(0)
+                } catch (_: Exception) {}
+            }
+            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
+            if (targetIdx >= 0) {
+                queueListState.smoothScrollToTrackIndex(targetIdx)
             }
         }
     }
@@ -220,13 +222,15 @@ fun LibraryScreen(
             selectedGroupTitle = null
             selectedGroupTracks = null
             selectedPlaylist = null
-            for (retry in 0..4) {
-                if (pagerState.currentPage != 0) {
-                    try {
-                        pagerState.scrollToPage(0)
-                    } catch (_: Exception) {}
-                    delay(50)
-                }
+            if (pagerState.currentPage != 0) {
+                try {
+                    pagerState.animateScrollToPage(0)
+                } catch (_: Exception) {}
+            }
+            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
+            if (targetIdx >= 0) {
+                queueListState.smoothScrollToTrackIndex(targetIdx)
             }
         }
     }
@@ -245,16 +249,25 @@ fun LibraryScreen(
         }
     }
 
+    val navigateToQueueAndScrollToCurrentTrack: () -> Unit = {
+        coroutineScope.launch {
+            if (pagerState.currentPage != 0) {
+                pagerState.animateScrollToPage(0)
+            }
+            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
+            if (targetIdx >= 0) {
+                queueListState.smoothScrollToTrackIndex(targetIdx)
+            }
+        }
+    }
+
     val navigateToTab: (Int) -> Unit = { targetPage ->
         if (pagerState.currentPage != targetPage) {
             selectedGroupTitle = null
             selectedGroupTracks = null
             selectedPlaylist = null
             coroutineScope.launch {
-                if (kotlin.math.abs(pagerState.currentPage - targetPage) > 1) {
-                    val adjacent = if (targetPage > pagerState.currentPage) targetPage - 1 else targetPage + 1
-                    pagerState.scrollToPage(adjacent)
-                }
                 pagerState.animateScrollToPage(
                     page = targetPage,
                     animationSpec = spring(
@@ -562,11 +575,7 @@ fun LibraryScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
                                     favoriteIds = favoriteIds,
-                                    onNavigateToQueue = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
+                                    onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
                                         if (tracks.isNotEmpty()) {
                                             viewModel.playWithShuffle(tracks)
@@ -605,11 +614,7 @@ fun LibraryScreen(
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
                                     getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
                                     favoriteIds = favoriteIds,
-                                    onNavigateToQueue = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
+                                    onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onMoveAllTracksTrack = { from, to -> viewModel.moveAllTracksTrack(from, to) },
                                     onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
                                     onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
@@ -640,11 +645,7 @@ fun LibraryScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
                                     favoriteIds = favoriteIds,
-                                    onNavigateToQueue = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
+                                    onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
                                         if (tracks.isNotEmpty()) {
                                             viewModel.playWithShuffle(tracks)
@@ -673,11 +674,7 @@ fun LibraryScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
                                     favoriteIds = favoriteIds,
-                                    onNavigateToQueue = {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(0)
-                                        }
-                                    },
+                                    onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
                                         if (tracks.isNotEmpty()) {
                                             viewModel.playWithShuffle(tracks)

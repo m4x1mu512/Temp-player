@@ -78,15 +78,11 @@ fun TrackListItem(
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    val itemBgColor by animateColorAsState(
-        targetValue = when {
-            isDragging -> MaterialTheme.colorScheme.surfaceVariant
-            isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(durationMillis = 150),
-        label = "item_bg_${track.id}"
-    )
+    val itemBgColor = when {
+        isDragging -> MaterialTheme.colorScheme.surfaceVariant
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+        else -> Color.Transparent
+    }
 
     val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
 
@@ -112,7 +108,7 @@ fun TrackListItem(
                 ImageRequest.Builder(context)
                     .data(track.albumArtUri ?: R.drawable.ic_default_art)
                     .size(150, 150)
-                    .crossfade(150)
+                    .crossfade(false)
                     .error(R.drawable.ic_default_art)
                     .build()
             }

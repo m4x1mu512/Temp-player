@@ -98,6 +98,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -312,18 +313,18 @@ fun ExpandablePlayerSheet(
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
-            // A collapse or expand must be a deliberate vertical motion, not an accidental slip
-            val thresholdDistance = (maxDragPx * 0.25f).coerceIn(140f, 360f)
+            val collapseDistanceThreshold = with(density) { 32.dp.toPx() }
+            val expandDistanceThreshold = with(density) { 24.dp.toPx() }
             val targetExpanded = when {
-                velocityY < -700f -> true // deliberate flick up -> expand
-                velocityY > 700f -> false // deliberate flick down -> collapse
+                velocityY < -180f -> true // Light flick up -> expand
+                velocityY > 180f -> false // Light flick down -> collapse
                 isExpanded -> {
-                    // Was expanded: require dragging down by at least thresholdDistance
-                    totalDragY < thresholdDistance && expandProgress > 0.65f
+                    // Was expanded: light downward drag collapses
+                    !(totalDragY > collapseDistanceThreshold || expandProgress < 0.90f)
                 }
                 else -> {
-                    // Was collapsed (mini): require dragging up by at least thresholdDistance
-                    totalDragY < -thresholdDistance || expandProgress > 0.35f
+                    // Was collapsed (mini): light upward drag expands
+                    totalDragY < -expandDistanceThreshold || expandProgress > 0.10f
                 }
             }
             isExpanded = targetExpanded
@@ -377,66 +378,47 @@ fun ExpandablePlayerSheet(
                         } else BorderStroke(0.dp, Color.Transparent),
                         shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
                     )
-                    .pointerInput(maxDragPx) {
+                    .pointerInput(maxDragPx, isExpanded) {
                         awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
                             val velocityTracker = VelocityTracker()
                             velocityTracker.addPosition(down.uptimeMillis, down.position)
                             var totalDragX = 0f
                             var totalDragY = 0f
-                            var dragDir = SheetDragDirection.NONE
+                            var isDraggingSheet = false
+                            var isHorizontalTrackSwipe = false
                             val pointerId = down.id
 
                             while (true) {
-                                val event = awaitPointerEvent()
+                                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
                                 val change = event.changes.firstOrNull { it.id == pointerId }
                                 if (change == null || !change.pressed) {
                                     val velocity = velocityTracker.calculateVelocity()
                                     val velocityX = velocity.x
                                     val velocityY = velocity.y
 
-                                    if (dragDir == SheetDragDirection.HORIZONTAL) {
-                                        // Strictly handle track switching - NEVER collapse/expand on horizontal swipe!
-                                        if (isDragging) {
-                                            isDragging = false
-                                            coroutineScope.launch {
-                                                animOffsetY.animateTo(if (isExpanded) 0f else maxDragPx)
-                                            }
-                                        }
-                                        if (totalDragX < -40f || velocityX < -350f) {
+                                    if (isDraggingSheet) {
+                                        settleToTarget(velocityY, totalDragY)
+                                    } else if (isHorizontalTrackSwipe) {
+                                        if (totalDragX < -30f || velocityX < -200f) {
                                             viewModel.nextTrack()
-                                        } else if (totalDragX > 40f || velocityX > 350f) {
+                                        } else if (totalDragX > 30f || velocityX > 200f) {
                                             viewModel.previousTrack()
                                         }
-                                    } else if (dragDir == SheetDragDirection.VERTICAL) {
-                                        settleToTarget(velocityY, totalDragY)
                                     } else {
-                                        // Quick flick with very little displacement
-                                        val isHorizontalFlick = abs(velocityX) > 350f && abs(velocityX) > abs(velocityY) * 1.5f
-                                        val isVerticalFlick = abs(velocityY) > 700f && abs(velocityY) > abs(velocityX) * 1.5f
-
+                                        val isHorizontalFlick = abs(velocityX) > 200f && abs(velocityX) > abs(velocityY)
+                                        val isVerticalFlick = abs(velocityY) > 180f && abs(velocityY) > abs(velocityX)
                                         if (isHorizontalFlick) {
-                                            if (totalDragX < -30f || velocityX < -350f) {
+                                            if (totalDragX < -20f || velocityX < -200f) {
                                                 viewModel.nextTrack()
-                                            } else if (totalDragX > 30f || velocityX > 350f) {
+                                            } else if (totalDragX > 20f || velocityX > 200f) {
                                                 viewModel.previousTrack()
                                             }
                                         } else if (isVerticalFlick) {
                                             settleToTarget(velocityY, totalDragY)
-                                        } else {
-                                            if (isDragging) {
-                                                isDragging = false
-                                                coroutineScope.launch {
-                                                    animOffsetY.animateTo(if (isExpanded) 0f else maxDragPx)
-                                                }
-                                            }
                                         }
                                     }
                                     break
-                                }
-
-                                if (change.isConsumed) {
-                                    continue
                                 }
 
                                 velocityTracker.addPosition(change.uptimeMillis, change.position)
@@ -446,28 +428,32 @@ fun ExpandablePlayerSheet(
                                     val dy = posChange.y
                                     totalDragY += dy
 
-                                    if (dragDir == SheetDragDirection.NONE) {
-                                        // Bias towards horizontal track switching to completely prevent accidental collapse
-                                        if (abs(totalDragX) > 18f && abs(totalDragX) >= abs(totalDragY)) {
-                                            dragDir = SheetDragDirection.HORIZONTAL
-                                        } else if (abs(totalDragY) > 28f && abs(totalDragY) > abs(totalDragX) * 1.6f) {
-                                            dragDir = SheetDragDirection.VERTICAL
-                                            isDragging = true
-                                            dragOffsetY = animOffsetY.value
-                                        }
-                                    } else if (dragDir == SheetDragDirection.VERTICAL) {
-                                        // If during vertical dragging horizontal motion clearly dominates, switch to horizontal!
-                                        if (abs(totalDragX) > 40f && abs(totalDragX) > abs(totalDragY) * 1.4f) {
-                                            dragDir = SheetDragDirection.HORIZONTAL
-                                            isDragging = false
-                                            dragOffsetY = if (isExpanded) 0f else maxDragPx
+                                    if (!isDraggingSheet && !isHorizontalTrackSwipe) {
+                                        if (isExpanded) {
+                                            // When expanded: light downward gesture immediately collapses player!
+                                            if (totalDragY > 10f && totalDragY > abs(totalDragX) * 0.6f) {
+                                                isDraggingSheet = true
+                                                isDragging = true
+                                                dragOffsetY = animOffsetY.value
+                                            } else if (abs(totalDragX) > 18f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
+                                                isHorizontalTrackSwipe = true
+                                            }
+                                        } else {
+                                            // When collapsed (mini player): light upward gesture immediately expands player!
+                                            if (totalDragY < -10f && abs(totalDragY) > abs(totalDragX) * 0.6f) {
+                                                isDraggingSheet = true
+                                                isDragging = true
+                                                dragOffsetY = animOffsetY.value
+                                            } else if (abs(totalDragX) > 18f && abs(totalDragX) > abs(totalDragY) * 1.3f) {
+                                                isHorizontalTrackSwipe = true
+                                            }
                                         }
                                     }
 
-                                    if (dragDir == SheetDragDirection.VERTICAL) {
+                                    if (isDraggingSheet) {
                                         change.consume()
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
-                                    } else if (dragDir == SheetDragDirection.HORIZONTAL) {
+                                    } else if (isHorizontalTrackSwipe) {
                                         change.consume()
                                     }
                                 }
