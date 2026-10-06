@@ -229,7 +229,9 @@ class PlaybackManager private constructor(private val context: Context) {
                     visualizerController.updateConfig(bands, sens)
                 }.collect()
             }
+        }
 
+        serviceScope.launch {
             restoreSavedQueueAndTrack()
         }
     }
@@ -1121,27 +1123,48 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
-    suspend fun restoreSavedQueueAndTrack() {
+    suspend fun restoreSavedQueueAndTrack(availableTracks: List<Track>? = null) {
         try {
             if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
 
             val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
-                settingsDataStore.queueTrackIdsFlow.first()
+                settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty {
+                    try {
+                        settingsDataStore.queueTrackIdsFlow.first()
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                }
             }
             val savedQueueIndex = if (settingsDataStore.getInitialLastQueueIndex() >= 0) {
                 settingsDataStore.getInitialLastQueueIndex()
             } else {
-                settingsDataStore.lastQueueIndexFlow.first()
+                try {
+                    settingsDataStore.lastQueueIndexFlow.first()
+                } catch (_: Exception) {
+                    -1
+                }
             }
             val lastTrackId = if (settingsDataStore.getInitialLastTrackId() > 0) {
                 settingsDataStore.getInitialLastTrackId()
             } else {
-                settingsDataStore.lastTrackIdFlow.first()
+                try {
+                    settingsDataStore.lastTrackIdFlow.first()
+                } catch (_: Exception) {
+                    -1L
+                }
             }
             val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
 
             val restoredQueue = if (savedQueueIds.isNotEmpty()) {
-                repository.getTracksByIds(savedQueueIds)
+                if (!availableTracks.isNullOrEmpty()) {
+                    val map = availableTracks.associateBy { it.id }
+                    savedQueueIds.mapNotNull { map[it] }.ifEmpty {
+                        repository.getTracksByIds(savedQueueIds)
+                    }
+                } else {
+                    repository.getTracksByIds(savedQueueIds)
+                }
             } else {
                 emptyList()
             }

@@ -102,13 +102,51 @@ class SettingsDataStore(private val context: Context) {
     fun getInitialCustomAllTracksOrder(): List<Long> {
         val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, null) ?: ""
-        return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        if (raw.isNotBlank()) {
+            return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+        val queueRaw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, null) ?: ""
+        return if (queueRaw.isBlank()) emptyList() else queueRaw.split(",").mapNotNull { it.trim().toLongOrNull() }
     }
 
     fun getInitialQueueTrackIds(): List<Long> {
         val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, null) ?: ""
+        if (raw.isNotBlank()) {
+            return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+        val customRaw = prefs.getString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, null) ?: ""
+        return if (customRaw.isBlank()) emptyList() else customRaw.split(",").mapNotNull { it.trim().toLongOrNull() }
+    }
+
+    fun getInitialFavoritesOrder(): List<Long> {
+        val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString("cached_favorites_order", null) ?: ""
         return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+    }
+
+    fun saveCachedFavoritesOrder(ids: List<Long>) {
+        try {
+            context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString("cached_favorites_order", ids.joinToString(","))
+                .commit()
+        } catch (_: Exception) {}
+    }
+
+    fun getInitialPlaylistOrder(playlistId: Long): List<Long> {
+        val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString("cached_playlist_order_$playlistId", null) ?: ""
+        return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+    }
+
+    fun saveCachedPlaylistOrder(playlistId: Long, ids: List<Long>) {
+        try {
+            context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString("cached_playlist_order_$playlistId", ids.joinToString(","))
+                .commit()
+        } catch (_: Exception) {}
     }
 
     fun getInitialLastQueueIndex(): Int {
@@ -135,20 +173,21 @@ class SettingsDataStore(private val context: Context) {
         }
     }.onStart {
         val initial = getInitialCustomAllTracksOrder()
-        if (initial.isNotEmpty()) {
-            emit(initial)
-        }
+        emit(initial)
     }
 
     suspend fun saveCustomAllTracksOrder(trackIds: List<Long>) {
+        val str = trackIds.joinToString(",")
         try {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
-                .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, trackIds.joinToString(","))
-                .apply()
+                .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, str)
+                .putString(KEY_CACHED_QUEUE_TRACK_IDS, str)
+                .commit()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
-            preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = trackIds.joinToString(",")
+            preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = str
+            preferences[KEY_QUEUE_TRACK_IDS] = str
         }
     }
 
@@ -161,9 +200,7 @@ class SettingsDataStore(private val context: Context) {
         }
     }.onStart {
         val initial = getInitialQueueTrackIds()
-        if (initial.isNotEmpty()) {
-            emit(initial)
-        }
+        emit(initial)
     }
 
     val lastQueueIndexFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -316,18 +353,22 @@ class SettingsDataStore(private val context: Context) {
             editor.putLong(KEY_CACHED_LAST_TRACK_ID, trackId)
             editor.putLong(KEY_CACHED_LAST_POSITION, position)
             if (queueIds != null) {
-                editor.putString(KEY_CACHED_QUEUE_TRACK_IDS, queueIds.joinToString(","))
+                val qStr = queueIds.joinToString(",")
+                editor.putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
+                editor.putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
             }
             if (queueIndex != null) {
                 editor.putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
             }
-            editor.apply()
+            editor.commit()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_LAST_TRACK_ID] = trackId
             preferences[KEY_LAST_POSITION] = position
             if (queueIds != null) {
-                preferences[KEY_QUEUE_TRACK_IDS] = queueIds.joinToString(",")
+                val qStr = queueIds.joinToString(",")
+                preferences[KEY_QUEUE_TRACK_IDS] = qStr
+                preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = qStr
             }
             if (queueIndex != null) {
                 preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
@@ -336,15 +377,18 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun saveQueue(trackIds: List<Long>, queueIndex: Int) {
+        val qStr = trackIds.joinToString(",")
         try {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
-                .putString(KEY_CACHED_QUEUE_TRACK_IDS, trackIds.joinToString(","))
+                .putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
+                .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
                 .putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
-                .apply()
+                .commit()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
-            preferences[KEY_QUEUE_TRACK_IDS] = trackIds.joinToString(",")
+            preferences[KEY_QUEUE_TRACK_IDS] = qStr
+            preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = qStr
             preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
         }
     }

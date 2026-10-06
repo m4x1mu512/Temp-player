@@ -510,7 +510,7 @@ fun LibraryScreen(
                         when (page) {
                             0 -> {
                                 // 1. "Список воспроизведения" (Queue of tracks from current folder/album/artist/playlist)
-                                val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+                                val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else allTracksOrdered
                                 if (queueToDisplay.isEmpty()) {
                                     EmptyState(
                                         title = "Список воспроизведения пуст",

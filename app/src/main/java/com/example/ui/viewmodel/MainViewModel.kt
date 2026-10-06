@@ -94,7 +94,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _favoriteIds = MutableStateFlow<Set<Long>>(emptySet())
     val favoriteIds: StateFlow<Set<Long>> = _favoriteIds.asStateFlow()
 
-    private val _inMemoryFavoriteOrder = MutableStateFlow<List<Long>?>(null)
+    private val _inMemoryFavoriteOrder = MutableStateFlow<List<Long>?>(
+        settingsDataStore.getInitialFavoritesOrder().ifEmpty { null }
+    )
 
     val favoriteTracks: StateFlow<List<Track>> = combine(
         repository.favoriteTracks,
@@ -112,14 +114,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
-    private val _inMemoryAllTracksOrder = MutableStateFlow<List<Long>?>(null)
+    private val _inMemoryAllTracksOrder = MutableStateFlow<List<Long>?>(
+        settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty { null }
+    )
 
     val allTracksOrdered: StateFlow<List<Track>> = combine(
         rawTracks,
         settingsDataStore.customAllTracksOrderFlow,
         _inMemoryAllTracksOrder
     ) { tracks, diskOrder, memOrder ->
-        val customOrder = memOrder ?: diskOrder
+        val customOrder = memOrder ?: diskOrder.ifEmpty {
+            settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty {
+                settingsDataStore.getInitialQueueTrackIds()
+            }
+        }
         if (customOrder.isEmpty()) {
             tracks
         } else {
@@ -188,7 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             playbackManager.restoreSavedQueueAndTrack()
             rawTracks.collect { tracks ->
                 if (tracks.isNotEmpty() && currentQueue.value.isEmpty()) {
-                    playbackManager.restoreSavedQueueAndTrack()
+                    playbackManager.restoreSavedQueueAndTrack(tracks)
                 }
             }
         }
@@ -440,7 +448,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getPlaylistTracks(playlistId: Long): StateFlow<List<Track>> {
         return playlistTracksCache.getOrPut(playlistId) {
-            val memFlow = _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }
+            val memFlow = _inMemoryPlaylistOrder.getOrPut(playlistId) {
+                MutableStateFlow(settingsDataStore.getInitialPlaylistOrder(playlistId).ifEmpty { null })
+            }
             combine(
                 repository.getTracksForPlaylist(playlistId),
                 memFlow
@@ -468,10 +478,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
-        if (playbackManager.queue.value.isEmpty() && rawTracks.value.isNotEmpty()) {
-            playbackManager.setQueue(rawTracks.value)
+        if (playbackManager.queue.value.isEmpty() && allTracksOrdered.value.isNotEmpty()) {
+            playbackManager.setQueue(allTracksOrdered.value)
         }
         playbackManager.moveQueueTrack(fromIndex, toIndex)
+        val newQueue = playbackManager.queue.value
+        if (newQueue.isNotEmpty()) {
+            val newIds = newQueue.map { it.id }
+            _inMemoryAllTracksOrder.value = newIds
+            viewModelScope.launch {
+                try {
+                    settingsDataStore.saveCustomAllTracksOrder(newIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     fun movePlaylistTrack(playlistId: Long, fromIndex: Int, toIndex: Int) {
@@ -480,10 +502,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
-        _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }.value = current.map { it.id }
+        val newIds = current.map { it.id }
+        _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }.value = newIds
+        settingsDataStore.saveCachedPlaylistOrder(playlistId, newIds)
         viewModelScope.launch {
             try {
-                repository.reorderPlaylistTracks(playlistId, current.map { it.id })
+                repository.reorderPlaylistTracks(playlistId, newIds)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -495,10 +519,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
-        _inMemoryFavoriteOrder.value = current.map { it.id }
+        val newIds = current.map { it.id }
+        _inMemoryFavoriteOrder.value = newIds
+        settingsDataStore.saveCachedFavoritesOrder(newIds)
         viewModelScope.launch {
             try {
-                repository.reorderFavorites(current.map { it.id })
+                repository.reorderFavorites(newIds)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -510,13 +536,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
-        _inMemoryAllTracksOrder.value = current.map { it.id }
+        val newIds = current.map { it.id }
+        _inMemoryAllTracksOrder.value = newIds
         viewModelScope.launch {
             try {
-                settingsDataStore.saveCustomAllTracksOrder(current.map { it.id })
+                settingsDataStore.saveCustomAllTracksOrder(newIds)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+        if (playbackManager.queue.value.isNotEmpty()) {
+            playbackManager.setQueue(current)
         }
     }
 
