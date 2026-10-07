@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
+import com.example.data.model.SortOrder
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
 import java.io.File
@@ -32,6 +33,7 @@ class SettingsDataStore(private val context: Context) {
         private const val KEY_CACHED_LAST_QUEUE_INDEX = "cached_last_queue_index"
         private const val KEY_CACHED_LAST_TRACK_ID = "cached_last_track_id"
         private const val KEY_CACHED_LAST_POSITION = "cached_last_position"
+        private const val KEY_CACHED_SORT_ORDER = "cached_sort_order"
 
         fun getInitialThemeMode(context: Context): ThemeMode {
             val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
@@ -130,6 +132,25 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString("cached_favorites_order", ids.joinToString(","))
+                .commit()
+        } catch (_: Exception) {}
+    }
+
+    fun getInitialSortOrder(): SortOrder {
+        val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_CACHED_SORT_ORDER, null) ?: return SortOrder.BY_TITLE
+        return try {
+            SortOrder.valueOf(raw)
+        } catch (_: Exception) {
+            SortOrder.BY_TITLE
+        }
+    }
+
+    fun saveCachedSortOrder(order: SortOrder) {
+        try {
+            context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CACHED_SORT_ORDER, order.name)
                 .commit()
         } catch (_: Exception) {}
     }

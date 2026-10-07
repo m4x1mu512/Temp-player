@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -172,7 +173,8 @@ fun TrackListItem(
         // Action buttons grouped closely together near the right edge
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(0.dp)
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            modifier = Modifier.padding(end = 0.dp)
         ) {
             // Favorite Button
             val heartScale by animateFloatAsState(
@@ -183,18 +185,20 @@ fun TrackListItem(
                 ),
                 label = "heartScale_${track.id}"
             )
-            IconButton(
-                onClick = onToggleFavorite,
+            Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .testTag("favorite_button_${track.id}")
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .clickable { onToggleFavorite() }
+                    .testTag("favorite_button_${track.id}"),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
                     tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(19.dp)
                         .graphicsLayer {
                             scaleX = heartScale
                             scaleY = heartScale
@@ -203,18 +207,20 @@ fun TrackListItem(
             }
 
             // More options dropdown
-            Box {
-                IconButton(
-                    onClick = { menuExpanded = true },
+            Box(contentAlignment = Alignment.Center) {
+                Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .testTag("more_button_${track.id}")
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .clickable { menuExpanded = true }
+                        .testTag("more_button_${track.id}"),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "Опции трека",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(19.dp)
                     )
                 }
 
@@ -295,7 +301,7 @@ fun TrackListItem(
             if (showReorderHandle) {
                 Box(
                     modifier = reorderModifier
-                        .size(36.dp)
+                        .size(32.dp)
                         .testTag("reorder_handle_${track.id}"),
                     contentAlignment = Alignment.Center
                 ) {
@@ -303,7 +309,7 @@ fun TrackListItem(
                         imageVector = Icons.Default.DragHandle,
                         contentDescription = "Переместить трек",
                         tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

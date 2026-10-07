@@ -68,8 +68,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _sortOrder = MutableStateFlow(SortOrder.BY_TITLE)
+    private val _sortOrder = MutableStateFlow(settingsDataStore.getInitialSortOrder())
     val sortOrder: StateFlow<SortOrder> = _sortOrder.asStateFlow()
+
+    private fun sortTrackList(list: List<Track>, sort: SortOrder): List<Track> {
+        return when (sort) {
+            SortOrder.BY_TITLE -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+            SortOrder.BY_ARTIST -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.artist })
+            SortOrder.BY_ALBUM -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.album })
+            SortOrder.BY_DURATION -> list.sortedByDescending { it.duration }
+            SortOrder.BY_DATE_ADDED -> list.sortedByDescending { it.dateAdded }
+        }
+    }
 
     private val _selectedTab = MutableStateFlow(0) // 0: Tracks, 1: Folders, 2: Artists, 3: Albums, 4: Playlists
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
@@ -104,7 +114,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     ) { tracks, memOrder ->
         if (memOrder != null) {
             val map = tracks.associateBy { it.id }
-            memOrder.mapNotNull { map[it] }
+            val ordered = memOrder.mapNotNull { map[it] }.toMutableList()
+            val existingIds = ordered.map { it.id }.toSet()
+            tracks.forEach { t ->
+                if (!existingIds.contains(t.id)) {
+                    ordered.add(t)
+                }
+            }
+            ordered
         } else {
             tracks
         }
@@ -121,15 +138,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val allTracksOrdered: StateFlow<List<Track>> = combine(
         rawTracks,
         settingsDataStore.customAllTracksOrderFlow,
-        _inMemoryAllTracksOrder
-    ) { tracks, diskOrder, memOrder ->
+        _inMemoryAllTracksOrder,
+        sortOrder
+    ) { tracks, diskOrder, memOrder, sort ->
         val customOrder = memOrder ?: diskOrder.ifEmpty {
             settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty {
                 settingsDataStore.getInitialQueueTrackIds()
             }
         }
         if (customOrder.isEmpty()) {
-            tracks
+            sortTrackList(tracks, sort)
         } else {
             val orderMap = customOrder.withIndex().associate { it.value to it.index }
             tracks.sortedBy { orderMap[it.id] ?: (Int.MAX_VALUE - 1000 + it.id.toInt().mod(1000)) }
@@ -163,14 +181,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         it.folderName.lowercase().contains(q)
             }
         }
-
-        when (sort) {
-            SortOrder.BY_TITLE -> filtered.sortedBy { it.title.lowercase() }
-            SortOrder.BY_ARTIST -> filtered.sortedBy { it.artist.lowercase() }
-            SortOrder.BY_ALBUM -> filtered.sortedBy { it.album.lowercase() }
-            SortOrder.BY_DURATION -> filtered.sortedByDescending { it.duration }
-            SortOrder.BY_DATE_ADDED -> filtered.sortedByDescending { it.dateAdded }
-        }
+        sortTrackList(filtered, sort)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -306,6 +317,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun onSortOrderChanged(order: SortOrder) {
         _sortOrder.value = order
+        settingsDataStore.saveCachedSortOrder(order)
+
+        val currentRaw = rawTracks.value
+        if (currentRaw.isNotEmpty()) {
+            val sorted = sortTrackList(currentRaw, order)
+            val sortedIds = sorted.map { it.id }
+            _inMemoryAllTracksOrder.value = sortedIds
+            viewModelScope.launch {
+                try {
+                    settingsDataStore.saveCustomAllTracksOrder(sortedIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        val queue = playbackManager.queue.value
+        if (queue.isNotEmpty()) {
+            val sortedQueue = sortTrackList(queue, order)
+            playbackManager.setQueue(sortedQueue)
+        }
+
+        val favs = favoriteTracks.value
+        if (favs.isNotEmpty()) {
+            val sortedFavs = sortTrackList(favs, order)
+            val sortedFavIds = sortedFavs.map { it.id }
+            _inMemoryFavoriteOrder.value = sortedFavIds
+            settingsDataStore.saveCachedFavoritesOrder(sortedFavIds)
+            viewModelScope.launch {
+                try {
+                    repository.reorderFavorites(sortedFavIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
     }
 
     fun onTabSelected(index: Int) {
@@ -400,6 +447,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val newSet = if (isCurrentlyFav) currentSet - trackId else currentSet + trackId
         _favoriteIds.value = newSet
 
+        val currentOrder = _inMemoryFavoriteOrder.value
+        if (currentOrder != null) {
+            val updatedOrder = if (isCurrentlyFav) {
+                currentOrder.filter { it != trackId }
+            } else {
+                if (!currentOrder.contains(trackId)) currentOrder + trackId else currentOrder
+            }
+            _inMemoryFavoriteOrder.value = updatedOrder
+            settingsDataStore.saveCachedFavoritesOrder(updatedOrder)
+        }
+
         playbackManager.updateTrackFavorite(trackId, !isCurrentlyFav)
 
         viewModelScope.launch {
@@ -438,12 +496,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addTrackToPlaylist(playlistId: Long, trackId: Long) {
         viewModelScope.launch {
             repository.addTrackToPlaylist(playlistId, trackId)
+            val memFlow = _inMemoryPlaylistOrder[playlistId]
+            val currentOrder = memFlow?.value
+            if (currentOrder != null && !currentOrder.contains(trackId)) {
+                val newOrder = currentOrder + trackId
+                memFlow.value = newOrder
+                settingsDataStore.saveCachedPlaylistOrder(playlistId, newOrder)
+            }
         }
     }
 
     fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
         viewModelScope.launch {
             repository.removeTrackFromPlaylist(playlistId, trackId)
+            val memFlow = _inMemoryPlaylistOrder[playlistId]
+            val currentOrder = memFlow?.value
+            if (currentOrder != null && currentOrder.contains(trackId)) {
+                val newOrder = currentOrder.filter { it != trackId }
+                memFlow.value = newOrder
+                settingsDataStore.saveCachedPlaylistOrder(playlistId, newOrder)
+            }
         }
     }
 
@@ -461,7 +533,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             ) { tracks, memOrder ->
                 if (memOrder != null) {
                     val map = tracks.associateBy { it.id }
-                    memOrder.mapNotNull { map[it] }
+                    val ordered = memOrder.mapNotNull { map[it] }.toMutableList()
+                    val existingIds = ordered.map { it.id }.toSet()
+                    tracks.forEach { t ->
+                        if (!existingIds.contains(t.id)) {
+                            ordered.add(t)
+                        }
+                    }
+                    ordered
                 } else {
                     tracks
                 }
