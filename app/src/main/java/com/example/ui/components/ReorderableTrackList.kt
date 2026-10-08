@@ -36,6 +36,7 @@ fun ReorderableTrackList(
     onAddToPlaylist: (Track) -> Unit,
     onMoveTrack: (fromIndex: Int, toIndex: Int) -> Unit,
     modifier: Modifier = Modifier,
+    highlightedTrackId: Long? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = 80.dp)
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -53,14 +54,32 @@ fun ReorderableTrackList(
         }
     }
 
-    // Keep currentList in sync with external tracks when not dragging
+    // Keep currentList in sync with external tracks when not dragging without 1-frame blank flicker
     LaunchedEffect(tracks) {
         if (!reorderableLazyListState.isAnyItemDragging) {
             val trackIds = tracks.map { it.id }
             val currentIds = currentList.map { it.id }
             if (currentIds != trackIds) {
-                currentList.clear()
-                currentList.addAll(tracks)
+                if (currentList.size == tracks.size) {
+                    for (i in tracks.indices) {
+                        if (currentList[i].id != tracks[i].id || currentList[i] != tracks[i]) {
+                            currentList[i] = tracks[i]
+                        }
+                    }
+                } else {
+                    while (currentList.size > tracks.size) {
+                        currentList.removeAt(currentList.lastIndex)
+                    }
+                    for (i in tracks.indices) {
+                        if (i < currentList.size) {
+                            if (currentList[i].id != tracks[i].id || currentList[i] != tracks[i]) {
+                                currentList[i] = tracks[i]
+                            }
+                        } else {
+                            currentList.add(tracks[i])
+                        }
+                    }
+                }
             }
         }
     }
@@ -84,6 +103,7 @@ fun ReorderableTrackList(
                     isCurrent = currentTrack?.id == track.id,
                     isPlaying = isPlaying && currentTrack?.id == track.id,
                     isFavorite = favoriteIds.contains(track.id),
+                    isHighlighted = highlightedTrackId != null && highlightedTrackId == track.id,
                     onClick = { onPlayTrack(track) },
                     onToggleFavorite = { onToggleFavorite(track.id) },
                     onAddToPlaylist = { onAddToPlaylist(track) },

@@ -4,8 +4,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -180,7 +183,6 @@ fun LibraryScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val queueListState = rememberLazyListState()
-    var lastHandledOpenQueue by remember { mutableIntStateOf(0) }
 
     // Pages: 0: Список воспроизведения (Queue), 1: Папки, 2: Плейлисты, 3: Альбомы, 4: Исполнители, 5: Поиск
     val pageCount = 6
@@ -191,21 +193,29 @@ fun LibraryScreen(
 
     // Reset selected group drilldown when user swipes between tabs
     LaunchedEffect(pagerState.settledPage) {
-        selectedGroupTitle = null
-        selectedGroupTracks = null
-        selectedPlaylist = null
+        if (pagerState.settledPage != 1 && pagerState.settledPage != 2 && pagerState.settledPage != 3 && pagerState.settledPage != 4) {
+            selectedGroupTitle = null
+            selectedGroupTracks = null
+            selectedPlaylist = null
+        }
     }
 
-    // Direct event from ViewModel to open playback queue (tab 0)
-    LaunchedEffect(Unit) {
-        viewModel.navigateToQueueEvent.collect {
+    val scrollToTrackSmooth: (LazyListState, Int) -> Unit = { listState, targetIndex ->
+        coroutineScope.launch {
+            listState.smoothScrollToTrackIndex(targetIndex)
+        }
+    }
+
+    val navigateToQueueAndScrollToCurrentTrack: () -> Unit = {
+        coroutineScope.launch {
             selectedGroupTitle = null
             selectedGroupTracks = null
             selectedPlaylist = null
             if (pagerState.currentPage != 0) {
-                try {
-                    pagerState.animateScrollToPage(0)
-                } catch (_: Exception) {}
+                pagerState.animateScrollToPage(
+                    page = 0,
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                )
             }
             val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
             val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
@@ -215,23 +225,10 @@ fun LibraryScreen(
         }
     }
 
-    // Explicit event to open playback queue (tab 0) and scroll to current track
-    LaunchedEffect(openQueueEvent) {
-        if (openQueueEvent > 0 && openQueueEvent != lastHandledOpenQueue) {
-            lastHandledOpenQueue = openQueueEvent
-            selectedGroupTitle = null
-            selectedGroupTracks = null
-            selectedPlaylist = null
-            if (pagerState.currentPage != 0) {
-                try {
-                    pagerState.animateScrollToPage(0)
-                } catch (_: Exception) {}
-            }
-            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
-            val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
-            if (targetIdx >= 0) {
-                queueListState.smoothScrollToTrackIndex(targetIdx)
-            }
+    // Single source of truth for external navigation event to queue & playing track
+    LaunchedEffect(Unit) {
+        viewModel.navigateToQueueEvent.collect {
+            navigateToQueueAndScrollToCurrentTrack()
         }
     }
 
@@ -246,19 +243,6 @@ fun LibraryScreen(
         errorMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
-        }
-    }
-
-    val navigateToQueueAndScrollToCurrentTrack: () -> Unit = {
-        coroutineScope.launch {
-            if (pagerState.currentPage != 0) {
-                pagerState.animateScrollToPage(0)
-            }
-            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
-            val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
-            if (targetIdx >= 0) {
-                queueListState.smoothScrollToTrackIndex(targetIdx)
-            }
         }
     }
 
@@ -543,9 +527,7 @@ fun LibraryScreen(
                                             onClick = {
                                                 val targetIndex = queueToDisplay.indexOfFirst { it.id == currentTrack?.id }
                                                 if (targetIndex >= 0) {
-                                                    coroutineScope.launch {
-                                                        queueListState.smoothScrollToTrackIndex(targetIndex)
-                                                    }
+                                                    scrollToTrackSmooth(queueListState, targetIndex)
                                                 }
                                             },
                                             modifier = Modifier
@@ -757,13 +739,9 @@ fun LibraryScreen(
                                                 onClick = {
                                                     val targetIndex = displayedTracks.indexOfFirst { it.id == currentTrack?.id }
                                                     if (targetIndex >= 0) {
-                                                        coroutineScope.launch {
-                                                            searchListState.smoothScrollToTrackIndex(targetIndex)
-                                                        }
+                                                        scrollToTrackSmooth(searchListState, targetIndex)
                                                     } else {
-                                                        coroutineScope.launch {
-                                                            pagerState.animateScrollToPage(0)
-                                                        }
+                                                        navigateToQueueAndScrollToCurrentTrack()
                                                     }
                                                 },
                                                 modifier = Modifier

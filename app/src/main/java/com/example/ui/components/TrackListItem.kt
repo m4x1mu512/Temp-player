@@ -70,6 +70,7 @@ fun TrackListItem(
     modifier: Modifier = Modifier,
     isFavorite: Boolean = track.isFavorite,
     isDragging: Boolean = false,
+    isHighlighted: Boolean = false,
     showReorderHandle: Boolean = false,
     reorderModifier: Modifier = Modifier,
     onMoveUp: (() -> Unit)? = null,
@@ -80,11 +81,18 @@ fun TrackListItem(
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    val itemBgColor = when {
+    val targetBgColor = when {
         isDragging -> MaterialTheme.colorScheme.surfaceVariant
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
+
+    val itemBgColor by animateColorAsState(
+        targetValue = targetBgColor,
+        animationSpec = tween(durationMillis = 350),
+        label = "track_item_bg_${track.id}"
+    )
 
     val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
 

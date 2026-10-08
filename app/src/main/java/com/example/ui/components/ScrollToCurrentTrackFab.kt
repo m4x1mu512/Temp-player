@@ -25,6 +25,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Track
@@ -36,6 +38,8 @@ fun ScrollToCurrentTrackFab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     AnimatedVisibility(
         visible = currentTrack != null,
         enter = scaleIn(animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f)) + fadeIn(),
@@ -45,7 +49,7 @@ fun ScrollToCurrentTrackFab(
         val infiniteTransition = rememberInfiniteTransition(label = "fab_pulse")
         val pulseScale by infiniteTransition.animateFloat(
             initialValue = 1.0f,
-            targetValue = if (isPlaying) 1.07f else 1.0f,
+            targetValue = if (isPlaying) 1.05f else 1.0f,
             animationSpec = infiniteRepeatable(
                 animation = tween(1200, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
@@ -54,7 +58,12 @@ fun ScrollToCurrentTrackFab(
         )
 
         SmallFloatingActionButton(
-            onClick = onClick,
+            onClick = {
+                try {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                } catch (_: Exception) {}
+                onClick()
+            },
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.primary,
             shape = CircleShape,
