@@ -1201,21 +1201,12 @@ private fun FolderCoverCollage(
                         )
                     }
                     Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
-                    Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[2]).size(120, 120).crossfade(100).build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
-                        Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
-                    }
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(distinctUris[2]).size(240, 120).crossfade(100).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    )
                 }
             }
             distinctUris.size == 2 -> {

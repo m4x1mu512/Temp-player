@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -97,7 +98,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Library Data
     val rawTracks: StateFlow<List<Track>> = repository.allTracks.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -110,9 +111,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val favoriteTracks: StateFlow<List<Track>> = combine(
         repository.favoriteTracks,
-        _inMemoryFavoriteOrder
-    ) { tracks, memOrder ->
-        if (memOrder != null) {
+        _inMemoryFavoriteOrder,
+        sortOrder
+    ) { tracks, memOrder, sort ->
+        if (tracks.isEmpty()) {
+            emptyList()
+        } else if (memOrder != null) {
             val map = tracks.associateBy { it.id }
             val ordered = memOrder.mapNotNull { map[it] }.toMutableList()
             val existingIds = ordered.map { it.id }.toSet()
@@ -123,11 +127,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             ordered
         } else {
-            tracks
+            sortTrackList(tracks, sort)
         }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -137,20 +141,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val allTracksOrdered: StateFlow<List<Track>> = combine(
         rawTracks,
-        settingsDataStore.customAllTracksOrderFlow,
         _inMemoryAllTracksOrder,
         sortOrder
-    ) { tracks, diskOrder, memOrder, sort ->
-        val customOrder = memOrder ?: diskOrder.ifEmpty {
-            settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty {
-                settingsDataStore.getInitialQueueTrackIds()
+    ) { tracks, memOrder, sort ->
+        if (tracks.isEmpty()) {
+            emptyList()
+        } else if (memOrder != null) {
+            val map = tracks.associateBy { it.id }
+            val ordered = memOrder.mapNotNull { map[it] }.toMutableList()
+            val existingIds = ordered.map { it.id }.toSet()
+            tracks.forEach { t ->
+                if (!existingIds.contains(t.id)) {
+                    ordered.add(t)
+                }
             }
-        }
-        if (customOrder.isEmpty()) {
-            sortTrackList(tracks, sort)
+            ordered
         } else {
-            val orderMap = customOrder.withIndex().associate { it.value to it.index }
-            tracks.sortedBy { orderMap[it.id] ?: (Int.MAX_VALUE - 1000 + it.id.toInt().mod(1000)) }
+            sortTrackList(tracks, sort)
         }
     }.stateIn(
         scope = viewModelScope,
@@ -160,7 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val playlists: StateFlow<List<Playlist>> = repository.playlists.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -184,7 +191,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sortTrackList(filtered, sort)
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -319,38 +326,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _sortOrder.value = order
         settingsDataStore.saveCachedSortOrder(order)
 
-        val currentRaw = rawTracks.value
-        if (currentRaw.isNotEmpty()) {
-            val sorted = sortTrackList(currentRaw, order)
-            val sortedIds = sorted.map { it.id }
-            _inMemoryAllTracksOrder.value = sortedIds
-            viewModelScope.launch {
-                try {
+        viewModelScope.launch {
+            try {
+                val currentRaw = if (rawTracks.value.isNotEmpty()) rawTracks.value else repository.allTracks.first()
+                if (currentRaw.isNotEmpty()) {
+                    val sorted = sortTrackList(currentRaw, order)
+                    val sortedIds = sorted.map { it.id }
+                    _inMemoryAllTracksOrder.value = sortedIds
                     settingsDataStore.saveCustomAllTracksOrder(sortedIds)
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
-            }
-        }
 
-        val queue = playbackManager.queue.value
-        if (queue.isNotEmpty()) {
-            val sortedQueue = sortTrackList(queue, order)
-            playbackManager.setQueue(sortedQueue)
-        }
+                val queue = playbackManager.queue.value
+                if (queue.isNotEmpty()) {
+                    val sortedQueue = sortTrackList(queue, order)
+                    playbackManager.setQueue(sortedQueue)
+                }
 
-        val favs = favoriteTracks.value
-        if (favs.isNotEmpty()) {
-            val sortedFavs = sortTrackList(favs, order)
-            val sortedFavIds = sortedFavs.map { it.id }
-            _inMemoryFavoriteOrder.value = sortedFavIds
-            settingsDataStore.saveCachedFavoritesOrder(sortedFavIds)
-            viewModelScope.launch {
-                try {
+                val favs = if (favoriteTracks.value.isNotEmpty()) favoriteTracks.value else repository.favoriteTracks.first()
+                if (favs.isNotEmpty()) {
+                    val sortedFavs = sortTrackList(favs, order)
+                    val sortedFavIds = sortedFavs.map { it.id }
+                    _inMemoryFavoriteOrder.value = sortedFavIds
+                    settingsDataStore.saveCachedFavoritesOrder(sortedFavIds)
                     repository.reorderFavorites(sortedFavIds)
-                } catch (e: Exception) {
-                    e.printStackTrace()
                 }
+
+                val currentPlaylists = repository.playlists.first()
+                for (pl in currentPlaylists) {
+                    val plTracks = repository.getTracksForPlaylist(pl.id).first()
+                    if (plTracks.isNotEmpty()) {
+                        val sortedPlTracks = sortTrackList(plTracks, order)
+                        val sortedPlIds = sortedPlTracks.map { it.id }
+                        _inMemoryPlaylistOrder.getOrPut(pl.id) { MutableStateFlow(null) }.value = sortedPlIds
+                        settingsDataStore.saveCachedPlaylistOrder(pl.id, sortedPlIds)
+                        repository.reorderPlaylistTracks(pl.id, sortedPlIds)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -447,16 +460,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val newSet = if (isCurrentlyFav) currentSet - trackId else currentSet + trackId
         _favoriteIds.value = newSet
 
-        val currentOrder = _inMemoryFavoriteOrder.value
-        if (currentOrder != null) {
-            val updatedOrder = if (isCurrentlyFav) {
-                currentOrder.filter { it != trackId }
-            } else {
-                if (!currentOrder.contains(trackId)) currentOrder + trackId else currentOrder
-            }
-            _inMemoryFavoriteOrder.value = updatedOrder
-            settingsDataStore.saveCachedFavoritesOrder(updatedOrder)
+        val currentOrder = _inMemoryFavoriteOrder.value ?: emptyList()
+        val updatedOrder = if (isCurrentlyFav) {
+            currentOrder.filter { it != trackId }
+        } else {
+            if (!currentOrder.contains(trackId)) currentOrder + trackId else currentOrder
         }
+        _inMemoryFavoriteOrder.value = updatedOrder
+        settingsDataStore.saveCachedFavoritesOrder(updatedOrder)
 
         playbackManager.updateTrackFavorite(trackId, !isCurrentlyFav)
 
@@ -496,9 +507,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addTrackToPlaylist(playlistId: Long, trackId: Long) {
         viewModelScope.launch {
             repository.addTrackToPlaylist(playlistId, trackId)
-            val memFlow = _inMemoryPlaylistOrder[playlistId]
-            val currentOrder = memFlow?.value
-            if (currentOrder != null && !currentOrder.contains(trackId)) {
+            val memFlow = _inMemoryPlaylistOrder.getOrPut(playlistId) {
+                MutableStateFlow(settingsDataStore.getInitialPlaylistOrder(playlistId).ifEmpty { null })
+            }
+            val currentOrder = memFlow.value ?: emptyList()
+            if (!currentOrder.contains(trackId)) {
                 val newOrder = currentOrder + trackId
                 memFlow.value = newOrder
                 settingsDataStore.saveCachedPlaylistOrder(playlistId, newOrder)
@@ -509,8 +522,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
         viewModelScope.launch {
             repository.removeTrackFromPlaylist(playlistId, trackId)
-            val memFlow = _inMemoryPlaylistOrder[playlistId]
-            val currentOrder = memFlow?.value
+            val memFlow = _inMemoryPlaylistOrder.getOrPut(playlistId) {
+                MutableStateFlow(settingsDataStore.getInitialPlaylistOrder(playlistId).ifEmpty { null })
+            }
+            val currentOrder = memFlow.value
             if (currentOrder != null && currentOrder.contains(trackId)) {
                 val newOrder = currentOrder.filter { it != trackId }
                 memFlow.value = newOrder
@@ -529,9 +544,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             combine(
                 repository.getTracksForPlaylist(playlistId),
-                memFlow
-            ) { tracks, memOrder ->
-                if (memOrder != null) {
+                memFlow,
+                sortOrder
+            ) { tracks, memOrder, sort ->
+                if (tracks.isEmpty()) {
+                    emptyList()
+                } else if (memOrder != null) {
                     val map = tracks.associateBy { it.id }
                     val ordered = memOrder.mapNotNull { map[it] }.toMutableList()
                     val existingIds = ordered.map { it.id }.toSet()
@@ -542,7 +560,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     ordered
                 } else {
-                    tracks
+                    sortTrackList(tracks, sort)
                 }
             }.stateIn(
                 scope = viewModelScope,
