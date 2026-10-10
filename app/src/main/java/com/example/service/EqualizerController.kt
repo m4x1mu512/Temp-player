@@ -9,6 +9,12 @@ import android.util.Log
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.ReverbPreset
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.max
 
 /**
@@ -19,11 +25,15 @@ import kotlin.math.max
  * - AutoEQ Headroom Protection: Automatically attenuates preamp when EQ bands are boosted,
  *   preventing digital clipping, harsh distortion, volume spikes, and DAC pop/click artifacts.
  * - Strict Separation of Baseline and Applied Levels: Preamp is never accumulatively added to band levels.
+ * - Anti-Surge Hardware Effect Transitions: Smoothly ramps Bass Boost & Virtualizer strengths
+ *   before changing hardware bypass states, eliminating transient volume surges, pops, and DSP AGC pumping.
  * - Audio Session Persistence: Effects are not needlessly destroyed and recreated on each track change,
  *   preventing audio glitches and pop sounds when starting a track.
  * - JNI Throttling: Avoids redundant AudioFlinger calls when band values haven't changed.
  */
-class EqualizerController {
+class EqualizerController(
+    private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+) {
 
     companion object {
         private const val TAG = "EqualizerController"
@@ -36,6 +46,9 @@ class EqualizerController {
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
     private var currentAudioSessionId: Int = 0
+
+    private var bassBoostRampJob: Job? = null
+    private var virtualizerRampJob: Job? = null
 
     var isEnabled: Boolean = true
         private set
@@ -101,8 +114,8 @@ class EqualizerController {
         // If already attached to this session and effects exist, smoothly update without recreating!
         if (audioSessionId == currentAudioSessionId && equalizer != null) {
             applyAllLevels()
-            updateBassBoost()
-            updateVirtualizer()
+            updateBassBoostImmediate()
+            updateVirtualizerImmediate()
             updateReverb()
             updateLoudnessEnhancer()
             return
@@ -130,12 +143,13 @@ class EqualizerController {
             equalizer = null
         }
 
-        // 2. Bass Boost
+        // 2. Bass Boost - Zero out hardware strength when attached disabled to prevent DSP transients
         try {
             val bb = BassBoost(0, audioSessionId)
             bb.enabled = bbEnabled
             if (bb.strengthSupported) {
-                bb.setStrength(bbStrength.toShort().coerceIn(0, 1000))
+                val initStrength = if (bbEnabled) bbStrength.coerceIn(0, 1000) else 0
+                bb.setStrength(initStrength.toShort())
             }
             bassBoost = bb
         } catch (e: Exception) {
@@ -143,12 +157,13 @@ class EqualizerController {
             bassBoost = null
         }
 
-        // 3. Virtualizer
+        // 3. Virtualizer - Zero out hardware strength when attached disabled
         try {
             val virt = Virtualizer(0, audioSessionId)
             virt.enabled = virtEnabled
             if (virt.strengthSupported) {
-                virt.setStrength(virtStrength.toShort().coerceIn(0, 1000))
+                val initStrength = if (virtEnabled) virtStrength.coerceIn(0, 1000) else 0
+                virt.setStrength(initStrength.toShort())
             }
             virtualizer = virt
         } catch (e: Exception) {
@@ -330,44 +345,188 @@ class EqualizerController {
 
     // --- Bass Boost API ---
 
-    fun setBassBoostEnabled(enabled: Boolean) {
+    fun setBassBoostEnabled(enabled: Boolean, smoothTransition: Boolean = true) {
         this.isBassBoostEnabled = enabled
-        updateBassBoost()
+        bassBoostRampJob?.cancel()
+
+        val bb = bassBoost
+        if (bb == null || !smoothTransition) {
+            updateBassBoostImmediate()
+            return
+        }
+
+        bassBoostRampJob = coroutineScope.launch {
+            try {
+                if (enabled) {
+                    // Smooth ramp UP:
+                    // 1. Enable hardware effect at strength 0 so no sudden pop or surge occurs
+                    if (!bb.enabled) {
+                        if (bb.strengthSupported) {
+                            bb.setStrength(0)
+                        }
+                        bb.enabled = true
+                    }
+                    val targetStrength = bassBoostStrength.coerceIn(0, 1000)
+                    if (bb.strengthSupported && targetStrength > 0) {
+                        val steps = 6
+                        val stepDelay = 15L
+                        for (i in 1..steps) {
+                            delay(stepDelay)
+                            val current = (targetStrength * i / steps).toShort()
+                            bb.setStrength(current)
+                        }
+                    }
+                } else {
+                    // Smooth ramp DOWN (Anti-Spike Protection):
+                    // Gradually attenuate low-end boost to 0 dB, allowing the hardware DSP limiter / AGC
+                    // to release smoothly instead of causing a sharp transient volume spike!
+                    val currentStrength = bassBoostStrength.coerceIn(0, 1000)
+                    if (bb.strengthSupported && currentStrength > 0 && bb.enabled) {
+                        val steps = 6
+                        val stepDelay = 15L
+                        for (i in (steps - 1) downTo 0) {
+                            delay(stepDelay)
+                            val current = (currentStrength * i / steps).toShort()
+                            bb.setStrength(current)
+                        }
+                    }
+                    // Filter response is now completely flat. Allow DSP to settle, then bypass effect cleanly.
+                    delay(25L)
+                    if (!isBassBoostEnabled) {
+                        if (bb.strengthSupported) {
+                            bb.setStrength(0)
+                        }
+                        bb.enabled = false
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "BassBoost transition error: ${e.message}")
+            }
+        }
     }
 
     fun setBassBoostStrength(strength: Int) {
         this.bassBoostStrength = strength.coerceIn(0, 1000)
-        updateBassBoost()
-    }
-
-    private fun updateBassBoost() {
+        bassBoostRampJob?.cancel()
         try {
             val bb = bassBoost ?: return
-            bb.enabled = isBassBoostEnabled
-            if (bb.strengthSupported) {
-                bb.setStrength(bassBoostStrength.toShort())
+            if (isBassBoostEnabled) {
+                if (!bb.enabled) {
+                    bb.enabled = true
+                }
+                if (bb.strengthSupported) {
+                    bb.setStrength(bassBoostStrength.toShort())
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun updateBassBoostImmediate() {
+        try {
+            val bb = bassBoost ?: return
+            if (isBassBoostEnabled) {
+                if (!bb.enabled) bb.enabled = true
+                if (bb.strengthSupported) {
+                    bb.setStrength(bassBoostStrength.toShort().coerceIn(0, 1000))
+                }
+            } else {
+                if (bb.strengthSupported) {
+                    bb.setStrength(0)
+                }
+                if (bb.enabled) bb.enabled = false
             }
         } catch (_: Exception) {}
     }
 
     // --- Virtualizer API ---
 
-    fun setVirtualizerEnabled(enabled: Boolean) {
+    fun setVirtualizerEnabled(enabled: Boolean, smoothTransition: Boolean = true) {
         this.isVirtualizerEnabled = enabled
-        updateVirtualizer()
+        virtualizerRampJob?.cancel()
+
+        val virt = virtualizer
+        if (virt == null || !smoothTransition) {
+            updateVirtualizerImmediate()
+            return
+        }
+
+        virtualizerRampJob = coroutineScope.launch {
+            try {
+                if (enabled) {
+                    // Smooth ramp UP
+                    if (!virt.enabled) {
+                        if (virt.strengthSupported) {
+                            virt.setStrength(0)
+                        }
+                        virt.enabled = true
+                    }
+                    val targetStrength = virtualizerStrength.coerceIn(0, 1000)
+                    if (virt.strengthSupported && targetStrength > 0) {
+                        val steps = 6
+                        val stepDelay = 15L
+                        for (i in 1..steps) {
+                            delay(stepDelay)
+                            val current = (targetStrength * i / steps).toShort()
+                            virt.setStrength(current)
+                        }
+                    }
+                } else {
+                    // Smooth ramp DOWN (Anti-Spike Protection):
+                    // Gradually reduce spatial widening to zero, eliminating phase cancellation
+                    // and volume surge artifacts before disabling hardware processing.
+                    val currentStrength = virtualizerStrength.coerceIn(0, 1000)
+                    if (virt.strengthSupported && currentStrength > 0 && virt.enabled) {
+                        val steps = 6
+                        val stepDelay = 15L
+                        for (i in (steps - 1) downTo 0) {
+                            delay(stepDelay)
+                            val current = (currentStrength * i / steps).toShort()
+                            virt.setStrength(current)
+                        }
+                    }
+                    delay(25L)
+                    if (!isVirtualizerEnabled) {
+                        if (virt.strengthSupported) {
+                            virt.setStrength(0)
+                        }
+                        virt.enabled = false
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Virtualizer transition error: ${e.message}")
+            }
+        }
     }
 
     fun setVirtualizerStrength(strength: Int) {
         this.virtualizerStrength = strength.coerceIn(0, 1000)
-        updateVirtualizer()
-    }
-
-    private fun updateVirtualizer() {
+        virtualizerRampJob?.cancel()
         try {
             val virt = virtualizer ?: return
-            virt.enabled = isVirtualizerEnabled
-            if (virt.strengthSupported) {
-                virt.setStrength(virtualizerStrength.toShort())
+            if (isVirtualizerEnabled) {
+                if (!virt.enabled) {
+                    virt.enabled = true
+                }
+                if (virt.strengthSupported) {
+                    virt.setStrength(virtualizerStrength.toShort())
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun updateVirtualizerImmediate() {
+        try {
+            val virt = virtualizer ?: return
+            if (isVirtualizerEnabled) {
+                if (!virt.enabled) virt.enabled = true
+                if (virt.strengthSupported) {
+                    virt.setStrength(virtualizerStrength.toShort().coerceIn(0, 1000))
+                }
+            } else {
+                if (virt.strengthSupported) {
+                    virt.setStrength(0)
+                }
+                if (virt.enabled) virt.enabled = false
             }
         } catch (_: Exception) {}
     }
@@ -388,7 +547,10 @@ class EqualizerController {
         try {
             val reverb = presetReverb ?: return
             reverb.preset = currentReverbPreset.presetValue
-            reverb.enabled = isReverbEnabled && currentReverbPreset != ReverbPreset.NONE
+            val shouldEnable = isReverbEnabled && currentReverbPreset != ReverbPreset.NONE
+            if (reverb.enabled != shouldEnable) {
+                reverb.enabled = shouldEnable
+            }
         } catch (_: Exception) {}
     }
 
@@ -408,13 +570,20 @@ class EqualizerController {
         try {
             val le = loudnessEnhancer ?: return
             le.setTargetGain(loudnessGain)
-            le.enabled = isLoudnessEnabled && loudnessGain > 0
+            val shouldEnable = isLoudnessEnabled && loudnessGain > 0
+            if (le.enabled != shouldEnable) {
+                le.enabled = shouldEnable
+            }
         } catch (_: Exception) {}
     }
 
     // --- Lifecycle ---
 
     fun release() {
+        bassBoostRampJob?.cancel()
+        virtualizerRampJob?.cancel()
+        bassBoostRampJob = null
+        virtualizerRampJob = null
         try { equalizer?.release() } catch (_: Exception) {}
         try { bassBoost?.release() } catch (_: Exception) {}
         try { virtualizer?.release() } catch (_: Exception) {}

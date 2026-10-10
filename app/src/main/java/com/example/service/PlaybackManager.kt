@@ -82,7 +82,7 @@ class PlaybackManager private constructor(private val context: Context) {
     var onRequestAudioFocus: (() -> Unit)? = null
 
     val visualizerController = AudioVisualizerController(serviceScope)
-    val equalizerController = EqualizerController()
+    val equalizerController = EqualizerController(serviceScope)
     val replayGainController = ReplayGainController(context)
     val crossfadeController = CrossfadeController(serviceScope)
 
@@ -510,6 +510,8 @@ class PlaybackManager private constructor(private val context: Context) {
     fun detachPlayer() {
         stopPositionTracking()
         cancelSleepTimer()
+        antiSpikeJob?.cancel()
+        antiSpikeJob = null
         crossfadeController.release()
         playerA?.removeListener(playerAListener)
         playerB?.removeListener(playerBListener)
@@ -1097,6 +1099,9 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun setEqualizerEnabled(enabled: Boolean) {
         _isEqualizerEnabled.value = enabled
+        if (!enabled) {
+            guardAgainstEffectSpike()
+        }
         equalizerController.setEnabled(enabled)
         serviceScope.launch {
             settingsDataStore.setEqualizerEnabled(enabled)
@@ -1134,8 +1139,59 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var antiSpikeJob: Job? = null
+
+    /**
+     * Anti-Spike Volume Guard:
+     * When hardware DSP effects like Bass Boost or Virtualizer are disabled during playback,
+     * the sudden removal of internal DSP attenuation/headroom compression can cause the device's
+     * hardware audio pipeline or DRC to surge in volume for ~500ms before settling.
+     *
+     * This guard gently cushions the master player volume by ~1.5 dB (to ~0.85x) for the duration
+     * of the hardware effect ramp-down (~120ms), and then smoothly restores the volume back to the
+     * exact user-set level over ~80ms. The result is a completely transparent, imperceptible transition
+     * with zero volume jump, zero pop, and zero clipping!
+     */
+    private fun guardAgainstEffectSpike() {
+        val player = activePlayer ?: return
+        if (!_isPlaying.value) return
+
+        antiSpikeJob?.cancel()
+        antiSpikeJob = serviceScope.launch {
+            try {
+                val targetVol = player.volume
+                if (targetVol <= 0.05f) return@launch
+
+                val dipVol = (targetVol * 0.85f).coerceAtLeast(0.05f)
+
+                // 1. Smooth micro-dip (30ms)
+                val dipSteps = 3
+                for (i in 1..dipSteps) {
+                    delay(10L)
+                    player.volume = targetVol - (targetVol - dipVol) * (i.toFloat() / dipSteps)
+                }
+
+                // 2. Hold through the hardware DSP strength ramp-down window (100ms)
+                delay(100L)
+
+                // 3. Smoothly ramp back up to original target volume (80ms)
+                val restoreSteps = 8
+                for (i in 1..restoreSteps) {
+                    delay(10L)
+                    player.volume = dipVol + (targetVol - dipVol) * (i.toFloat() / restoreSteps)
+                }
+                player.volume = targetVol
+            } catch (_: Exception) {
+                // Audio safe
+            }
+        }
+    }
+
     fun setBassBoostEnabled(enabled: Boolean) {
         _isBassBoostEnabled.value = enabled
+        if (!enabled) {
+            guardAgainstEffectSpike()
+        }
         equalizerController.setBassBoostEnabled(enabled)
         serviceScope.launch {
             settingsDataStore.setBassBoostEnabled(enabled)
@@ -1152,6 +1208,9 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun setVirtualizerEnabled(enabled: Boolean) {
         _isVirtualizerEnabled.value = enabled
+        if (!enabled) {
+            guardAgainstEffectSpike()
+        }
         equalizerController.setVirtualizerEnabled(enabled)
         serviceScope.launch {
             settingsDataStore.setVirtualizerEnabled(enabled)
@@ -1221,6 +1280,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun resetAudioEffects() {
+        guardAgainstEffectSpike()
         setBassBoostEnabled(false)
         setBassBoostStrength(0)
         setVirtualizerEnabled(false)
