@@ -11,6 +11,7 @@ import com.example.data.model.EqualizerPreset
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Playlist
 import com.example.data.model.RepeatMode
+import com.example.data.model.ReverbPreset
 import com.example.data.model.SortOrder
 import com.example.data.model.ThemeMode
 import com.example.data.model.Track
@@ -260,6 +261,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val equalizerBands: StateFlow<List<EqualizerBand>> = playbackManager.equalizerBands
     val equalizerPreset: StateFlow<EqualizerPreset> = playbackManager.equalizerPreset
     val isEqualizerEnabled: StateFlow<Boolean> = playbackManager.isEqualizerEnabled
+    val eqPreamp: StateFlow<Int> = playbackManager.eqPreamp
+    val isBassBoostEnabled: StateFlow<Boolean> = playbackManager.isBassBoostEnabled
+    val bassBoostStrength: StateFlow<Int> = playbackManager.bassBoostStrength
+    val isVirtualizerEnabled: StateFlow<Boolean> = playbackManager.isVirtualizerEnabled
+    val virtualizerStrength: StateFlow<Int> = playbackManager.virtualizerStrength
+    val isReverbEnabled: StateFlow<Boolean> = playbackManager.isReverbEnabled
+    val reverbPreset: StateFlow<ReverbPreset> = playbackManager.reverbPreset
+    val isLoudnessEnabled: StateFlow<Boolean> = playbackManager.isLoudnessEnabled
+    val loudnessGain: StateFlow<Int> = playbackManager.loudnessGain
+    val playbackSpeed: StateFlow<Float> = playbackManager.playbackSpeed
+    val playbackPitch: StateFlow<Float> = playbackManager.playbackPitch
     val visualizerData: StateFlow<FloatArray> = playbackManager.visualizerData
     val visualizerWaveform: StateFlow<FloatArray> = playbackManager.visualizerWaveform
     val audioAmplitude: StateFlow<Float> = playbackManager.audioAmplitude
@@ -669,6 +681,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEqualizerBandLevel(band: Short, level: Short) {
         playbackManager.setEqualizerBandLevel(band, level)
+    }
+
+    fun setEqPreamp(preampMilliBels: Int) {
+        playbackManager.setEqPreamp(preampMilliBels)
+    }
+
+    fun setBassBoostEnabled(enabled: Boolean) {
+        playbackManager.setBassBoostEnabled(enabled)
+    }
+
+    fun setBassBoostStrength(strength: Int) {
+        playbackManager.setBassBoostStrength(strength)
+    }
+
+    fun setVirtualizerEnabled(enabled: Boolean) {
+        playbackManager.setVirtualizerEnabled(enabled)
+    }
+
+    fun setVirtualizerStrength(strength: Int) {
+        playbackManager.setVirtualizerStrength(strength)
+    }
+
+    fun setReverbEnabled(enabled: Boolean) {
+        playbackManager.setReverbEnabled(enabled)
+    }
+
+    fun setReverbPreset(preset: ReverbPreset) {
+        playbackManager.setReverbPreset(preset)
+    }
+
+    fun setLoudnessEnabled(enabled: Boolean) {
+        playbackManager.setLoudnessEnabled(enabled)
+    }
+
+    fun setLoudnessGain(gainMilliBels: Int) {
+        playbackManager.setLoudnessGain(gainMilliBels)
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        playbackManager.setPlaybackSpeed(speed)
+    }
+
+    fun setPlaybackPitch(pitch: Float) {
+        playbackManager.setPlaybackPitch(pitch)
+    }
+
+    fun resetAudioEffects() {
+        playbackManager.resetAudioEffects()
+    }
+
+    fun resetEqualizer() {
+        playbackManager.resetEqualizer()
+    }
+
+    fun resetPlaybackSpeedAndPitch() {
+        playbackManager.resetPlaybackSpeedAndPitch()
     }
 
     fun setThemeMode(mode: ThemeMode) {

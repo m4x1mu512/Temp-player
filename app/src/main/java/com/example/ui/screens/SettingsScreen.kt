@@ -705,8 +705,8 @@ fun SettingsScreen(
                 Column {
                     SettingsActionItem(
                         icon = Icons.Default.Tune,
-                        title = "Эквалайзер",
-                        subtitle = if (isEqualizerEnabled) "Включен (${equalizerPreset.displayName})" else "Выключен",
+                        title = "Эквалайзер и аудиоэффекты",
+                        subtitle = if (isEqualizerEnabled) "Эквалайзер (${equalizerPreset.displayName}), басы, 3D звук" else "Настройка частот, баса, 3D звука и эффектов",
                         onClick = { showEqualizerDialog = true },
                         testTag = "settings_open_equalizer"
                     )
@@ -824,7 +824,8 @@ fun SettingsScreen(
             onEnableChanged = { viewModel.setEqualizerEnabled(it) },
             onPresetSelected = { viewModel.setEqualizerPreset(it) },
             onBandLevelChanged = { band, level -> viewModel.setEqualizerBandLevel(band, level) },
-            onDismiss = { showEqualizerDialog = false }
+            onDismiss = { showEqualizerDialog = false },
+            viewModel = viewModel
         )
     }
 

@@ -807,7 +807,8 @@ fun LibraryScreen(
             onEnableChanged = { viewModel.setEqualizerEnabled(it) },
             onPresetSelected = { viewModel.setEqualizerPreset(it) },
             onBandLevelChanged = { band, level -> viewModel.setEqualizerBandLevel(band, level) },
-            onDismiss = { showEqualizerDialog = false }
+            onDismiss = { showEqualizerDialog = false },
+            viewModel = viewModel
         )
     }
 

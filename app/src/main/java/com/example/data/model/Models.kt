@@ -110,11 +110,27 @@ data class EqualizerBand(
 
 enum class EqualizerPreset(val displayName: String) {
     FLAT("Обычный"),
+    BASS_BOOST("Усиление басов"),
+    TREBLE_BOOST("Усиление ВЧ"),
     ROCK("Рок"),
     JAZZ("Джаз"),
     POP("Поп"),
     CLASSICAL("Классика"),
+    ELECTRONIC("Электроника"),
+    HIP_HOP("Хип-хоп"),
+    VOCAL("Вокал"),
+    ACOUSTIC("Акустика"),
     CUSTOM("Пользовательский")
+}
+
+enum class ReverbPreset(val displayName: String, val presetValue: Short) {
+    NONE("Отключено", 0),
+    SMALL_ROOM("Маленькая комната", 1),
+    MEDIUM_ROOM("Средняя комната", 2),
+    LARGE_ROOM("Большая комната", 3),
+    MEDIUM_HALL("Средний зал", 4),
+    LARGE_HALL("Большой концертный зал", 5),
+    PLATE("Пластинчатый ревербератор", 6)
 }
 
 enum class MiniPlayerBgMode(val displayName: String) {

@@ -15,6 +15,7 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.Tracks
@@ -36,6 +37,7 @@ import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.RepeatMode
+import com.example.data.model.ReverbPreset
 import com.example.data.model.Track
 import com.example.data.repository.MusicRepository
 import kotlinx.coroutines.CoroutineScope
@@ -147,6 +149,39 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _isEqualizerEnabled = MutableStateFlow(true)
     val isEqualizerEnabled: StateFlow<Boolean> = _isEqualizerEnabled.asStateFlow()
 
+    private val _eqPreamp = MutableStateFlow(0)
+    val eqPreamp: StateFlow<Int> = _eqPreamp.asStateFlow()
+
+    private val _isBassBoostEnabled = MutableStateFlow(false)
+    val isBassBoostEnabled: StateFlow<Boolean> = _isBassBoostEnabled.asStateFlow()
+
+    private val _bassBoostStrength = MutableStateFlow(0)
+    val bassBoostStrength: StateFlow<Int> = _bassBoostStrength.asStateFlow()
+
+    private val _isVirtualizerEnabled = MutableStateFlow(false)
+    val isVirtualizerEnabled: StateFlow<Boolean> = _isVirtualizerEnabled.asStateFlow()
+
+    private val _virtualizerStrength = MutableStateFlow(0)
+    val virtualizerStrength: StateFlow<Int> = _virtualizerStrength.asStateFlow()
+
+    private val _isReverbEnabled = MutableStateFlow(false)
+    val isReverbEnabled: StateFlow<Boolean> = _isReverbEnabled.asStateFlow()
+
+    private val _reverbPreset = MutableStateFlow(ReverbPreset.NONE)
+    val reverbPreset: StateFlow<ReverbPreset> = _reverbPreset.asStateFlow()
+
+    private val _isLoudnessEnabled = MutableStateFlow(false)
+    val isLoudnessEnabled: StateFlow<Boolean> = _isLoudnessEnabled.asStateFlow()
+
+    private val _loudnessGain = MutableStateFlow(0)
+    val loudnessGain: StateFlow<Int> = _loudnessGain.asStateFlow()
+
+    private val _playbackSpeed = MutableStateFlow(1.0f)
+    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
+
+    private val _playbackPitch = MutableStateFlow(1.0f)
+    val playbackPitch: StateFlow<Float> = _playbackPitch.asStateFlow()
+
     private val _isReplayGainEnabled = MutableStateFlow(true)
     val isReplayGainEnabled: StateFlow<Boolean> = _isReplayGainEnabled.asStateFlow()
 
@@ -213,6 +248,17 @@ class PlaybackManager private constructor(private val context: Context) {
             _isShuffle.value = settingsDataStore.shuffleEnabledFlow.first()
             _isEqualizerEnabled.value = settingsDataStore.eqEnabledFlow.first()
             _equalizerPreset.value = settingsDataStore.eqPresetFlow.first()
+            _eqPreamp.value = settingsDataStore.eqPreampFlow.first()
+            _isBassBoostEnabled.value = settingsDataStore.bassBoostEnabledFlow.first()
+            _bassBoostStrength.value = settingsDataStore.bassBoostStrengthFlow.first()
+            _isVirtualizerEnabled.value = settingsDataStore.virtualizerEnabledFlow.first()
+            _virtualizerStrength.value = settingsDataStore.virtualizerStrengthFlow.first()
+            _isReverbEnabled.value = settingsDataStore.reverbEnabledFlow.first()
+            _reverbPreset.value = settingsDataStore.reverbPresetFlow.first()
+            _isLoudnessEnabled.value = settingsDataStore.loudnessEnabledFlow.first()
+            _loudnessGain.value = settingsDataStore.loudnessGainFlow.first()
+            _playbackSpeed.value = settingsDataStore.playbackSpeedFlow.first()
+            _playbackPitch.value = settingsDataStore.playbackPitchFlow.first()
             _isReplayGainEnabled.value = settingsDataStore.replayGainEnabledFlow.first()
             replayGainController.setEnabled(_isReplayGainEnabled.value)
 
@@ -319,12 +365,7 @@ class PlaybackManager private constructor(private val context: Context) {
                             currentAudioSessionId = currentSessionId
                             visualizerController.attachToAudioSession(currentSessionId)
                             replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
-                            serviceScope.launch {
-                                val savedLevels = settingsDataStore.eqLevelsFlow.first()
-                                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
-                                _equalizerBands.value = equalizerController.getBands()
-                                equalizerController.applyPreset(_equalizerPreset.value)
-                            }
+                            applyAudioEffectsToSession(currentSessionId)
                         }
                     }
                     Player.STATE_ENDED -> {
@@ -428,12 +469,7 @@ class PlaybackManager private constructor(private val context: Context) {
             currentAudioSessionId = currentSessionId
             visualizerController.attachToAudioSession(currentSessionId)
             replayGainController.attachToAudioSession(currentSessionId, _isReplayGainEnabled.value)
-            serviceScope.launch {
-                val savedLevels = settingsDataStore.eqLevelsFlow.first()
-                equalizerController.attachToAudioSession(currentSessionId, savedLevels, _isEqualizerEnabled.value)
-                _equalizerBands.value = equalizerController.getBands()
-                equalizerController.applyPreset(_equalizerPreset.value)
-            }
+            applyAudioEffectsToSession(currentSessionId)
         }
 
         // Restore pending playback if service was started on-demand or restored on launch
@@ -678,6 +714,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
             replayGainController.attachPlayer(player)
             replayGainController.onTrackChanged(track)
+            player.playbackParameters = PlaybackParameters(_playbackSpeed.value, _playbackPitch.value)
             player.setMediaItem(mediaItem)
             player.prepare()
             if (startPaused) {
@@ -1086,6 +1123,146 @@ class PlaybackManager private constructor(private val context: Context) {
             settingsDataStore.setEqualizerPreset(EqualizerPreset.CUSTOM)
             val levels = _equalizerBands.value.map { it.levelMilliBels.toInt() }
             settingsDataStore.setEqualizerLevels(levels)
+        }
+    }
+
+    fun setEqPreamp(preampMilliBels: Int) {
+        _eqPreamp.value = preampMilliBels
+        equalizerController.setPreamp(preampMilliBels)
+        _equalizerBands.value = equalizerController.getBands()
+        serviceScope.launch {
+            settingsDataStore.setEqPreamp(preampMilliBels)
+        }
+    }
+
+    fun setBassBoostEnabled(enabled: Boolean) {
+        _isBassBoostEnabled.value = enabled
+        equalizerController.setBassBoostEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setBassBoostEnabled(enabled)
+        }
+    }
+
+    fun setBassBoostStrength(strength: Int) {
+        _bassBoostStrength.value = strength
+        equalizerController.setBassBoostStrength(strength)
+        serviceScope.launch {
+            settingsDataStore.setBassBoostStrength(strength)
+        }
+    }
+
+    fun setVirtualizerEnabled(enabled: Boolean) {
+        _isVirtualizerEnabled.value = enabled
+        equalizerController.setVirtualizerEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setVirtualizerEnabled(enabled)
+        }
+    }
+
+    fun setVirtualizerStrength(strength: Int) {
+        _virtualizerStrength.value = strength
+        equalizerController.setVirtualizerStrength(strength)
+        serviceScope.launch {
+            settingsDataStore.setVirtualizerStrength(strength)
+        }
+    }
+
+    fun setReverbEnabled(enabled: Boolean) {
+        _isReverbEnabled.value = enabled
+        equalizerController.setReverbEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setReverbEnabled(enabled)
+        }
+    }
+
+    fun setReverbPreset(preset: ReverbPreset) {
+        _reverbPreset.value = preset
+        equalizerController.setReverbPreset(preset)
+        serviceScope.launch {
+            settingsDataStore.setReverbPreset(preset)
+        }
+    }
+
+    fun setLoudnessEnabled(enabled: Boolean) {
+        _isLoudnessEnabled.value = enabled
+        equalizerController.setLoudnessEnabled(enabled)
+        serviceScope.launch {
+            settingsDataStore.setLoudnessEnabled(enabled)
+        }
+    }
+
+    fun setLoudnessGain(gainMilliBels: Int) {
+        _loudnessGain.value = gainMilliBels
+        equalizerController.setLoudnessGain(gainMilliBels)
+        serviceScope.launch {
+            settingsDataStore.setLoudnessGain(gainMilliBels)
+        }
+    }
+
+    fun setPlaybackSpeed(speed: Float) {
+        val clamped = speed.coerceIn(0.25f, 3.0f)
+        _playbackSpeed.value = clamped
+        val params = PlaybackParameters(clamped, _playbackPitch.value)
+        playerA?.playbackParameters = params
+        playerB?.playbackParameters = params
+        serviceScope.launch {
+            settingsDataStore.setPlaybackSpeed(clamped)
+        }
+    }
+
+    fun setPlaybackPitch(pitch: Float) {
+        val clamped = pitch.coerceIn(0.25f, 3.0f)
+        _playbackPitch.value = clamped
+        val params = PlaybackParameters(_playbackSpeed.value, clamped)
+        playerA?.playbackParameters = params
+        playerB?.playbackParameters = params
+        serviceScope.launch {
+            settingsDataStore.setPlaybackPitch(clamped)
+        }
+    }
+
+    fun resetAudioEffects() {
+        setBassBoostEnabled(false)
+        setBassBoostStrength(0)
+        setVirtualizerEnabled(false)
+        setVirtualizerStrength(0)
+        setReverbEnabled(false)
+        setReverbPreset(ReverbPreset.NONE)
+        setLoudnessEnabled(false)
+        setLoudnessGain(0)
+        setEqPreamp(0)
+    }
+
+    fun resetEqualizer() {
+        setEqualizerPreset(EqualizerPreset.FLAT)
+        setEqPreamp(0)
+    }
+
+    fun resetPlaybackSpeedAndPitch() {
+        setPlaybackSpeed(1.0f)
+        setPlaybackPitch(1.0f)
+    }
+
+    private fun applyAudioEffectsToSession(sessionId: Int) {
+        if (sessionId <= 0) return
+        serviceScope.launch {
+            val savedLevels = settingsDataStore.eqLevelsFlow.first()
+            equalizerController.attachToAudioSession(
+                audioSessionId = sessionId,
+                savedLevels = savedLevels,
+                eqEnabled = _isEqualizerEnabled.value,
+                preamp = _eqPreamp.value,
+                bbEnabled = _isBassBoostEnabled.value,
+                bbStrength = _bassBoostStrength.value,
+                virtEnabled = _isVirtualizerEnabled.value,
+                virtStrength = _virtualizerStrength.value,
+                revEnabled = _isReverbEnabled.value,
+                revPreset = _reverbPreset.value,
+                loudEnabled = _isLoudnessEnabled.value,
+                loudGain = _loudnessGain.value
+            )
+            _equalizerBands.value = equalizerController.getBands()
+            equalizerController.applyPreset(_equalizerPreset.value)
         }
     }
 

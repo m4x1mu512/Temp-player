@@ -13,6 +13,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
+import com.example.data.model.ReverbPreset
 import com.example.data.model.SortOrder
 import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
@@ -90,6 +91,17 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_EQ_ENABLED = booleanPreferencesKey("eq_enabled")
         private val KEY_EQ_PRESET = stringPreferencesKey("eq_preset")
         private val KEY_EQ_LEVELS = stringPreferencesKey("eq_levels")
+        private val KEY_EQ_PREAMP = intPreferencesKey("eq_preamp")
+        private val KEY_BASS_BOOST_ENABLED = booleanPreferencesKey("bass_boost_enabled")
+        private val KEY_BASS_BOOST_STRENGTH = intPreferencesKey("bass_boost_strength")
+        private val KEY_VIRTUALIZER_ENABLED = booleanPreferencesKey("virtualizer_enabled")
+        private val KEY_VIRTUALIZER_STRENGTH = intPreferencesKey("virtualizer_strength")
+        private val KEY_REVERB_ENABLED = booleanPreferencesKey("reverb_enabled")
+        private val KEY_REVERB_PRESET = stringPreferencesKey("reverb_preset")
+        private val KEY_LOUDNESS_ENABLED = booleanPreferencesKey("loudness_enabled")
+        private val KEY_LOUDNESS_GAIN = intPreferencesKey("loudness_gain")
+        private val KEY_PLAYBACK_SPEED = floatPreferencesKey("playback_speed")
+        private val KEY_PLAYBACK_PITCH = floatPreferencesKey("playback_pitch")
         private val KEY_MINI_PLAYER_BG_MODE = stringPreferencesKey("mini_player_bg_mode")
         private val KEY_MINI_PLAYER_CUSTOM_COLOR = longPreferencesKey("mini_player_custom_color")
         private val KEY_AUTO_ROTATE = booleanPreferencesKey("auto_rotate")
@@ -332,6 +344,55 @@ class SettingsDataStore(private val context: Context) {
         raw.split(",").mapNotNull { it.trim().toIntOrNull() }.ifEmpty { listOf(0, 0, 0, 0, 0) }
     }
 
+    val eqPreampFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_EQ_PREAMP] ?: 0
+    }
+
+    val bassBoostEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_BASS_BOOST_ENABLED] ?: false
+    }
+
+    val bassBoostStrengthFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_BASS_BOOST_STRENGTH] ?: 0
+    }
+
+    val virtualizerEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_VIRTUALIZER_ENABLED] ?: false
+    }
+
+    val virtualizerStrengthFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_VIRTUALIZER_STRENGTH] ?: 0
+    }
+
+    val reverbEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_REVERB_ENABLED] ?: false
+    }
+
+    val reverbPresetFlow: Flow<ReverbPreset> = context.dataStore.data.map { preferences ->
+        val name = preferences[KEY_REVERB_PRESET] ?: ReverbPreset.NONE.name
+        try {
+            ReverbPreset.valueOf(name)
+        } catch (_: Exception) {
+            ReverbPreset.NONE
+        }
+    }
+
+    val loudnessEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LOUDNESS_ENABLED] ?: false
+    }
+
+    val loudnessGainFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LOUDNESS_GAIN] ?: 0
+    }
+
+    val playbackSpeedFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[KEY_PLAYBACK_SPEED] ?: 1.0f
+    }
+
+    val playbackPitchFlow: Flow<Float> = context.dataStore.data.map { preferences ->
+        preferences[KEY_PLAYBACK_PITCH] ?: 1.0f
+    }
+
     suspend fun setThemeMode(mode: ThemeMode) {
         saveCachedThemeMode(context, mode)
         context.dataStore.edit { preferences ->
@@ -441,6 +502,72 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setEqualizerLevels(levels: List<Int>) {
         context.dataStore.edit { preferences ->
             preferences[KEY_EQ_LEVELS] = levels.joinToString(",")
+        }
+    }
+
+    suspend fun setEqPreamp(preamp: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_EQ_PREAMP] = preamp
+        }
+    }
+
+    suspend fun setBassBoostEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_BASS_BOOST_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setBassBoostStrength(strength: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_BASS_BOOST_STRENGTH] = strength.coerceIn(0, 1000)
+        }
+    }
+
+    suspend fun setVirtualizerEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_VIRTUALIZER_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setVirtualizerStrength(strength: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_VIRTUALIZER_STRENGTH] = strength.coerceIn(0, 1000)
+        }
+    }
+
+    suspend fun setReverbEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_REVERB_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setReverbPreset(preset: ReverbPreset) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_REVERB_PRESET] = preset.name
+        }
+    }
+
+    suspend fun setLoudnessEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_LOUDNESS_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setLoudnessGain(gain: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_LOUDNESS_GAIN] = gain.coerceIn(0, 1000)
+        }
+    }
+
+    suspend fun setPlaybackSpeed(speed: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_PLAYBACK_SPEED] = speed.coerceIn(0.25f, 3.0f)
+        }
+    }
+
+    suspend fun setPlaybackPitch(pitch: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_PLAYBACK_PITCH] = pitch.coerceIn(0.25f, 3.0f)
         }
     }
 
