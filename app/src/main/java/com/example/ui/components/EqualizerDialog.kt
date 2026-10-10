@@ -402,7 +402,10 @@ private fun EqualizerTabContent(
 
                 Slider(
                     value = eqPreamp.toFloat(),
-                    onValueChange = { onPreampChanged(it.roundToInt()) },
+                    onValueChange = {
+                        val quantized = ((it / 50f).roundToInt() * 50).coerceIn(-1200, 600)
+                        onPreampChanged(quantized)
+                    },
                     valueRange = -1200f..600f,
                     enabled = isEnabled,
                     colors = SliderDefaults.colors(
@@ -501,7 +504,8 @@ private fun EqualizerTabContent(
                         Slider(
                             value = band.levelMilliBels.toFloat(),
                             onValueChange = { newMilliBels ->
-                                onBandLevelChanged(band.bandIndex, newMilliBels.toInt().toShort())
+                                val quantized = ((newMilliBels / 25f).roundToInt() * 25).coerceIn(-1200, 1200).toShort()
+                                onBandLevelChanged(band.bandIndex, quantized)
                             },
                             valueRange = -1200f..1200f,
                             enabled = isEnabled,
@@ -701,7 +705,7 @@ private fun AudioEffectsTabContent(
             onEnabledChange = onLoudnessEnabledChanged,
             sliderValue = loudnessGain,
             sliderValueText = "+%.1f дБ".format(loudnessDb),
-            onSliderChange = { onLoudnessGainChanged(it.roundToInt()) },
+            onSliderChange = { onLoudnessGainChanged(((it / 25f).roundToInt() * 25).coerceIn(0, 800)) },
             valueRange = 0f..800f
         )
     }

@@ -709,7 +709,6 @@ class PlaybackManager private constructor(private val context: Context) {
 
     private fun executePlay(player: ExoPlayer, track: Track, startPaused: Boolean) {
         try {
-            player.volume = 1f
             val mediaItem = createMediaItem(track)
 
             replayGainController.attachPlayer(player)

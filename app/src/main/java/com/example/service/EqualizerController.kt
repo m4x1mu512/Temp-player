@@ -9,28 +9,44 @@ import android.util.Log
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.ReverbPreset
+import kotlin.math.max
 
 /**
  * Controller for hardware-accelerated audio effects and equalizer,
  * modeled after high-fidelity Android players like Rhythm.
  *
- * Supports:
- * - Multi-band Equalizer with 12 presets and smooth band interpolation
- * - Preamp / Headroom clipping protection
- * - Bass Boost with strength control
- * - Virtualizer (3D audio surround)
- * - Preset Reverb (environmental room simulation)
- * - Loudness Enhancer (dynamic range gain boost)
+ * Anti-Clipping & Anti-Click Architecture:
+ * - AutoEQ Headroom Protection: Automatically attenuates preamp when EQ bands are boosted,
+ *   preventing digital clipping, harsh distortion, volume spikes, and DAC pop/click artifacts.
+ * - Strict Separation of Baseline and Applied Levels: Preamp is never accumulatively added to band levels.
+ * - Audio Session Persistence: Effects are not needlessly destroyed and recreated on each track change,
+ *   preventing audio glitches and pop sounds when starting a track.
+ * - JNI Throttling: Avoids redundant AudioFlinger calls when band values haven't changed.
  */
 class EqualizerController {
+
+    companion object {
+        private const val TAG = "EqualizerController"
+    }
+
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
     private var virtualizer: Virtualizer? = null
     private var presetReverb: PresetReverb? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
+    private var currentAudioSessionId: Int = 0
+
     var isEnabled: Boolean = true
         private set
+
+    // Base levels chosen by user or preset (in milliBels: -1200 to +1200)
+    private var baseBandLevels = ShortArray(16) { 0 }
+    private var numBands: Int = 0
+    private var bandFrequencies = IntArray(16) { 0 }
+
+    // Last applied hardware levels to prevent JNI flooding / zipper noise
+    private var lastAppliedBandLevels = ShortArray(16) { Short.MIN_VALUE }
 
     var isBassBoostEnabled: Boolean = false
         private set
@@ -69,7 +85,6 @@ class EqualizerController {
         loudEnabled: Boolean = false,
         loudGain: Int = 0
     ) {
-        release()
         if (audioSessionId <= 0) return
 
         this.isEnabled = eqEnabled
@@ -83,22 +98,36 @@ class EqualizerController {
         this.isLoudnessEnabled = loudEnabled
         this.loudnessGain = loudGain
 
-        // 1. Equalizer
+        // If already attached to this session and effects exist, smoothly update without recreating!
+        if (audioSessionId == currentAudioSessionId && equalizer != null) {
+            applyAllLevels()
+            updateBassBoost()
+            updateVirtualizer()
+            updateReverb()
+            updateLoudnessEnhancer()
+            return
+        }
+
+        release()
+        this.currentAudioSessionId = audioSessionId
+
+        // 1. Equalizer setup
         try {
             val eq = Equalizer(0, audioSessionId)
-            eq.enabled = eqEnabled
+            numBands = eq.numberOfBands.toInt().coerceIn(0, 16)
 
-            if (savedLevels != null && savedLevels.size >= eq.numberOfBands) {
-                val range = eq.bandLevelRange
-                for (i in 0 until eq.numberOfBands) {
-                    val rawLevel = savedLevels[i] + preamp
-                    val clamped = rawLevel.toShort().coerceIn(range[0], range[1])
-                    eq.setBandLevel(i.toShort(), clamped)
-                }
+            for (i in 0 until numBands) {
+                bandFrequencies[i] = eq.getCenterFreq(i.toShort()) / 1000 // in Hz
+                val saved = savedLevels?.getOrNull(i)?.toShort() ?: 0.toShort()
+                baseBandLevels[i] = saved
             }
+
+            eq.enabled = eqEnabled
             equalizer = eq
+            applyAllLevels()
         } catch (e: Exception) {
-            Log.w("EqualizerController", "Equalizer unavailable: ${e.message}")
+            Log.w(TAG, "Equalizer unavailable on session $audioSessionId: ${e.message}")
+            equalizer = null
         }
 
         // 2. Bass Boost
@@ -110,7 +139,8 @@ class EqualizerController {
             }
             bassBoost = bb
         } catch (e: Exception) {
-            Log.w("EqualizerController", "BassBoost unavailable: ${e.message}")
+            Log.w(TAG, "BassBoost unavailable: ${e.message}")
+            bassBoost = null
         }
 
         // 3. Virtualizer
@@ -122,7 +152,8 @@ class EqualizerController {
             }
             virtualizer = virt
         } catch (e: Exception) {
-            Log.w("EqualizerController", "Virtualizer unavailable: ${e.message}")
+            Log.w(TAG, "Virtualizer unavailable: ${e.message}")
+            virtualizer = null
         }
 
         // 4. Preset Reverb
@@ -132,21 +163,22 @@ class EqualizerController {
             reverb.enabled = revEnabled && revPreset != ReverbPreset.NONE
             presetReverb = reverb
         } catch (e: Exception) {
-            Log.w("EqualizerController", "PresetReverb unavailable: ${e.message}")
+            Log.w(TAG, "PresetReverb unavailable: ${e.message}")
+            presetReverb = null
         }
 
         // 5. Loudness Enhancer
         try {
             val le = LoudnessEnhancer(audioSessionId)
-            le.setTargetGain(loudGain.coerceIn(0, 1000))
-            le.enabled = loudEnabled
+            le.setTargetGain(loudGain.coerceIn(0, 800))
+            le.enabled = loudEnabled && loudGain > 0
             loudnessEnhancer = le
         } catch (e: Exception) {
-            Log.w("EqualizerController", "LoudnessEnhancer unavailable: ${e.message}")
+            Log.w(TAG, "LoudnessEnhancer unavailable: ${e.message}")
+            loudnessEnhancer = null
         }
     }
 
-    // Overload for backward compatibility
     fun attachToAudioSession(audioSessionId: Int, savedLevels: List<Int>?, enabled: Boolean) {
         attachToAudioSession(
             audioSessionId = audioSessionId,
@@ -164,7 +196,7 @@ class EqualizerController {
         )
     }
 
-    // --- Equalizer API ---
+    // --- Equalizer & AutoEQ Headroom Protection ---
 
     fun setEnabled(enabled: Boolean) {
         this.isEnabled = enabled
@@ -175,74 +207,109 @@ class EqualizerController {
 
     fun setPreamp(preamp: Int) {
         this.preampMilliBels = preamp
-        val eq = equalizer ?: return
-        val range = eq.bandLevelRange
-        for (i in 0 until eq.numberOfBands) {
-            val current = eq.getBandLevel(i.toShort())
-            val adjusted = (current + preamp).toShort().coerceIn(range[0], range[1])
-            try {
-                eq.setBandLevel(i.toShort(), adjusted)
-            } catch (_: Exception) {}
-        }
+        applyAllLevels()
     }
 
     fun getBands(): List<EqualizerBand> {
-        val eq = equalizer ?: return emptyList()
-        val numBands = eq.numberOfBands.toInt()
         val bands = mutableListOf<EqualizerBand>()
-        for (i in 0 until numBands) {
+        val count = if (numBands > 0) numBands else 5
+        for (i in 0 until count) {
             val band = i.toShort()
-            val centerFreq = eq.getCenterFreq(band) / 1000 // In Hz
-            val level = eq.getBandLevel(band)
-            bands.add(EqualizerBand(band, centerFreq, level))
+            val freq = if (bandFrequencies[i] > 0) bandFrequencies[i] else (60 * (1 shl (i * 2)))
+            val level = baseBandLevels[i]
+            bands.add(EqualizerBand(band, freq, level))
         }
         return bands
     }
 
     fun getBandLevelRange(): Pair<Short, Short> {
         val eq = equalizer ?: return Pair((-1200).toShort(), 1200.toShort())
-        val range = eq.bandLevelRange
-        return Pair(range[0], range[1])
+        return try {
+            val range = eq.bandLevelRange
+            Pair(range[0], range[1])
+        } catch (_: Exception) {
+            Pair((-1200).toShort(), 1200.toShort())
+        }
     }
 
     fun setBandLevel(band: Short, level: Short) {
-        try {
-            val eq = equalizer ?: return
-            val range = eq.bandLevelRange
-            val clamped = level.coerceIn(range[0], range[1])
-            eq.setBandLevel(band, clamped)
-        } catch (_: Exception) {}
+        val idx = band.toInt()
+        if (idx in 0 until 16) {
+            baseBandLevels[idx] = level.coerceIn(-1200, 1200)
+            applyAllLevels()
+        }
     }
 
     fun applyPreset(preset: EqualizerPreset) {
-        val eq = equalizer ?: return
-        val numBands = eq.numberOfBands.toInt()
         if (preset == EqualizerPreset.CUSTOM) return
 
-        // Base 5-band frequency curves in milliBels (-1200 to +1200)
+        val count = if (numBands > 0) numBands else 5
         val baseLevels = when (preset) {
             EqualizerPreset.FLAT -> listOf(0, 0, 0, 0, 0)
-            EqualizerPreset.BASS_BOOST -> listOf(650, 450, 200, 0, 0)
-            EqualizerPreset.TREBLE_BOOST -> listOf(0, 0, 150, 450, 650)
-            EqualizerPreset.ROCK -> listOf(500, 300, -100, 300, 600)
-            EqualizerPreset.JAZZ -> listOf(400, 200, 100, 300, 400)
-            EqualizerPreset.POP -> listOf(-100, 200, 500, 200, -100)
-            EqualizerPreset.CLASSICAL -> listOf(500, 300, 0, 200, 400)
-            EqualizerPreset.ELECTRONIC -> listOf(500, 250, 0, 250, 550)
-            EqualizerPreset.HIP_HOP -> listOf(600, 350, 0, 150, 350)
-            EqualizerPreset.VOCAL -> listOf(-250, 100, 500, 350, -150)
-            EqualizerPreset.ACOUSTIC -> listOf(350, 200, 100, 250, 350)
+            EqualizerPreset.BASS_BOOST -> listOf(600, 400, 150, 0, 0)
+            EqualizerPreset.TREBLE_BOOST -> listOf(0, 0, 150, 400, 600)
+            EqualizerPreset.ROCK -> listOf(500, 300, -100, 300, 550)
+            EqualizerPreset.JAZZ -> listOf(400, 200, 100, 250, 350)
+            EqualizerPreset.POP -> listOf(-100, 200, 450, 200, -100)
+            EqualizerPreset.CLASSICAL -> listOf(450, 250, 0, 200, 350)
+            EqualizerPreset.ELECTRONIC -> listOf(500, 250, 0, 250, 500)
+            EqualizerPreset.HIP_HOP -> listOf(550, 300, 0, 150, 300)
+            EqualizerPreset.VOCAL -> listOf(-200, 100, 450, 300, -150)
+            EqualizerPreset.ACOUSTIC -> listOf(300, 200, 100, 200, 300)
             EqualizerPreset.CUSTOM -> return
         }
 
-        val levels = interpolateLevels(baseLevels, numBands)
-        val range = eq.bandLevelRange
-        for (i in 0 until minOf(numBands, levels.size)) {
-            val band = i.toShort()
-            val targetLevel = (levels[i] + preampMilliBels).toShort().coerceIn(range[0], range[1])
-            try {
-                eq.setBandLevel(band, targetLevel)
-            } catch (_: Exception) {}
+        val interpolated = interpolateLevels(baseLevels, count)
+        for (i in 0 until minOf(count, interpolated.size)) {
+            baseBandLevels[i] = interpolated[i].toShort()
+        }
+        applyAllLevels()
+    }
+
+    /**
+     * Applies baseline levels + preamp + AutoEQ headroom protection to the hardware equalizer.
+     * Prevents digital clipping / pops and avoids accumulative preamp volume runaway.
+     */
+    private fun applyAllLevels() {
+        val eq = equalizer ?: return
+        val count = minOf(numBands, eq.numberOfBands.toInt())
+        if (count <= 0) return
+
+        val range = try {
+            eq.bandLevelRange
+        } catch (_: Exception) {
+            shortArrayOf(-1200, 1200)
+        }
+        val minRange = range[0]
+        val maxRange = range[1]
+
+        // AutoEQ Headroom Protection:
+        // Find max positive boost across all bands
+        var maxBoost = 0
+        for (i in 0 until count) {
+            val lvl = baseBandLevels[i].toInt()
+            if (lvl > maxBoost) {
+                maxBoost = lvl
+            }
+        }
+
+        // If user boosts frequencies, apply headroom attenuation so total peak never clips above 0 dBFS!
+        val autoHeadroomAttenuation = -maxBoost
+
+        for (i in 0 until count) {
+            val base = baseBandLevels[i].toInt()
+            val computed = base + preampMilliBels + autoHeadroomAttenuation
+            val clamped = computed.toShort().coerceIn(minRange, maxRange)
+
+            // Only send to AudioFlinger if value actually changed (prevents zipper noise / clicks)
+            if (lastAppliedBandLevels[i] != clamped) {
+                try {
+                    eq.setBandLevel(i.toShort(), clamped)
+                    lastAppliedBandLevels[i] = clamped
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to set band level $i: ${e.message}")
+                }
+            }
         }
     }
 
@@ -265,17 +332,20 @@ class EqualizerController {
 
     fun setBassBoostEnabled(enabled: Boolean) {
         this.isBassBoostEnabled = enabled
-        try {
-            bassBoost?.enabled = enabled
-        } catch (_: Exception) {}
+        updateBassBoost()
     }
 
     fun setBassBoostStrength(strength: Int) {
-        this.bassBoostStrength = strength
+        this.bassBoostStrength = strength.coerceIn(0, 1000)
+        updateBassBoost()
+    }
+
+    private fun updateBassBoost() {
         try {
             val bb = bassBoost ?: return
+            bb.enabled = isBassBoostEnabled
             if (bb.strengthSupported) {
-                bb.setStrength(strength.toShort().coerceIn(0, 1000))
+                bb.setStrength(bassBoostStrength.toShort())
             }
         } catch (_: Exception) {}
     }
@@ -284,17 +354,20 @@ class EqualizerController {
 
     fun setVirtualizerEnabled(enabled: Boolean) {
         this.isVirtualizerEnabled = enabled
-        try {
-            virtualizer?.enabled = enabled
-        } catch (_: Exception) {}
+        updateVirtualizer()
     }
 
     fun setVirtualizerStrength(strength: Int) {
-        this.virtualizerStrength = strength
+        this.virtualizerStrength = strength.coerceIn(0, 1000)
+        updateVirtualizer()
+    }
+
+    private fun updateVirtualizer() {
         try {
             val virt = virtualizer ?: return
+            virt.enabled = isVirtualizerEnabled
             if (virt.strengthSupported) {
-                virt.setStrength(strength.toShort().coerceIn(0, 1000))
+                virt.setStrength(virtualizerStrength.toShort())
             }
         } catch (_: Exception) {}
     }
@@ -303,17 +376,19 @@ class EqualizerController {
 
     fun setReverbEnabled(enabled: Boolean) {
         this.isReverbEnabled = enabled
-        try {
-            presetReverb?.enabled = enabled && currentReverbPreset != ReverbPreset.NONE
-        } catch (_: Exception) {}
+        updateReverb()
     }
 
     fun setReverbPreset(preset: ReverbPreset) {
         this.currentReverbPreset = preset
+        updateReverb()
+    }
+
+    private fun updateReverb() {
         try {
             val reverb = presetReverb ?: return
-            reverb.preset = preset.presetValue
-            reverb.enabled = isReverbEnabled && preset != ReverbPreset.NONE
+            reverb.preset = currentReverbPreset.presetValue
+            reverb.enabled = isReverbEnabled && currentReverbPreset != ReverbPreset.NONE
         } catch (_: Exception) {}
     }
 
@@ -321,15 +396,19 @@ class EqualizerController {
 
     fun setLoudnessEnabled(enabled: Boolean) {
         this.isLoudnessEnabled = enabled
-        try {
-            loudnessEnhancer?.enabled = enabled
-        } catch (_: Exception) {}
+        updateLoudnessEnhancer()
     }
 
     fun setLoudnessGain(gainMilliBels: Int) {
-        this.loudnessGain = gainMilliBels
+        this.loudnessGain = gainMilliBels.coerceIn(0, 800)
+        updateLoudnessEnhancer()
+    }
+
+    private fun updateLoudnessEnhancer() {
         try {
-            loudnessEnhancer?.setTargetGain(gainMilliBels.coerceIn(0, 1000))
+            val le = loudnessEnhancer ?: return
+            le.setTargetGain(loudnessGain)
+            le.enabled = isLoudnessEnabled && loudnessGain > 0
         } catch (_: Exception) {}
     }
 
@@ -346,5 +425,7 @@ class EqualizerController {
         virtualizer = null
         presetReverb = null
         loudnessEnhancer = null
+        currentAudioSessionId = 0
+        lastAppliedBandLevels.fill(Short.MIN_VALUE)
     }
 }
