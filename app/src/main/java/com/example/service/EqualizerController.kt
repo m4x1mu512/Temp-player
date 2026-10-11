@@ -2,12 +2,12 @@ package com.example.service
 
 import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
-import android.media.audiofx.PresetReverb
 import android.util.Log
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.ReverbPreset
 import com.example.service.audio.RhythmBassBoostProcessor
+import com.example.service.audio.RhythmReverbProcessor
 import com.example.service.audio.RhythmSpatializationProcessor
 
 /**
@@ -19,13 +19,17 @@ import com.example.service.audio.RhythmSpatializationProcessor
  *   hardware AudioEffect volume spike / DRC pumping bug when toggled.
  * - 3D Virtualizer: Powered by [RhythmSpatializationProcessor] (real-time Mid/Side stereo widening
  *   with soft clipping). Completely free of volume surges, pops, or DSP phase artifacts.
+ * - Reverb: Powered by [RhythmReverbProcessor] (real-time Schroeder/Freeverb algorithmic reverberator
+ *   with equal-power gain normalization). Guarantees that track volume NEVER surges or increases
+ *   when enabling any spatial reverb preset, with click-free and pop-free transitions.
  * - Hardware Multi-Band Equalizer: Uses Android's native [Equalizer] with AutoEQ Headroom Protection
  *   (automatically attenuates preamp by peak boost) to ensure output never exceeds 0 dBFS.
- * - Hardware Preset Reverb & Loudness Enhancer for environmental acoustics and volume boost.
+ * - Hardware Loudness Enhancer for clean volume boost when requested.
  */
 class EqualizerController(
     val bassBoostProcessor: RhythmBassBoostProcessor = RhythmBassBoostProcessor(),
-    val spatializationProcessor: RhythmSpatializationProcessor = RhythmSpatializationProcessor()
+    val spatializationProcessor: RhythmSpatializationProcessor = RhythmSpatializationProcessor(),
+    val reverbProcessor: RhythmReverbProcessor = RhythmReverbProcessor()
 ) {
 
     companion object {
@@ -33,7 +37,6 @@ class EqualizerController(
     }
 
     private var equalizer: Equalizer? = null
-    private var presetReverb: PresetReverb? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
 
     private var currentAudioSessionId: Int = 0
@@ -61,10 +64,11 @@ class EqualizerController(
     val virtualizerStrength: Int
         get() = spatializationProcessor.getStrength().toInt()
 
-    var isReverbEnabled: Boolean = false
-        private set
-    var currentReverbPreset: ReverbPreset = ReverbPreset.NONE
-        private set
+    val isReverbEnabled: Boolean
+        get() = reverbProcessor.isEnabled()
+
+    val currentReverbPreset: ReverbPreset
+        get() = reverbProcessor.getPreset()
 
     var isLoudnessEnabled: Boolean = false
         private set
@@ -96,15 +100,14 @@ class EqualizerController(
         bassBoostProcessor.setStrength(bbStrength.coerceIn(0, 1000).toShort())
         spatializationProcessor.setEnabled(virtEnabled)
         spatializationProcessor.setStrength(virtStrength.coerceIn(0, 1000).toShort())
-        this.isReverbEnabled = revEnabled
-        this.currentReverbPreset = revPreset
+        reverbProcessor.setEnabled(revEnabled)
+        reverbProcessor.setPreset(revPreset)
         this.isLoudnessEnabled = loudEnabled
         this.loudnessGain = loudGain
 
         // If already attached to this session and effects exist, smoothly update without recreating!
         if (audioSessionId == currentAudioSessionId && equalizer != null) {
             applyAllLevels()
-            updateReverb()
             updateLoudnessEnhancer()
             return
         }
@@ -131,18 +134,7 @@ class EqualizerController(
             equalizer = null
         }
 
-        // 2. Preset Reverb
-        try {
-            val reverb = PresetReverb(0, audioSessionId)
-            reverb.preset = revPreset.presetValue
-            reverb.enabled = revEnabled && revPreset != ReverbPreset.NONE
-            presetReverb = reverb
-        } catch (e: Exception) {
-            Log.w(TAG, "PresetReverb unavailable: ${e.message}")
-            presetReverb = null
-        }
-
-        // 3. Loudness Enhancer
+        // 2. Loudness Enhancer
         try {
             val le = LoudnessEnhancer(audioSessionId)
             le.setTargetGain(loudGain.coerceIn(0, 800))
@@ -326,24 +318,11 @@ class EqualizerController(
     // --- Reverb API ---
 
     fun setReverbEnabled(enabled: Boolean) {
-        this.isReverbEnabled = enabled
-        updateReverb()
+        reverbProcessor.setEnabled(enabled)
     }
 
     fun setReverbPreset(preset: ReverbPreset) {
-        this.currentReverbPreset = preset
-        updateReverb()
-    }
-
-    private fun updateReverb() {
-        try {
-            val reverb = presetReverb ?: return
-            reverb.preset = currentReverbPreset.presetValue
-            val shouldEnable = isReverbEnabled && currentReverbPreset != ReverbPreset.NONE
-            if (reverb.enabled != shouldEnable) {
-                reverb.enabled = shouldEnable
-            }
-        } catch (_: Exception) {}
+        reverbProcessor.setPreset(preset)
     }
 
     // --- Loudness Enhancer API ---
@@ -373,10 +352,8 @@ class EqualizerController(
 
     fun release() {
         try { equalizer?.release() } catch (_: Exception) {}
-        try { presetReverb?.release() } catch (_: Exception) {}
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
         equalizer = null
-        presetReverb = null
         loudnessEnhancer = null
         currentAudioSessionId = 0
         lastAppliedBandLevels.fill(Short.MIN_VALUE)

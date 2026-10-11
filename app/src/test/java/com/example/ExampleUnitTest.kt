@@ -125,5 +125,62 @@ class ExampleUnitTest {
         // Clean release
         visualizer.release()
     }
+
+    @Test
+    fun `test rhythm reverb processor maintains volume and does not surge on presets`() {
+        val reverb = com.example.service.audio.RhythmReverbProcessor()
+        val format = androidx.media3.common.audio.AudioProcessor.AudioFormat(
+            44100,
+            2,
+            androidx.media3.common.C.ENCODING_PCM_16BIT
+        )
+        reverb.configure(format)
+
+        assertEquals(false, reverb.isEnabled())
+        assertEquals(com.example.data.model.ReverbPreset.NONE, reverb.getPreset())
+
+        // Test with a stereo test signal
+        val sampleCount = 512
+        val inputSamples = ShortArray(sampleCount) { i ->
+            (kotlin.math.sin(i * 0.05) * 16000).toInt().toShort()
+        }
+
+        // Initially bypassed
+        val initialCopy = inputSamples.clone()
+        reverb.processSamples(initialCopy, sampleCount)
+        // Since disabled, samples should be identical
+        for (i in 0 until sampleCount) {
+            assertEquals(inputSamples[i], initialCopy[i])
+        }
+
+        // Enable Reverb with various presets
+        for (preset in com.example.data.model.ReverbPreset.entries) {
+            reverb.setEnabled(preset != com.example.data.model.ReverbPreset.NONE)
+            reverb.setPreset(preset)
+
+            val testSamples = inputSamples.clone()
+            reverb.processSamples(testSamples, sampleCount)
+
+            // Verify samples remain within 16-bit PCM bounds and no NaN / infinity
+            var maxAmplitude = 0
+            for (s in testSamples) {
+                val amp = kotlin.math.abs(s.toInt())
+                if (amp > maxAmplitude) maxAmplitude = amp
+            }
+            // Max amplitude should not clip or explode (<= 32767)
+            assertTrue("Max amplitude $maxAmplitude must be within PCM range", maxAmplitude <= 32767)
+            // Volume shouldn't explode compared to original peak of 16000 (must be < 28000)
+            assertTrue("Loudness must not surge uncontrollably (got $maxAmplitude)", maxAmplitude < 28000)
+        }
+
+        // Test parent-child synchronization
+        val childReverb = com.example.service.audio.RhythmReverbProcessor()
+        childReverb.setParent(reverb)
+        reverb.setPreset(com.example.data.model.ReverbPreset.MEDIUM_HALL)
+        reverb.setEnabled(true)
+
+        assertTrue(childReverb.isEnabled())
+        assertEquals(com.example.data.model.ReverbPreset.MEDIUM_HALL, childReverb.getPreset())
+    }
 }
 

@@ -93,8 +93,11 @@ class PlaybackManager private constructor(private val context: Context) {
         val spatial = com.example.service.audio.RhythmSpatializationProcessor().apply {
             setParent(equalizerController.spatializationProcessor)
         }
+        val reverb = com.example.service.audio.RhythmReverbProcessor().apply {
+            setParent(equalizerController.reverbProcessor)
+        }
         val tee = TeeAudioProcessor(visualizerController.audioBufferSink)
-        return arrayOf(bass, spatial, tee)
+        return arrayOf(bass, spatial, reverb, tee)
     }
 
     // Playback States
