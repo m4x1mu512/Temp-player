@@ -89,7 +89,7 @@ class PlaybackService : MediaSessionService() {
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .setAudioOffloadSupportProvider { _, _ -> AudioOffloadSupport.DEFAULT_UNSUPPORTED }
-                    .setAudioProcessors(arrayOf(TeeAudioProcessor(playbackManager.visualizerController.audioBufferSink)))
+                    .setAudioProcessors(playbackManager.createPlayerAudioProcessors())
                     .build()
             }
         }
