@@ -17,7 +17,10 @@ data class TrackEntity(
     val size: Long,
     val dateAdded: Long,
     val folderName: String,
-    val path: String
+    val path: String,
+    val genre: String = "",
+    val year: String = "",
+    val isCustomEdited: Boolean = false
 ) {
     fun toTrack(isFavorite: Boolean = false): Track = Track(
         id = id,
@@ -31,11 +34,13 @@ data class TrackEntity(
         dateAdded = dateAdded,
         folderName = folderName,
         path = path,
-        isFavorite = isFavorite
+        isFavorite = isFavorite,
+        genre = genre,
+        year = year
     )
 
     companion object {
-        fun fromTrack(track: Track): TrackEntity = TrackEntity(
+        fun fromTrack(track: Track, isCustomEdited: Boolean = false): TrackEntity = TrackEntity(
             id = track.id,
             title = track.title,
             artist = track.artist,
@@ -46,7 +51,10 @@ data class TrackEntity(
             size = track.size,
             dateAdded = track.dateAdded,
             folderName = track.folderName,
-            path = track.path
+            path = track.path,
+            genre = track.genre,
+            year = track.year,
+            isCustomEdited = isCustomEdited
         )
     }
 }

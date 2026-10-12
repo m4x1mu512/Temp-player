@@ -130,11 +130,18 @@ class MusicRepository(
             MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.DATA
+            MediaStore.Audio.Media.DATA,
+            MediaStore.Audio.Media.YEAR
         )
 
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
+
+        val existingTracksMap = try {
+            trackDao.getAllTracksDirect().associateBy { it.id }
+        } catch (_: Exception) {
+            emptyMap()
+        }
 
         try {
             context.contentResolver.query(
@@ -154,6 +161,7 @@ class MusicRepository(
                 val displayNameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
                 val albumIdCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
                 val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val yearCol = cursor.getColumnIndex(MediaStore.Audio.Media.YEAR)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -178,6 +186,9 @@ class MusicRepository(
                     val album = if (rawAlbum.isNullOrBlank() || rawAlbum == "<unknown>") {
                         "Неизвестный альбом"
                     } else rawAlbum
+
+                    val rawYear = if (yearCol != -1) cursor.getString(yearCol) else null
+                    val year = if (!rawYear.isNullOrBlank() && rawYear != "0") rawYear else ""
 
                     var duration = if (durationCol != -1) cursor.getLong(durationCol) else 0L
                     val size = if (sizeCol != -1) cursor.getLong(sizeCol) else 0L
@@ -206,14 +217,19 @@ class MusicRepository(
                         }
                     } else "Разное"
 
-                    // If duration is 0, attempt metadata retriever extraction
-                    if (duration <= 0 || albumArtUri == null) {
+                    var genre = ""
+
+                    // If duration is 0 or metadata needed, attempt metadata retriever extraction
+                    if (duration <= 0 || albumArtUri == null || genre.isEmpty()) {
                         try {
                             MediaMetadataRetriever().use { mmr ->
                                 mmr.setDataSource(context, contentUri)
                                 if (duration <= 0) {
                                     val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                                     duration = durStr?.toLongOrNull() ?: 0L
+                                }
+                                if (genre.isEmpty()) {
+                                    genre = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: ""
                                 }
                                 if (albumArtUri == null) {
                                     val pictureBytes = mmr.embeddedPicture
@@ -234,6 +250,9 @@ class MusicRepository(
                                             val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                                             duration = durStr?.toLongOrNull() ?: 0L
                                         }
+                                        if (genre.isEmpty()) {
+                                            genre = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE) ?: ""
+                                        }
                                         if (albumArtUri == null) {
                                             val pictureBytes = mmr.embeddedPicture
                                             if (pictureBytes != null && pictureBytes.isNotEmpty()) {
@@ -253,21 +272,40 @@ class MusicRepository(
                         duration = (size * 8000L / 192_000L).coerceAtLeast(10_000L)
                     }
 
-                    scannedTracks.add(
-                        TrackEntity(
-                            id = id,
-                            title = title,
-                            artist = artist,
-                            album = album,
-                            duration = duration,
-                            uriString = contentUri.toString(),
-                            albumArtUriString = albumArtUri,
-                            size = size,
-                            dateAdded = dateAdded,
-                            folderName = folderName,
-                            path = path
+                    val existing = existingTracksMap[id]
+                    if (existing != null && existing.isCustomEdited) {
+                        // Preserve user-edited track details
+                        scannedTracks.add(
+                            existing.copy(
+                                duration = if (duration > 0) duration else existing.duration,
+                                size = size,
+                                dateAdded = dateAdded,
+                                folderName = folderName,
+                                path = path,
+                                uriString = contentUri.toString(),
+                                albumArtUriString = albumArtUri ?: existing.albumArtUriString
+                            )
                         )
-                    )
+                    } else {
+                        scannedTracks.add(
+                            TrackEntity(
+                                id = id,
+                                title = title,
+                                artist = artist,
+                                album = album,
+                                duration = duration,
+                                uriString = contentUri.toString(),
+                                albumArtUriString = albumArtUri,
+                                size = size,
+                                dateAdded = dateAdded,
+                                folderName = folderName,
+                                path = path,
+                                genre = if (genre.isNotBlank()) genre else (existing?.genre ?: ""),
+                                year = if (year.isNotBlank()) year else (existing?.year ?: ""),
+                                isCustomEdited = false
+                            )
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -279,6 +317,33 @@ class MusicRepository(
             trackDao.deleteTracksNotIn(scannedTracks.map { it.id })
         }
         scannedTracks.size
+    }
+
+    suspend fun updateTrackInfo(
+        trackId: Long,
+        title: String,
+        artist: String,
+        album: String,
+        genre: String,
+        year: String
+    ): Track? = withContext(Dispatchers.IO) {
+        val existing = trackDao.getTrackById(trackId) ?: return@withContext null
+        val updatedTitle = if (title.isNotBlank()) title else existing.title
+        val updatedArtist = if (artist.isNotBlank()) artist else "Неизвестный исполнитель"
+        val updatedAlbum = if (album.isNotBlank()) album else "Неизвестный альбом"
+
+        trackDao.updateTrackInfo(
+            id = trackId,
+            title = updatedTitle,
+            artist = updatedArtist,
+            album = updatedAlbum,
+            genre = genre,
+            year = year
+        )
+
+        val updatedEntity = trackDao.getTrackById(trackId) ?: return@withContext null
+        val isFav = favoriteDao.isFavoriteDirect(trackId)
+        updatedEntity.toTrack(isFavorite = isFav)
     }
 
     suspend fun updateTrackDuration(trackId: Long, realDuration: Long) = withContext(Dispatchers.IO) {

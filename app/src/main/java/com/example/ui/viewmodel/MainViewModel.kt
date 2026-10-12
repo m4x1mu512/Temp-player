@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.SettingsDataStore
@@ -489,6 +490,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 _favoriteIds.value = currentSet
                 playbackManager.updateTrackFavorite(trackId, isCurrentlyFav)
+            }
+        }
+    }
+
+    fun updateTrackInfo(
+        trackId: Long,
+        title: String,
+        artist: String,
+        album: String,
+        genre: String,
+        year: String
+    ) {
+        viewModelScope.launch {
+            try {
+                val updatedTrack = repository.updateTrackInfo(
+                    trackId = trackId,
+                    title = title,
+                    artist = artist,
+                    album = album,
+                    genre = genre,
+                    year = year
+                )
+                if (updatedTrack != null) {
+                    playbackManager.updateTrackMetadata(updatedTrack)
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Failed to update track info: ${e.message}", e)
             }
         }
     }

@@ -926,6 +926,20 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    fun updateTrackMetadata(updatedTrack: Track) {
+        val curr = _currentTrack.value
+        if (curr != null && curr.id == updatedTrack.id) {
+            _currentTrack.value = updatedTrack
+        }
+        val q = _queue.value
+        if (q.isNotEmpty()) {
+            val updatedQueue = q.map { track ->
+                if (track.id == updatedTrack.id) updatedTrack else track
+            }
+            _queue.value = updatedQueue
+        }
+    }
+
     private fun getNextTrackIndex(): Int? {
         val q = _queue.value
         if (q.isEmpty()) return null

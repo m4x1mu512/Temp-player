@@ -14,7 +14,9 @@ data class Track(
     val dateAdded: Long = 0,
     val folderName: String = "",
     val path: String = "",
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val genre: String = "",
+    val year: String = ""
 ) {
     val uri: Uri get() = Uri.parse(uriString)
     val albumArtUri: Uri? get() = albumArtUriString?.let { Uri.parse(it) }

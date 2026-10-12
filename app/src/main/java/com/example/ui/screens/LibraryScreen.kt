@@ -109,6 +109,7 @@ import com.example.data.model.SortOrder
 import com.example.data.model.Track
 import com.example.ui.components.AddToPlaylistDialog
 import com.example.ui.components.CreatePlaylistDialog
+import com.example.ui.components.EditTrackInfoDialog
 import com.example.ui.components.EmptyState
 import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
@@ -164,6 +165,7 @@ fun LibraryScreen(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var playlistToRename by remember { mutableStateOf<Playlist?>(null) }
     var trackForPlaylistDialog by remember { mutableStateOf<Track?>(null) }
+    var trackForEditInfoDialog by remember { mutableStateOf<Track?>(null) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
@@ -518,6 +520,7 @@ fun LibraryScreen(
                                             },
                                             onToggleFavorite = { viewModel.toggleFavorite(it) },
                                             onAddToPlaylist = { trackForPlaylistDialog = it },
+                                            onEditTrackInfo = { trackForEditInfoDialog = it },
                                             onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) }
                                         )
 
@@ -556,6 +559,7 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    onEditTrackInfo = { trackForEditInfoDialog = it },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
@@ -594,6 +598,7 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    onEditTrackInfo = { trackForEditInfoDialog = it },
                                     getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
@@ -626,6 +631,7 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    onEditTrackInfo = { trackForEditInfoDialog = it },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
@@ -655,6 +661,7 @@ fun LibraryScreen(
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
                                     onAddToPlaylist = { trackForPlaylistDialog = it },
+                                    onEditTrackInfo = { trackForEditInfoDialog = it },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
@@ -728,7 +735,8 @@ fun LibraryScreen(
                                                             )
                                                         },
                                                         onToggleFavorite = { viewModel.toggleFavorite(track.id) },
-                                                        onAddToPlaylist = { trackForPlaylistDialog = track }
+                                                        onAddToPlaylist = { trackForPlaylistDialog = track },
+                                                        onEditTrackInfo = { trackForEditInfoDialog = track }
                                                     )
                                                 }
                                             }
@@ -799,6 +807,24 @@ fun LibraryScreen(
         )
     }
 
+    trackForEditInfoDialog?.let { track ->
+        EditTrackInfoDialog(
+            track = track,
+            onDismiss = { trackForEditInfoDialog = null },
+            onConfirm = { updatedTitle, updatedArtist, updatedAlbum, updatedGenre, updatedYear ->
+                viewModel.updateTrackInfo(
+                    trackId = track.id,
+                    title = updatedTitle,
+                    artist = updatedArtist,
+                    album = updatedAlbum,
+                    genre = updatedGenre,
+                    year = updatedYear
+                )
+                trackForEditInfoDialog = null
+            }
+        )
+    }
+
     if (showEqualizerDialog) {
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
@@ -841,6 +867,7 @@ private fun GroupedListSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
+    onEditTrackInfo: (Track) -> Unit = {},
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
@@ -1005,7 +1032,8 @@ private fun GroupedListSection(
                             isFavorite = favoriteIds.contains(track.id),
                             onClick = { onPlayTrack(track, tracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) }
+                            onAddToPlaylist = { onAddToPlaylist(track) },
+                            onEditTrackInfo = { onEditTrackInfo(track) }
                         )
                     }
                 }
@@ -1236,6 +1264,7 @@ private fun FoldersSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
+    onEditTrackInfo: (Track) -> Unit = {},
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
@@ -1387,7 +1416,8 @@ private fun FoldersSection(
                             isFavorite = favoriteIds.contains(track.id),
                             onClick = { onPlayTrack(track, tracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) }
+                            onAddToPlaylist = { onAddToPlaylist(track) },
+                            onEditTrackInfo = { onEditTrackInfo(track) }
                         )
                     }
                 }
@@ -1489,6 +1519,7 @@ private fun AlbumsSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
+    onEditTrackInfo: (Track) -> Unit = {},
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
@@ -1662,7 +1693,8 @@ private fun AlbumsSection(
                             isFavorite = favoriteIds.contains(track.id),
                             onClick = { onPlayTrack(track, tracks) },
                             onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) }
+                            onAddToPlaylist = { onAddToPlaylist(track) },
+                            onEditTrackInfo = { onEditTrackInfo(track) }
                         )
                     }
                 }
@@ -1820,6 +1852,7 @@ private fun PlaylistsSection(
     onPlayTrack: (Track, List<Track>) -> Unit,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
+    onEditTrackInfo: (Track) -> Unit = {},
     getPlaylistTracks: (Long) -> kotlinx.coroutines.flow.StateFlow<List<Track>>,
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
@@ -2045,6 +2078,7 @@ private fun PlaylistsSection(
                         onPlayTrack = { track -> onPlayTrack(track, tracks) },
                         onToggleFavorite = { onToggleFavorite(it) },
                         onAddToPlaylist = { onAddToPlaylist(it) },
+                        onEditTrackInfo = { onEditTrackInfo(it) },
                         onMoveTrack = onMoveItem,
                         modifier = Modifier.fillMaxSize()
                     )

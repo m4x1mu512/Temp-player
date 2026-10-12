@@ -20,19 +20,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
-import androidx.compose.material.icons.filled.VerticalAlignBottom
-import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,10 +69,7 @@ fun TrackListItem(
     isHighlighted: Boolean = false,
     showReorderHandle: Boolean = false,
     reorderModifier: Modifier = Modifier,
-    onMoveUp: (() -> Unit)? = null,
-    onMoveDown: (() -> Unit)? = null,
-    onMoveToTop: (() -> Unit)? = null,
-    onMoveToBottom: (() -> Unit)? = null
+    onEditTrackInfo: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -236,6 +229,17 @@ fun TrackListItem(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    if (onEditTrackInfo != null) {
+                        DropdownMenuItem(
+                            text = { Text("Редактировать инфо") },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onEditTrackInfo()
+                            },
+                            modifier = Modifier.testTag("menu_edit_info_${track.id}")
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("Добавить в плейлист") },
                         leadingIcon = { Icon(Icons.Default.PlaylistAdd, contentDescription = null) },
@@ -258,50 +262,6 @@ fun TrackListItem(
                             onToggleFavorite()
                         }
                     )
-
-                    if (onMoveUp != null || onMoveDown != null || onMoveToTop != null || onMoveToBottom != null) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        if (onMoveUp != null) {
-                            DropdownMenuItem(
-                                text = { Text("Переместить выше") },
-                                leadingIcon = { Icon(Icons.Default.ArrowUpward, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onMoveUp()
-                                }
-                            )
-                        }
-                        if (onMoveDown != null) {
-                            DropdownMenuItem(
-                                text = { Text("Переместить ниже") },
-                                leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onMoveDown()
-                                }
-                            )
-                        }
-                        if (onMoveToTop != null) {
-                            DropdownMenuItem(
-                                text = { Text("В самое начало") },
-                                leadingIcon = { Icon(Icons.Default.VerticalAlignTop, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onMoveToTop()
-                                }
-                            )
-                        }
-                        if (onMoveToBottom != null) {
-                            DropdownMenuItem(
-                                text = { Text("В самый конец") },
-                                leadingIcon = { Icon(Icons.Default.VerticalAlignBottom, contentDescription = null) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onMoveToBottom()
-                                }
-                            )
-                        }
-                    }
                 }
             }
 
