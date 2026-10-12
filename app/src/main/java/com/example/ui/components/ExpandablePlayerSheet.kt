@@ -340,18 +340,18 @@ fun ExpandablePlayerSheet(
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
-            val collapseDistanceThreshold = with(density) { 32.dp.toPx() }
-            val expandDistanceThreshold = with(density) { 24.dp.toPx() }
+            val collapseDistanceThreshold = with(density) { 14.dp.toPx() }
+            val expandDistanceThreshold = with(density) { 14.dp.toPx() }
             val targetExpanded = when {
-                velocityY < -180f -> true // Light flick up -> expand
-                velocityY > 180f -> false // Light flick down -> collapse
+                velocityY < -100f -> true // Light flick up -> expand
+                velocityY > 100f -> false // Light flick down -> collapse
                 isExpanded -> {
-                    // Was expanded: light downward drag collapses
-                    !(totalDragY > collapseDistanceThreshold || expandProgress < 0.90f)
+                    // Was expanded: light downward drag (14dp or progress drop) collapses
+                    !(totalDragY > collapseDistanceThreshold || expandProgress < 0.96f)
                 }
                 else -> {
-                    // Was collapsed (mini): light upward drag expands
-                    totalDragY < -expandDistanceThreshold || expandProgress > 0.10f
+                    // Was collapsed (mini): light upward drag (14dp or progress gain) expands
+                    totalDragY < -expandDistanceThreshold || expandProgress > 0.04f
                 }
             }
             isExpanded = targetExpanded
@@ -456,6 +456,17 @@ fun ExpandablePlayerSheet(
                                             )
                                             isTrackSwiping = false
                                         }
+                                    } else {
+                                        // Light quick swipe without full drag engagement
+                                        if (isExpanded) {
+                                            if (velocityY > 80f || totalDragY > 12f) {
+                                                collapseToMini()
+                                            }
+                                        } else {
+                                            if (velocityY < -80f || totalDragY < -12f) {
+                                                expandToFull()
+                                            }
+                                        }
                                     }
                                     break
                                 }
@@ -470,21 +481,21 @@ fun ExpandablePlayerSheet(
                                     if (!isDraggingSheet && !isHorizontalTrackSwipe) {
                                         if (isExpanded) {
                                             // When expanded: downward swipe collapses sheet, horizontal swipe switches track
-                                            if (totalDragY > 22f && totalDragY > abs(totalDragX) * 1.35f) {
+                                            if (totalDragY > 10f && totalDragY > abs(totalDragX) * 0.75f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
-                                            } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
+                                            } else if (abs(totalDragX) > 22f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
                                                 isHorizontalTrackSwipe = true
                                                 isTrackSwiping = true
                                             }
                                         } else {
                                             // When collapsed (mini player): upward swipe expands sheet
-                                            if (totalDragY < -20f && abs(totalDragY) > abs(totalDragX) * 1.35f) {
+                                            if (totalDragY < -10f && abs(totalDragY) > abs(totalDragX) * 0.75f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
-                                            } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
+                                            } else if (abs(totalDragX) > 22f && abs(totalDragX) > abs(totalDragY) * 1.35f) {
                                                 isHorizontalTrackSwipe = true
                                                 isTrackSwiping = true
                                             }
@@ -784,7 +795,8 @@ fun ExpandablePlayerSheet(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 2.dp),
+                                    .padding(top = 8.dp, bottom = 2.dp)
+                                    .clickable { collapseToMini() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Box(
