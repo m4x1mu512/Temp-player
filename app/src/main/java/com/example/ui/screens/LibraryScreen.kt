@@ -171,16 +171,28 @@ fun LibraryScreen(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
 
-    // Selected folder / artist / album filter drilldown
-    var selectedGroupTitle by remember { mutableStateOf<String?>(null) }
-    var selectedGroupTracks by remember { mutableStateOf<List<Track>?>(null) }
+    // Dedicated filter drilldown states per library section
+    var selectedFolderTitle by remember { mutableStateOf<String?>(null) }
+    var selectedFolderTracks by remember { mutableStateOf<List<Track>?>(null) }
+
+    var selectedPlaylistCategoryTitle by remember { mutableStateOf<String?>(null) }
     var selectedPlaylist by remember { mutableStateOf<Playlist?>(null) }
 
-    // Intercept back gesture when a folder (or any category group) is open to return to the all-folders overview
-    BackHandler(enabled = selectedGroupTitle != null || selectedPlaylist != null) {
-        selectedGroupTitle = null
-        selectedGroupTracks = null
+    var selectedAlbumTitle by remember { mutableStateOf<String?>(null) }
+    var selectedAlbumTracks by remember { mutableStateOf<List<Track>?>(null) }
+
+    var selectedArtistTitle by remember { mutableStateOf<String?>(null) }
+    var selectedArtistTracks by remember { mutableStateOf<List<Track>?>(null) }
+
+    val resetAllDrilldowns = {
+        selectedFolderTitle = null
+        selectedFolderTracks = null
+        selectedPlaylistCategoryTitle = null
         selectedPlaylist = null
+        selectedAlbumTitle = null
+        selectedAlbumTracks = null
+        selectedArtistTitle = null
+        selectedArtistTracks = null
     }
 
     val coroutineScope = rememberCoroutineScope()
@@ -193,12 +205,41 @@ fun LibraryScreen(
         pageCount = { pageCount }
     )
 
-    // Reset selected group drilldown when user swipes between tabs
+    val hasOpenDrilldown = selectedFolderTitle != null ||
+            selectedPlaylistCategoryTitle != null ||
+            selectedPlaylist != null ||
+            selectedAlbumTitle != null ||
+            selectedArtistTitle != null
+
+    // Intercept back gesture when inside a folder, playlist, album, or artist to return to that section's initial overview
+    BackHandler(enabled = hasOpenDrilldown) {
+        when (pagerState.currentPage) {
+            1 -> {
+                selectedFolderTitle = null
+                selectedFolderTracks = null
+            }
+            2 -> {
+                selectedPlaylistCategoryTitle = null
+                selectedPlaylist = null
+            }
+            3 -> {
+                selectedAlbumTitle = null
+                selectedAlbumTracks = null
+            }
+            4 -> {
+                selectedArtistTitle = null
+                selectedArtistTracks = null
+            }
+            else -> resetAllDrilldowns()
+        }
+    }
+
+    // Reset drilldowns whenever user changes tabs / swipes between screens so initial screen opens
+    var lastSettledPage by remember { mutableIntStateOf(0) }
     LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage != 1 && pagerState.settledPage != 2 && pagerState.settledPage != 3 && pagerState.settledPage != 4) {
-            selectedGroupTitle = null
-            selectedGroupTracks = null
-            selectedPlaylist = null
+        if (pagerState.settledPage != lastSettledPage) {
+            resetAllDrilldowns()
+            lastSettledPage = pagerState.settledPage
         }
     }
 
@@ -210,9 +251,7 @@ fun LibraryScreen(
 
     val navigateToQueueAndScrollToCurrentTrack: () -> Unit = {
         coroutineScope.launch {
-            selectedGroupTitle = null
-            selectedGroupTracks = null
-            selectedPlaylist = null
+            resetAllDrilldowns()
             if (pagerState.currentPage != 0) {
                 pagerState.animateScrollToPage(
                     page = 0,
@@ -249,10 +288,8 @@ fun LibraryScreen(
     }
 
     val navigateToTab: (Int) -> Unit = { targetPage ->
+        resetAllDrilldowns()
         if (pagerState.currentPage != targetPage) {
-            selectedGroupTitle = null
-            selectedGroupTracks = null
-            selectedPlaylist = null
             coroutineScope.launch {
                 pagerState.animateScrollToPage(
                     page = targetPage,
@@ -281,14 +318,7 @@ fun LibraryScreen(
             ) {
                 // 1. Список воспроизведения (Queue)
                 IconButton(
-                    onClick = {
-                        if (pagerState.currentPage != 0) {
-                            navigateToTab(0)
-                        }
-                        selectedGroupTitle = null
-                        selectedGroupTracks = null
-                        selectedPlaylist = null
-                    },
+                    onClick = { navigateToTab(0) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("nav_queue_button")
@@ -547,14 +577,14 @@ fun LibraryScreen(
                                     folderGroups = folderGroups,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
-                                    selectedTitle = selectedGroupTitle,
+                                    selectedTitle = selectedFolderTitle,
                                     onSelectGroup = { title, tracks ->
-                                        selectedGroupTitle = title
-                                        selectedGroupTracks = tracks
+                                        selectedFolderTitle = title
+                                        selectedFolderTracks = tracks
                                     },
                                     onBackFromGroup = {
-                                        selectedGroupTitle = null
-                                        selectedGroupTracks = null
+                                        selectedFolderTitle = null
+                                        selectedFolderTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
@@ -578,18 +608,18 @@ fun LibraryScreen(
                                     playlists = playlists,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
-                                    selectedCategoryTitle = selectedGroupTitle,
+                                    selectedCategoryTitle = selectedPlaylistCategoryTitle,
                                     selectedPlaylist = selectedPlaylist,
                                     onSelectCategory = { title ->
-                                        selectedGroupTitle = title
+                                        selectedPlaylistCategoryTitle = title
                                         selectedPlaylist = null
                                     },
                                     onSelectPlaylist = { pl ->
                                         selectedPlaylist = pl
-                                        selectedGroupTitle = null
+                                        selectedPlaylistCategoryTitle = null
                                     },
                                     onBackFromGroup = {
-                                        selectedGroupTitle = null
+                                        selectedPlaylistCategoryTitle = null
                                         selectedPlaylist = null
                                     },
                                     onCreatePlaylist = { showCreatePlaylistDialog = true },
@@ -619,14 +649,14 @@ fun LibraryScreen(
                                     albumGroups = albumGroups,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
-                                    selectedTitle = selectedGroupTitle,
+                                    selectedTitle = selectedAlbumTitle,
                                     onSelectGroup = { title, tracks ->
-                                        selectedGroupTitle = title
-                                        selectedGroupTracks = tracks
+                                        selectedAlbumTitle = title
+                                        selectedAlbumTracks = tracks
                                     },
                                     onBackFromGroup = {
-                                        selectedGroupTitle = null
-                                        selectedGroupTracks = null
+                                        selectedAlbumTitle = null
+                                        selectedAlbumTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },
@@ -649,14 +679,14 @@ fun LibraryScreen(
                                     icon = Icons.Default.Person,
                                     currentTrack = currentTrack,
                                     isPlaying = isPlaying,
-                                    selectedTitle = selectedGroupTitle,
+                                    selectedTitle = selectedArtistTitle,
                                     onSelectGroup = { title, tracks ->
-                                        selectedGroupTitle = title
-                                        selectedGroupTracks = tracks
+                                        selectedArtistTitle = title
+                                        selectedArtistTracks = tracks
                                     },
                                     onBackFromGroup = {
-                                        selectedGroupTitle = null
-                                        selectedGroupTracks = null
+                                        selectedArtistTitle = null
+                                        selectedArtistTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) },

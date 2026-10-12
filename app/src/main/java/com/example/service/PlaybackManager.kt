@@ -1135,11 +1135,70 @@ class PlaybackManager private constructor(private val context: Context) {
         _sleepTimerMode.value = 0
     }
 
+    private var equalizerVolumeRestoreTarget: Float? = null
+    private var equalizerVolumeTransitionJob: Job? = null
+
     fun setEqualizerEnabled(enabled: Boolean) {
         _isEqualizerEnabled.value = enabled
-        equalizerController.setEnabled(enabled)
         serviceScope.launch {
             settingsDataStore.setEqualizerEnabled(enabled)
+        }
+
+        val player = activePlayer
+        if (player == null || !player.isPlaying) {
+            equalizerController.setEnabled(enabled)
+            return
+        }
+
+        val restoreVolume = equalizerVolumeRestoreTarget ?: player.volume
+        if (restoreVolume <= 0f) {
+            equalizerController.setEnabled(enabled)
+            return
+        }
+
+        equalizerVolumeTransitionJob?.cancel()
+        equalizerVolumeRestoreTarget = restoreVolume
+
+        // Prevent ReplayGain from overriding during volume guard transition
+        replayGainController.isInternalVolumeAdjustment = true
+
+        // 1. Duck player volume to 0.0f to completely silence any transient audio/DSP burst
+        player.volume = 0.0f
+
+        equalizerVolumeTransitionJob = serviceScope.launch(Dispatchers.Main.immediate) {
+            try {
+                // If disabling, start disabling effects immediately
+                if (!enabled) {
+                    equalizerController.setEnabled(false)
+                }
+
+                // 2. Wait for ducked volume to propagate and audio buffer to clear
+                val drainDelay = if (enabled) 120L else 300L
+                delay(drainDelay)
+
+                // 3. Set equalizer enabled state while fully silent
+                equalizerController.setEnabled(enabled)
+
+                // 4. Settle delay to allow audio pipeline / DSP to fully settle in silence
+                val settleDelay = if (enabled) 45L else 550L
+                delay(settleDelay)
+
+                // 5. Smoothly ramp volume back up to restoreVolume from 0.0f
+                val startVolume = player.volume
+                val rampSteps = 6
+                val rampStepDelayMs = 22L
+                repeat(rampSteps) { step ->
+                    val fraction = (step + 1).toFloat() / rampSteps.toFloat()
+                    player.volume = startVolume + (restoreVolume - startVolume) * fraction
+                    delay(rampStepDelayMs)
+                }
+            } finally {
+                if (equalizerVolumeRestoreTarget == restoreVolume) {
+                    player.volume = restoreVolume
+                    equalizerVolumeRestoreTarget = null
+                }
+                replayGainController.isInternalVolumeAdjustment = false
+            }
         }
     }
 

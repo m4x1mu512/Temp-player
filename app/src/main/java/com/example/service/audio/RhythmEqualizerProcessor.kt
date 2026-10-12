@@ -160,11 +160,18 @@ class RhythmEqualizerProcessor : RhythmAudioProcessor() {
 
         synchronized(lock) {
             if (!active) {
-                // When disabled, smoothly slew target back to unity and flat EQ
-                targetPreampScale = 1.0f
+                // When disabled, band gains slew down towards 0 dB.
+                // Headroom protection scale must track the remaining positive boost
+                // so that preamp scale only returns to unity as the filter boost actually fades away.
+                var remainingBoost = 0f
                 for (i in 0 until NUM_BANDS) {
                     targetBandGainsDb[i] = 0f
+                    if (currentBandGainsDb[i] > remainingBoost) {
+                        remainingBoost = currentBandGainsDb[i]
+                    }
                 }
+                val autoHeadroomAttenuationDb = -remainingBoost
+                targetPreampScale = 10f.pow(autoHeadroomAttenuationDb / 20.0f)
             } else {
                 // AutoEQ Headroom Protection:
                 // Find maximum positive boost across all active bands

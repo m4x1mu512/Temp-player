@@ -465,27 +465,39 @@ private fun EqualizerTabContent(
                 val dbText = if (dbValue > 0) "+%.1f дБ".format(dbValue) else "%.1f дБ".format(dbValue)
 
                 Card(
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 3.dp)
+                        .padding(vertical = 4.dp)
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        // Frequency label
-                        Text(
-                            text = freqText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(58.dp)
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Frequency label
+                            Text(
+                                text = freqText,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
 
-                        // Extended slider for comfortable finger interaction
+                            // Current dB value
+                            Text(
+                                text = dbText,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Full-width extended slider for maximum finger control
                         Slider(
                             value = band.levelMilliBels.toFloat(),
                             onValueChange = { newMilliBels ->
@@ -500,19 +512,8 @@ private fun EqualizerTabContent(
                                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                             ),
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp)
+                                .fillMaxWidth()
                                 .testTag("band_slider_${band.bandIndex}")
-                        )
-
-                        // Current dB value
-                        Text(
-                            text = dbText,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.width(56.dp)
                         )
                     }
                 }

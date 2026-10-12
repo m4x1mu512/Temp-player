@@ -164,7 +164,10 @@ class ReplayGainController(private val context: Context) {
         }
     }
 
+    var isInternalVolumeAdjustment: Boolean = false
+
     private fun applyCurrentGainInternal(smooth: Boolean) {
+        if (isInternalVolumeAdjustment) return
         if (!isEnabled) {
             setUnityGainInternal(smooth)
             return
@@ -196,6 +199,7 @@ class ReplayGainController(private val context: Context) {
     }
 
     private fun setUnityGainInternal(smooth: Boolean) {
+        if (isInternalVolumeAdjustment) return
         currentAppliedGainDb = 0f
         setPlayerVolume(1.0f, smooth)
     }
