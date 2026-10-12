@@ -87,6 +87,9 @@ class PlaybackManager private constructor(private val context: Context) {
     val crossfadeController = CrossfadeController(serviceScope)
 
     fun createPlayerAudioProcessors(): Array<androidx.media3.common.audio.AudioProcessor> {
+        val eq = com.example.service.audio.RhythmEqualizerProcessor().apply {
+            setParent(equalizerController.equalizerProcessor)
+        }
         val bass = com.example.service.audio.RhythmBassBoostProcessor().apply {
             setParent(equalizerController.bassBoostProcessor)
         }
@@ -97,7 +100,7 @@ class PlaybackManager private constructor(private val context: Context) {
             setParent(equalizerController.reverbProcessor)
         }
         val tee = TeeAudioProcessor(visualizerController.audioBufferSink)
-        return arrayOf(bass, spatial, reverb, tee)
+        return arrayOf(eq, bass, spatial, reverb, tee)
     }
 
     // Playback States
@@ -275,6 +278,15 @@ class PlaybackManager private constructor(private val context: Context) {
             _playbackPitch.value = settingsDataStore.playbackPitchFlow.first()
             _isReplayGainEnabled.value = settingsDataStore.replayGainEnabledFlow.first()
             replayGainController.setEnabled(_isReplayGainEnabled.value)
+
+            equalizerController.setEnabled(_isEqualizerEnabled.value)
+            equalizerController.setPreamp(_eqPreamp.value)
+            equalizerController.applyPreset(_equalizerPreset.value)
+            val savedEqLevels = settingsDataStore.eqLevelsFlow.first()
+            if (savedEqLevels.isNotEmpty()) {
+                equalizerController.setLevels(savedEqLevels)
+            }
+            _equalizerBands.value = equalizerController.getBands()
 
             _isCrossfadeEnabled.value = settingsDataStore.crossfadeEnabledFlow.first()
             _crossfadeDurationSeconds.value = settingsDataStore.crossfadeDurationSecondsFlow.first()
@@ -1288,8 +1300,12 @@ class PlaybackManager private constructor(private val context: Context) {
                 loudEnabled = _isLoudnessEnabled.value,
                 loudGain = _loudnessGain.value
             )
+            if (_equalizerPreset.value != EqualizerPreset.CUSTOM) {
+                equalizerController.applyPreset(_equalizerPreset.value)
+            } else if (savedLevels.isNotEmpty()) {
+                equalizerController.setLevels(savedLevels)
+            }
             _equalizerBands.value = equalizerController.getBands()
-            equalizerController.applyPreset(_equalizerPreset.value)
         }
     }
 

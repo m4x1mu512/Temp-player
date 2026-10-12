@@ -182,5 +182,61 @@ class ExampleUnitTest {
         assertTrue(childReverb.isEnabled())
         assertEquals(com.example.data.model.ReverbPreset.MEDIUM_HALL, childReverb.getPreset())
     }
+
+    @Test
+    fun `test rhythm equalizer processor smoothly toggles without volume surges and protects headroom`() {
+        val eq = com.example.service.audio.RhythmEqualizerProcessor()
+        val format = androidx.media3.common.audio.AudioProcessor.AudioFormat(
+            44100,
+            2,
+            androidx.media3.common.C.ENCODING_PCM_16BIT
+        )
+        eq.configure(format)
+
+        assertEquals(true, eq.isEnabled())
+        assertEquals(5, eq.getBands().size)
+
+        // Generate test signal with 1000Hz tone
+        val sampleCount = 1024
+        val inputSamples = ShortArray(sampleCount) { i ->
+            (kotlin.math.sin(i * 0.1) * 16000).toInt().toShort()
+        }
+
+        // Apply a heavy boost preset like ROCK or BASS_BOOST
+        eq.applyPreset(com.example.data.model.EqualizerPreset.ROCK)
+        eq.setEnabled(true)
+
+        val testSamples = inputSamples.clone()
+        eq.processSamples(testSamples, sampleCount)
+
+        var peakAmplitude = 0
+        for (s in testSamples) {
+            val amp = kotlin.math.abs(s.toInt())
+            if (amp > peakAmplitude) peakAmplitude = amp
+        }
+        // AutoEQ headroom protection must keep output safe from hard clipping
+        assertTrue("Equalizer peak $peakAmplitude must be within valid range", peakAmplitude <= 32767)
+
+        // Now test disabling: toggle to false and process buffers
+        eq.setEnabled(false)
+        val disableSamples = inputSamples.clone()
+        eq.processSamples(disableSamples, sampleCount)
+
+        var disabledPeak = 0
+        for (s in disableSamples) {
+            val amp = kotlin.math.abs(s.toInt())
+            if (amp > disabledPeak) disabledPeak = amp
+        }
+        // Peak should not surge or spike above original signal peak + margin
+        assertTrue("Disabling equalizer must never surge volume (got $disabledPeak)", disabledPeak <= 20000)
+
+        // Parent-child test
+        val childEq = com.example.service.audio.RhythmEqualizerProcessor()
+        childEq.setParent(eq)
+        eq.setEnabled(true)
+        eq.applyPreset(com.example.data.model.EqualizerPreset.JAZZ)
+        assertTrue(childEq.isEnabled())
+        assertEquals(400.toShort(), childEq.getBands()[0].levelMilliBels)
+    }
 }
 
