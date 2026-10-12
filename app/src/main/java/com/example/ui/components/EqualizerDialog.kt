@@ -25,12 +25,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
@@ -43,7 +41,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -477,30 +474,18 @@ private fun EqualizerTabContent(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         // Frequency label
                         Text(
                             text = freqText,
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(62.dp)
+                            modifier = Modifier.width(58.dp)
                         )
 
-                        // Slider with step buttons
-                        FilledTonalIconButton(
-                            onClick = {
-                                val next = (band.levelMilliBels - 100).coerceAtLeast(-1200)
-                                onBandLevelChanged(band.bandIndex, next.toShort())
-                            },
-                            enabled = isEnabled,
-                            modifier = Modifier.size(30.dp),
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Меньше", modifier = Modifier.size(16.dp))
-                        }
-
+                        // Extended slider for comfortable finger interaction
                         Slider(
                             value = band.levelMilliBels.toFloat(),
                             onValueChange = { newMilliBels ->
@@ -516,30 +501,18 @@ private fun EqualizerTabContent(
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 4.dp)
+                                .padding(horizontal = 8.dp)
                                 .testTag("band_slider_${band.bandIndex}")
                         )
-
-                        FilledTonalIconButton(
-                            onClick = {
-                                val next = (band.levelMilliBels + 100).coerceAtMost(1200)
-                                onBandLevelChanged(band.bandIndex, next.toShort())
-                            },
-                            enabled = isEnabled,
-                            modifier = Modifier.size(30.dp),
-                            shape = CircleShape
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Больше", modifier = Modifier.size(16.dp))
-                        }
 
                         // Current dB value
                         Text(
                             text = dbText,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.secondary,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.width(64.dp)
+                            modifier = Modifier.width(56.dp)
                         )
                     }
                 }
