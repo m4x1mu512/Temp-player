@@ -1,7 +1,13 @@
 package com.example.ui.components
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Track
 import sh.calvin.reorderable.ReorderableItem
@@ -38,6 +47,38 @@ fun ReorderableTrackList(
     highlightedTrackId: Long? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = 80.dp)
 ) {
+    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
+    val vibrator = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibratorManager?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    }
+
+    val triggerVibration: () -> Unit = remember(haptic, vibrator) {
+        {
+            try {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            } catch (_: Exception) {}
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(VibrationEffect.createOneShot(35, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(35L)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
     val currentList = remember { mutableStateListOf<Track>().apply { addAll(tracks) } }
 
     var dragStartTrackId by remember { mutableStateOf<Long?>(null) }
@@ -50,6 +91,9 @@ fun ReorderableTrackList(
         currentList.apply {
             add(to.index, removeAt(from.index))
         }
+        try {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        } catch (_: Exception) {}
     }
 
     // Keep currentList in sync with external tracks when not dragging without 1-frame blank flicker
@@ -96,6 +140,14 @@ fun ReorderableTrackList(
                 val interactionSource = remember { MutableInteractionSource() }
                 val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "reorder_elevation")
 
+                LaunchedEffect(interactionSource) {
+                    interactionSource.interactions.collect { interaction ->
+                        if (interaction is PressInteraction.Press) {
+                            triggerVibration()
+                        }
+                    }
+                }
+
                 TrackListItem(
                     track = track,
                     isCurrent = currentTrack?.id == track.id,
@@ -111,6 +163,7 @@ fun ReorderableTrackList(
                     reorderModifier = Modifier.draggableHandle(
                         interactionSource = interactionSource,
                         onDragStarted = {
+                            triggerVibration()
                             dragStartTrackId = track.id
                             dragStartIndex = currentList.indexOfFirst { it.id == track.id }
                         },
