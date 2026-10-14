@@ -235,12 +235,11 @@ fun LibraryScreen(
     }
 
     // Reset drilldowns whenever user changes tabs / swipes between screens so initial screen opens
-    var lastSettledPage by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pagerState.currentPage) {
+        resetAllDrilldowns()
+    }
     LaunchedEffect(pagerState.settledPage) {
-        if (pagerState.settledPage != lastSettledPage) {
-            resetAllDrilldowns()
-            lastSettledPage = pagerState.settledPage
-        }
+        resetAllDrilldowns()
     }
 
     val scrollToTrackSmooth: (LazyListState, Int) -> Unit = { listState, targetIndex ->

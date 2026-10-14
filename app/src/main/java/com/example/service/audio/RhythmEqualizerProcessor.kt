@@ -315,9 +315,10 @@ class RhythmEqualizerProcessor : RhythmAudioProcessor() {
         for (frame in 0 until frames) {
             val offset = frame * channels
 
-            // 1. Slew preamp scale smoothly
+            // 1. Slew preamp scale smoothly (slew conservatively on upward volume ramp so filter decay finishes first)
             if (abs(currentPreampScale - targetPreampScale) > 0.0001f) {
-                currentPreampScale += (targetPreampScale - currentPreampScale) * SLEW_COEFF
+                val coeff = if (targetPreampScale > currentPreampScale) 0.0003f else SLEW_COEFF
+                currentPreampScale += (targetPreampScale - currentPreampScale) * coeff
             }
 
             // 2. Slew band gains smoothly (every 16 frames for optimal CPU performance)

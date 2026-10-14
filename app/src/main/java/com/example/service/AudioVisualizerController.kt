@@ -6,6 +6,7 @@ import androidx.media3.exoplayer.audio.TeeAudioProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,6 +84,8 @@ class AudioVisualizerController(
     private var ringWriteIndex = 0
     private var ringAvailableSamples = 0
 
+    private var internalJob = SupervisorJob()
+    private var internalScope = CoroutineScope(internalJob + Dispatchers.Default)
     private var frameLoopJob: Job? = null
 
     var onRmsCalculated: ((Float) -> Unit)? = null
@@ -92,8 +95,21 @@ class AudioVisualizerController(
     fun getCurrentChannelCount(): Int = currentChannelCount
     fun getCurrentEncoding(): Int = currentEncoding
 
+    fun ensureStarted() {
+        synchronized(lock) {
+            if (!internalScope.isActive || frameLoopJob == null || frameLoopJob?.isActive != true) {
+                if (!internalScope.isActive) {
+                    internalJob = SupervisorJob()
+                    internalScope = CoroutineScope(internalJob + Dispatchers.Default)
+                }
+                startFrameLoop()
+            }
+        }
+    }
+
     val audioBufferSink = object : TeeAudioProcessor.AudioBufferSink {
         override fun flush(sampleRateHz: Int, channelCount: Int, encoding: Int) {
+            ensureStarted()
             try {
                 currentSampleRate = if (sampleRateHz > 0) sampleRateHz else 44100
                 currentChannelCount = channelCount.coerceAtLeast(1)
@@ -105,6 +121,7 @@ class AudioVisualizerController(
         }
 
         override fun handleBuffer(buffer: ByteBuffer) {
+            ensureStarted()
             try {
                 processAudioBuffer(buffer)
             } catch (t: Throwable) {
@@ -142,13 +159,19 @@ class AudioVisualizerController(
      * Stubs preserved for interface compatibility.
      * ZERO microphone / RECORD_AUDIO permissions are used.
      */
-    fun onPermissionGranted() {}
-    fun attachToAudioSession(audioSessionId: Int) {}
+    fun onPermissionGranted() {
+        ensureStarted()
+    }
+
+    fun attachToAudioSession(audioSessionId: Int) {
+        ensureStarted()
+    }
 
     fun onPlaybackStateChanged(playing: Boolean) {
         isPlaying = playing
         if (playing) {
             playbackStartTimeMs = System.currentTimeMillis()
+            ensureStarted()
         }
     }
 
@@ -283,12 +306,18 @@ class AudioVisualizerController(
         }
     }
 
-    private fun startFrameLoop() {
-        frameLoopJob = scope.launch(Dispatchers.Default) {
-            val windowSize = 256
-            val pcmMono = FloatArray(windowSize)
+    fun startFrameLoop() {
+        synchronized(lock) {
+            if (frameLoopJob?.isActive == true) return
+            if (!internalScope.isActive) {
+                internalJob = SupervisorJob()
+                internalScope = CoroutineScope(internalJob + Dispatchers.Default)
+            }
+            frameLoopJob = internalScope.launch {
+                val windowSize = 256
+                val pcmMono = FloatArray(windowSize)
 
-            while (isActive) {
+                while (isActive) {
                 try {
                     val now = System.currentTimeMillis()
                 val bands = currentBandCount
@@ -467,6 +496,7 @@ class AudioVisualizerController(
             }
         }
     }
+}
 
     private fun computeFft(samples: FloatArray, outMagnitudes: FloatArray, agc: Float) {
         val n = 256

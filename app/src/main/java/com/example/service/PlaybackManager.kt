@@ -490,6 +490,9 @@ class PlaybackManager private constructor(private val context: Context) {
 
         replayGainController.attachPlayer(player1)
 
+        visualizerController.ensureStarted()
+        visualizerController.onPlaybackStateChanged(_isPlaying.value)
+
         val currentSessionId = player1.audioSessionId
         if (currentSessionId > 0 && currentSessionId != currentAudioSessionId) {
             currentAudioSessionId = currentSessionId
@@ -541,7 +544,8 @@ class PlaybackManager private constructor(private val context: Context) {
         playerB?.removeListener(playerBListener)
         playerA = null
         playerB = null
-        visualizerController.release()
+        visualizerController.onPlaybackStateChanged(false)
+        visualizerController.resetBuffers()
         equalizerController.release()
         replayGainController.release()
         _isPlaying.value = false
@@ -1145,12 +1149,16 @@ class PlaybackManager private constructor(private val context: Context) {
         }
 
         val player = activePlayer
-        if (player == null || !player.isPlaying) {
+        if (player == null || (!player.isPlaying && !player.playWhenReady)) {
+            if (!enabled) {
+                // When disabling without active playback: zero bands first as in Rhythm
+                equalizerController.equalizerProcessor.setLevels(List(5) { 0 })
+            }
             equalizerController.setEnabled(enabled)
             return
         }
 
-        val restoreVolume = equalizerVolumeRestoreTarget ?: player.volume
+        val restoreVolume = equalizerVolumeRestoreTarget ?: (if (player.volume > 0f) player.volume else 1.0f)
         if (restoreVolume <= 0f) {
             equalizerController.setEnabled(enabled)
             return
@@ -1159,42 +1167,48 @@ class PlaybackManager private constructor(private val context: Context) {
         equalizerVolumeTransitionJob?.cancel()
         equalizerVolumeRestoreTarget = restoreVolume
 
-        // Prevent ReplayGain from overriding during volume guard transition
+        // Flag internal volume adjustment so ReplayGain engine doesn't overwrite with ducked values
         replayGainController.isInternalVolumeAdjustment = true
 
-        // 1. Duck player volume to 0.0f to completely silence any transient audio/DSP burst
-        player.volume = 0.0f
+        // 1. Duck player volume to 0.0f on both dual-players to completely silence transient DSP / buffer burst
+        playerA?.volume = 0.0f
+        playerB?.volume = 0.0f
 
         equalizerVolumeTransitionJob = serviceScope.launch(Dispatchers.Main.immediate) {
             try {
-                // If disabling, start disabling effects immediately
+                // If disabling, set the band levels to 0 (flat) first before waiting,
+                // so DSP coefficients transition smoothly in the background without burst.
                 if (!enabled) {
-                    equalizerController.setEnabled(false)
+                    equalizerController.equalizerProcessor.setLevels(List(5) { 0 })
                 }
 
-                // 2. Wait for ducked volume to propagate and audio buffer to clear
+                // 2. Wait for ducked volume state to propagate and audio track's buffer to clear
+                // Use 300ms when disabling to ensure audio buffer is completely drained in silence
                 val drainDelay = if (enabled) 120L else 300L
                 delay(drainDelay)
 
-                // 3. Set equalizer enabled state while fully silent
+                // 3. Safely toggle equalizer enabled state while fully silent
                 equalizerController.setEnabled(enabled)
 
-                // 4. Settle delay to allow audio pipeline / DSP to fully settle in silence
+                // 4. Settle delay to allow audio pipeline / hardware DSP to fully transition
+                // 550ms deactivation settle delay ensures driver pops finish in complete silence
                 val settleDelay = if (enabled) 45L else 550L
                 delay(settleDelay)
 
-                // 5. Smoothly ramp volume back up to restoreVolume from 0.0f
-                val startVolume = player.volume
-                val rampSteps = 6
-                val rampStepDelayMs = 22L
+                // 5. Smoothly ramp volume back up to restoreVolume from 0.0f over 10 steps (200ms total)
+                val rampSteps = 10
+                val rampStepDelayMs = 20L
                 repeat(rampSteps) { step ->
                     val fraction = (step + 1).toFloat() / rampSteps.toFloat()
-                    player.volume = startVolume + (restoreVolume - startVolume) * fraction
+                    val targetVol = restoreVolume * fraction
+                    playerA?.volume = targetVol
+                    playerB?.volume = targetVol
                     delay(rampStepDelayMs)
                 }
             } finally {
                 if (equalizerVolumeRestoreTarget == restoreVolume) {
-                    player.volume = restoreVolume
+                    playerA?.volume = restoreVolume
+                    playerB?.volume = restoreVolume
                     equalizerVolumeRestoreTarget = null
                 }
                 replayGainController.isInternalVolumeAdjustment = false
