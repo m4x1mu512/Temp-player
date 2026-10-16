@@ -137,7 +137,6 @@ import com.example.ui.theme.NeonPurple
 import com.example.ui.util.formatTime
 import com.example.ui.util.rememberPlayerColors
 import com.example.ui.util.rememberShouldUseSimplifiedShadows
-import com.example.ui.util.rememberShouldUseSimplifiedFlip
 import com.example.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -391,7 +390,12 @@ fun ExpandablePlayerSheet(
 
         val onSwipePreviousTrack: () -> Unit = {
             transitionDirection = -1
-            viewModel.previousTrack()
+            viewModel.previousTrack(forcePrevious = true)
+        }
+
+        val onButtonPreviousTrack: () -> Unit = {
+            transitionDirection = -1
+            viewModel.previousTrack(forcePrevious = false)
         }
 
         val sheetCornerRadius = lerp(20.dp, 0.dp, expandProgress)
@@ -446,9 +450,9 @@ fun ExpandablePlayerSheet(
                                         val minFlingVelocity = 750f
 
                                         if (totalDragX < -swipeThresholdPx || (velocityX < -minFlingVelocity && totalDragX < -20f)) {
-                                            viewModel.nextTrack()
+                                            onSwipeNextTrack()
                                         } else if (totalDragX > swipeThresholdPx || (velocityX > minFlingVelocity && totalDragX > 20f)) {
-                                            viewModel.previousTrack()
+                                            onSwipePreviousTrack()
                                         }
                                         coroutineScope.launch {
                                             trackSwipeOffset.animateTo(
@@ -568,15 +572,12 @@ fun ExpandablePlayerSheet(
                         },
                         contentAlignment = Alignment.Center
                     ) {
-                        ExpandedFlippableArtwork(
+                        ExpandedSlidingArtwork(
                             currentTrack = track,
-                            currentQueue = currentQueue,
-                            currentQueueIndex = currentQueueIndex,
-                            repeatMode = repeatMode,
-                            isPlaying = isPlaying,
                             direction = transitionDirection,
                             artSize = fullArtSize,
                             cornerRadius = fullCornerRadius,
+                            isPlaying = isPlaying,
                             progressTrackColor = colorScheme.progressTrackColor,
                             onSwipeNext = onSwipeNextTrack,
                             onSwipePrevious = onSwipePreviousTrack
@@ -606,10 +607,11 @@ fun ExpandablePlayerSheet(
                             }
                     ) {
                         Crossfade(
-                            targetState = track.albumArtUri,
+                            targetState = track.id,
                             animationSpec = tween(durationMillis = 180),
                             label = "expandable_player_art_crossfade"
-                        ) { artUri ->
+                        ) { _ ->
+                            val artUri = track.albumArtUri
                             if (artUri == null) {
                                 Image(
                                     painter = painterResource(R.drawable.ic_default_art),
@@ -622,6 +624,7 @@ fun ExpandablePlayerSheet(
                                     ImageRequest.Builder(context)
                                         .data(artUri)
                                         .crossfade(false)
+                                        .placeholder(R.drawable.ic_default_art)
                                         .error(R.drawable.ic_default_art)
                                         .build()
                                 }
@@ -723,7 +726,7 @@ fun ExpandablePlayerSheet(
                             }
 
                             IconButton(
-                                onClick = onSwipePreviousTrack,
+                                onClick = onButtonPreviousTrack,
                                 modifier = Modifier
                                     .size(38.dp)
                                     .testTag("mini_player_previous")
@@ -946,7 +949,7 @@ fun ExpandablePlayerSheet(
                                         horizontalArrangement = Arrangement.SpaceEvenly,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        IconButton(onClick = onSwipePreviousTrack, modifier = Modifier.testTag("player_prev_button")) {
+                                        IconButton(onClick = onButtonPreviousTrack, modifier = Modifier.testTag("player_prev_button")) {
                                             Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий", modifier = Modifier.size(30.dp))
                                         }
                                         FilledIconButton(
@@ -1165,7 +1168,7 @@ fun ExpandablePlayerSheet(
                                     }
 
                                     IconButton(
-                                        onClick = onSwipePreviousTrack,
+                                        onClick = onButtonPreviousTrack,
                                         modifier = Modifier.size(52.dp).testTag("player_prev_button")
                                     ) {
                                         Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", modifier = Modifier.size(34.dp))
@@ -1372,7 +1375,7 @@ private fun SheetProgressSection(
 }
 
 @Composable
-private fun FlippableArtworkCard(
+private fun PlayerArtworkCard(
     track: Track,
     size: Dp,
     cornerRadius: Dp,
@@ -1381,14 +1384,15 @@ private fun FlippableArtworkCard(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val simplifiedShadows = rememberShouldUseSimplifiedShadows()
     Box(
         modifier = modifier
             .size(size)
             .shadow(
-                elevation = 20.dp,
+                elevation = if (simplifiedShadows) 8.dp else 20.dp,
                 shape = RoundedCornerShape(cornerRadius),
-                spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.25f),
-                ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.35f) else Color.Transparent
+                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.25f),
+                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.3f) else Color.Transparent
             )
             .clip(RoundedCornerShape(cornerRadius))
             .background(progressTrackColor)
@@ -1406,6 +1410,7 @@ private fun FlippableArtworkCard(
                 ImageRequest.Builder(context)
                     .data(artUri)
                     .crossfade(false)
+                    .placeholder(R.drawable.ic_default_art)
                     .error(R.drawable.ic_default_art)
                     .build()
             }
@@ -1420,199 +1425,115 @@ private fun FlippableArtworkCard(
 }
 
 @Composable
-private fun ExpandedFlippableArtwork(
+private fun ExpandedSlidingArtwork(
     currentTrack: Track,
-    currentQueue: List<Track>,
-    currentQueueIndex: Int,
-    repeatMode: RepeatMode,
-    isPlaying: Boolean,
     direction: Int,
     artSize: Dp,
     cornerRadius: Dp,
+    isPlaying: Boolean,
     progressTrackColor: Color,
     onSwipeNext: () -> Unit,
     onSwipePrevious: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val coroutineScope = rememberCoroutineScope()
+    val dragOffsetX = remember { Animatable(0f) }
     val density = LocalDensity.current
     val artSizePx = with(density) { artSize.toPx() }
-    val coroutineScope = rememberCoroutineScope()
-
-    var displayedTrack by remember { mutableStateOf(currentTrack) }
-    var outgoingTrack by remember { mutableStateOf<Track?>(null) }
-    var activeDirection by remember { mutableIntStateOf(direction) }
-
-    val flipAngle = remember { Animatable(0f) }
-    var isInteractiveDrag by remember { mutableStateOf(false) }
-    var interactiveDragOffsetX by remember { mutableFloatStateOf(0f) }
-
-    val nextTrack = remember(currentQueue, currentTrack, currentQueueIndex, repeatMode) {
-        if (currentQueue.isEmpty()) null
-        else {
-            val idx = if (currentQueueIndex in currentQueue.indices) currentQueueIndex else currentQueue.indexOfFirst { it.id == currentTrack.id }
-            if (idx >= 0 && idx + 1 < currentQueue.size) currentQueue[idx + 1]
-            else if (repeatMode == RepeatMode.ALL) currentQueue.firstOrNull()
-            else currentQueue.getOrNull((idx + 1) % currentQueue.size)
-        }
-    }
-
-    val prevTrack = remember(currentQueue, currentTrack, currentQueueIndex, repeatMode) {
-        if (currentQueue.isEmpty()) null
-        else {
-            val idx = if (currentQueueIndex in currentQueue.indices) currentQueueIndex else currentQueue.indexOfFirst { it.id == currentTrack.id }
-            if (idx > 0) currentQueue[idx - 1]
-            else if (repeatMode == RepeatMode.ALL) currentQueue.lastOrNull()
-            else currentQueue.firstOrNull()
-        }
-    }
-
-    LaunchedEffect(currentTrack.id) {
-        if (currentTrack.id != displayedTrack.id) {
-            if (!isInteractiveDrag) {
-                outgoingTrack = displayedTrack
-                activeDirection = if (direction != 0) direction else 1
-                flipAngle.snapTo(0f)
-                flipAngle.animateTo(
-                    targetValue = 180f,
-                    animationSpec = spring(
-                        dampingRatio = 0.82f,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                )
-                displayedTrack = currentTrack
-                outgoingTrack = null
-                flipAngle.snapTo(0f)
-            } else {
-                displayedTrack = currentTrack
-                outgoingTrack = null
-            }
-        }
-    }
-
-    val currentAngle = flipAngle.value
-    val isFrontSide = currentAngle < 90f
-
-    val backTrackCandidate = if (isInteractiveDrag) {
-        if (interactiveDragOffsetX <= 0f) (nextTrack ?: currentTrack) else (prevTrack ?: currentTrack)
-    } else {
-        currentTrack
-    }
-
-    val frontTrackToRender = outgoingTrack ?: displayedTrack
-    val backTrackToRender = if (outgoingTrack != null) currentTrack else backTrackCandidate
-
-    val trackToRender = if (isFrontSide) frontTrackToRender else backTrackToRender
-
-    val cardRotationY = if (activeDirection >= 0) {
-        if (isFrontSide) -currentAngle else (180f - currentAngle)
-    } else {
-        if (isFrontSide) currentAngle else (-180f + currentAngle)
-    }
-
-    val simplifiedFlip = rememberShouldUseSimplifiedFlip()
-    val angleRadians = Math.toRadians(currentAngle.toDouble())
-    val depthScale = if (simplifiedFlip) 1f else (1f - (0.10f * sin(angleRadians))).toFloat()
-    val dimAlpha = if (simplifiedFlip) 0f else (0.28f * sin(angleRadians)).toFloat().coerceIn(0f, 0.4f)
 
     Box(
         modifier = modifier
             .size(artSize)
-            .pointerInput(currentTrack.id, nextTrack?.id, prevTrack?.id) {
+            .pointerInput(currentTrack.id) {
                 var totalDragX = 0f
                 var velocityTracker = VelocityTracker()
-
                 detectHorizontalDragGestures(
                     onDragStart = {
                         velocityTracker = VelocityTracker()
                         totalDragX = 0f
-                        isInteractiveDrag = true
-                        interactiveDragOffsetX = 0f
                     },
                     onDragEnd = {
                         val velocity = velocityTracker.calculateVelocity().x
-                        val thresholdPx = artSizePx * 0.22f
+                        val thresholdPx = artSizePx * 0.20f
                         val minFlingVelocity = 600f
-
                         coroutineScope.launch {
                             if (totalDragX < -thresholdPx || (velocity < -minFlingVelocity && totalDragX < -20f)) {
-                                activeDirection = 1
-                                flipAngle.animateTo(
-                                    targetValue = 180f,
-                                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                )
                                 onSwipeNext()
-                                delay(60)
-                                displayedTrack = currentTrack
-                                outgoingTrack = null
-                                flipAngle.snapTo(0f)
                             } else if (totalDragX > thresholdPx || (velocity > minFlingVelocity && totalDragX > 20f)) {
-                                activeDirection = -1
-                                flipAngle.animateTo(
-                                    targetValue = 180f,
-                                    animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)
-                                )
                                 onSwipePrevious()
-                                delay(60)
-                                displayedTrack = currentTrack
-                                outgoingTrack = null
-                                flipAngle.snapTo(0f)
-                            } else {
-                                flipAngle.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)
-                                )
                             }
-                            isInteractiveDrag = false
-                            interactiveDragOffsetX = 0f
+                            dragOffsetX.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            )
                         }
                     },
                     onDragCancel = {
                         coroutineScope.launch {
-                            flipAngle.animateTo(
+                            dragOffsetX.animateTo(
                                 targetValue = 0f,
-                                animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
                             )
-                            isInteractiveDrag = false
-                            interactiveDragOffsetX = 0f
                         }
                     },
                     onHorizontalDrag = { change, dragAmount ->
                         change.consume()
                         totalDragX += dragAmount
-                        interactiveDragOffsetX = totalDragX
                         velocityTracker.addPosition(change.uptimeMillis, change.position)
-
-                        activeDirection = if (totalDragX <= 0f) 1 else -1
-                        val fraction = (abs(totalDragX) / artSizePx).coerceIn(0f, 1f)
                         coroutineScope.launch {
-                            flipAngle.snapTo(fraction * 180f)
+                            val resistance = (1f - (abs(totalDragX) / (artSizePx * 2.2f)).coerceIn(0f, 0.45f))
+                            dragOffsetX.snapTo(totalDragX * resistance)
                         }
                     }
                 )
             }
             .graphicsLayer {
-                this.rotationY = cardRotationY
-                this.cameraDistance = if (simplifiedFlip) 8f * density.density else 16f * density.density
-                this.scaleX = depthScale
-                this.scaleY = depthScale
+                translationX = dragOffsetX.value
             },
         contentAlignment = Alignment.Center
     ) {
-        FlippableArtworkCard(
-            track = trackToRender,
-            size = artSize,
-            cornerRadius = cornerRadius,
-            isPlaying = isPlaying,
-            progressTrackColor = progressTrackColor,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        if (dimAlpha > 0.01f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(cornerRadius))
-                    .background(Color.Black.copy(alpha = dimAlpha))
+        AnimatedContent(
+            targetState = currentTrack,
+            transitionSpec = {
+                if (direction >= 0) {
+                    (slideInHorizontally(
+                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        initialOffsetX = { fullWidth -> fullWidth }
+                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    .togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            targetOffsetX = { fullWidth -> -fullWidth }
+                        ) + fadeOut(animationSpec = tween(180))
+                    )
+                } else {
+                    (slideInHorizontally(
+                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        initialOffsetX = { fullWidth -> -fullWidth }
+                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    .togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            targetOffsetX = { fullWidth -> fullWidth }
+                        ) + fadeOut(animationSpec = tween(180))
+                    )
+                }
+            },
+            label = "expanded_player_sliding_artwork"
+        ) { targetTrack ->
+            PlayerArtworkCard(
+                track = targetTrack,
+                size = artSize,
+                cornerRadius = cornerRadius,
+                isPlaying = isPlaying,
+                progressTrackColor = progressTrackColor,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }

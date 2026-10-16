@@ -439,8 +439,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.nextTrack()
     }
 
-    fun previousTrack() {
-        playbackManager.previousTrack()
+    fun previousTrack(forcePrevious: Boolean = false) {
+        playbackManager.previousTrack(forcePrevious = forcePrevious)
     }
 
     fun seekTo(positionMs: Long) {

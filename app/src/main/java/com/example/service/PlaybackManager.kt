@@ -903,7 +903,7 @@ class PlaybackManager private constructor(private val context: Context) {
         playTrackAtIndex(nextIdx, autoPlay = shouldPlay)
     }
 
-    fun previousTrack(autoPlayIfPaused: Boolean = false) {
+    fun previousTrack(autoPlayIfPaused: Boolean = false, forcePrevious: Boolean = false) {
         Log.d("TempPlayer", "previous")
         crossfadeController.cancelCrossfade()
         val q = _queue.value
@@ -911,8 +911,8 @@ class PlaybackManager private constructor(private val context: Context) {
         val currentIdx = _queueIndex.value
         val shouldPlay = if (autoPlayIfPaused) true else _isPlaying.value
 
-        // If played more than 3 seconds, replay track from beginning
-        if (_playbackPosition.value > 3000L) {
+        // If played more than 3 seconds, not forced, and currently playing, replay track from beginning
+        if (!forcePrevious && _isPlaying.value && _playbackPosition.value > 3000L) {
             seekTo(0)
             return
         }
