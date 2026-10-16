@@ -800,6 +800,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.onAudioPermissionGranted()
     }
 
+    fun ensureVisualizerStarted() {
+        playbackManager.visualizerController.ensureStarted()
+    }
+
     fun setVisualizerBands(bands: Int) {
         viewModelScope.launch {
             settingsDataStore.setVisualizerBands(bands)

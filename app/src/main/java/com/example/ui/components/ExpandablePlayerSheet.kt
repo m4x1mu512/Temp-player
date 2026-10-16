@@ -136,6 +136,8 @@ import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
 import com.example.ui.util.formatTime
 import com.example.ui.util.rememberPlayerColors
+import com.example.ui.util.rememberShouldUseSimplifiedShadows
+import com.example.ui.util.rememberShouldUseSimplifiedFlip
 import com.example.ui.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -340,18 +342,17 @@ fun ExpandablePlayerSheet(
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
-            val collapseDistanceThreshold = with(density) { 8.dp.toPx() }
-            val expandDistanceThreshold = with(density) { 8.dp.toPx() }
+            val lightThresholdPx = with(density) { 4.dp.toPx() }
             val targetExpanded = when {
-                velocityY < -50f -> true // Any light flick up -> expand
-                velocityY > 50f -> false // Any light flick down -> collapse
+                velocityY < -25f -> true // Any light flick up -> expand
+                velocityY > 25f -> false // Any light flick down -> collapse
                 isExpanded -> {
-                    // Was expanded: light downward drag (8dp) or slight progress drop collapses
-                    !(totalDragY > collapseDistanceThreshold || expandProgress < 0.94f)
+                    // Was expanded: light downward drag (4dp or positive delta) or slight progress drop collapses
+                    !(totalDragY > lightThresholdPx || expandProgress < 0.98f)
                 }
                 else -> {
-                    // Was collapsed (mini): light upward drag (8dp) or slight progress gain expands
-                    totalDragY < -expandDistanceThreshold || expandProgress > 0.05f
+                    // Was collapsed (mini): light upward drag (4dp or negative delta) or slight progress gain expands
+                    totalDragY < -lightThresholdPx || expandProgress > 0.02f
                 }
             }
             isExpanded = targetExpanded
@@ -459,11 +460,11 @@ fun ExpandablePlayerSheet(
                                     } else {
                                         // Light quick swipe without full drag engagement
                                         if (isExpanded) {
-                                            if (velocityY > 40f || totalDragY > 6f) {
+                                            if (velocityY > 20f || totalDragY > 3f) {
                                                 collapseToMini()
                                             }
                                         } else {
-                                            if (velocityY < -40f || totalDragY < -6f) {
+                                            if (velocityY < -20f || totalDragY < -3f) {
                                                 expandToFull()
                                             }
                                         }
@@ -481,7 +482,7 @@ fun ExpandablePlayerSheet(
                                     if (!isDraggingSheet && !isHorizontalTrackSwipe) {
                                         if (isExpanded) {
                                             // When expanded: slight downward swipe collapses sheet
-                                            if (totalDragY > 6f && totalDragY > abs(totalDragX) * 0.5f) {
+                                            if (totalDragY > 3f && totalDragY > abs(totalDragX) * 0.4f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
@@ -491,7 +492,7 @@ fun ExpandablePlayerSheet(
                                             }
                                         } else {
                                             // When collapsed (mini player): slight upward swipe expands sheet
-                                            if (totalDragY < -6f && abs(totalDragY) > abs(totalDragX) * 0.5f) {
+                                            if (totalDragY < -3f && abs(totalDragY) > abs(totalDragX) * 0.4f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
@@ -583,6 +584,7 @@ fun ExpandablePlayerSheet(
                     }
                 } else {
                     // Single Smoothly Morphing Artwork Box (used when mini player or during transition)
+                    val simplifiedShadows = rememberShouldUseSimplifiedShadows()
                     Box(
                         modifier = Modifier
                             .offset(x = currentArtX, y = currentArtY)
@@ -592,10 +594,10 @@ fun ExpandablePlayerSheet(
                                 translationX = swipe * 0.4f
                             }
                             .shadow(
-                                elevation = lerp(2.dp, 24.dp, expandProgress),
+                                elevation = lerp(2.dp, if (simplifiedShadows) 10.dp else 24.dp, expandProgress),
                                 shape = RoundedCornerShape(currentArtCornerRadius),
-                                spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.5f * expandProgress) else Color.Black.copy(alpha = 0.2f),
-                                ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.35f * expandProgress) else Color.Transparent
+                                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.5f * expandProgress) else Color.Black.copy(alpha = 0.2f),
+                                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.35f * expandProgress) else Color.Transparent
                             )
                             .clip(RoundedCornerShape(currentArtCornerRadius))
                             .background(colorScheme.progressTrackColor)
@@ -1507,9 +1509,10 @@ private fun ExpandedFlippableArtwork(
         if (isFrontSide) currentAngle else (-180f + currentAngle)
     }
 
+    val simplifiedFlip = rememberShouldUseSimplifiedFlip()
     val angleRadians = Math.toRadians(currentAngle.toDouble())
-    val depthScale = (1f - (0.10f * sin(angleRadians))).toFloat()
-    val dimAlpha = (0.28f * sin(angleRadians)).toFloat().coerceIn(0f, 0.4f)
+    val depthScale = if (simplifiedFlip) 1f else (1f - (0.10f * sin(angleRadians))).toFloat()
+    val dimAlpha = if (simplifiedFlip) 0f else (0.28f * sin(angleRadians)).toFloat().coerceIn(0f, 0.4f)
 
     Box(
         modifier = modifier
@@ -1589,7 +1592,7 @@ private fun ExpandedFlippableArtwork(
             }
             .graphicsLayer {
                 this.rotationY = cardRotationY
-                this.cameraDistance = 16f * density.density
+                this.cameraDistance = if (simplifiedFlip) 8f * density.density else 16f * density.density
                 this.scaleX = depthScale
                 this.scaleY = depthScale
             },

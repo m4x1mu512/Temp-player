@@ -175,7 +175,7 @@ fun MiniPlayer(
                 .pointerInput(onClick) {
                     detectVerticalDragGestures(
                         onVerticalDrag = { change, dragAmount ->
-                            if (dragAmount < -8f) {
+                            if (dragAmount < -4f) {
                                 change.consume()
                                 onClick()
                             }

@@ -81,7 +81,9 @@ class PlaybackManager private constructor(private val context: Context) {
     var onActivePlayerChanged: ((ExoPlayer) -> Unit)? = null
     var onRequestAudioFocus: (() -> Unit)? = null
 
-    val visualizerController = AudioVisualizerController(serviceScope)
+    val visualizerController = AudioVisualizerController(serviceScope).apply {
+        frameDelayMs = com.example.ui.util.DevicePerformanceHelper.getVisualizerDelayMs(context)
+    }
     val equalizerController = EqualizerController()
     val replayGainController = ReplayGainController(context)
     val crossfadeController = CrossfadeController(serviceScope)

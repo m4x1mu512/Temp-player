@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        viewModel.ensureVisualizerStarted()
         try {
             val serviceIntent = Intent(this, PlaybackService::class.java)
             startService(serviceIntent)

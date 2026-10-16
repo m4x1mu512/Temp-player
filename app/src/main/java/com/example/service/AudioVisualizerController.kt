@@ -54,6 +54,9 @@ class AudioVisualizerController(
     private var isPlaying = false
 
     @Volatile
+    var frameDelayMs: Long = 20L
+
+    @Volatile
     private var currentBandCount = 32
 
     @Volatile
@@ -171,8 +174,8 @@ class AudioVisualizerController(
         isPlaying = playing
         if (playing) {
             playbackStartTimeMs = System.currentTimeMillis()
-            ensureStarted()
         }
+        ensureStarted()
     }
 
     private fun processAudioBuffer(buffer: ByteBuffer) {
@@ -488,11 +491,17 @@ class AudioVisualizerController(
                         }
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (t: Throwable) {
                 // Calculation safety
             }
 
-            delay(20)
+            try {
+                delay(frameDelayMs.coerceAtLeast(15L))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Throwable) {}
             }
         }
     }

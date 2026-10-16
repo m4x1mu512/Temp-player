@@ -131,18 +131,42 @@ private fun AmplitudeVisualizer(
     colorEnd: Color,
     modifier: Modifier = Modifier
 ) {
+    val isLowPower = com.example.ui.util.rememberIsLowPowerDevice()
+    val verticalBrush = remember(colorStart, colorMiddle, colorEnd) {
+        Brush.verticalGradient(listOf(colorStart, colorMiddle, colorEnd))
+    }
+    val baselineColorsPlaying = remember(colorStart, colorMiddle) {
+        listOf(
+            Color.Transparent,
+            colorMiddle.copy(alpha = 0.35f),
+            colorStart.copy(alpha = 0.55f),
+            colorMiddle.copy(alpha = 0.35f),
+            Color.Transparent
+        )
+    }
+    val baselineColorsPaused = remember(colorStart, colorMiddle) {
+        listOf(
+            Color.Transparent,
+            colorMiddle.copy(alpha = 0.12f),
+            colorStart.copy(alpha = 0.2f),
+            colorMiddle.copy(alpha = 0.12f),
+            Color.Transparent
+        )
+    }
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
         val midY = height / 2f
-        val barCount = waveformData.size.coerceIn(16, 48)
+        val maxBars = if (isLowPower) 24 else 48
+        val barCount = waveformData.size.coerceIn(16, maxBars)
 
         val totalSpacing = width * 0.25f
         val barWidth = ((width - totalSpacing) / barCount).coerceAtLeast(3f)
         val spacing = totalSpacing / (barCount - 1).coerceAtLeast(1)
 
-        // Center pulsating amplitude halo responding to live amplitude
-        if (isPlaying && amplitude > 0.04f) {
+        // Center pulsating amplitude halo responding to live amplitude (skipped on low-power to save GPU bandwidth)
+        if (!isLowPower && isPlaying && amplitude > 0.04f) {
             val bloomRadius = (height * 0.5f) * (0.6f + amplitude * 0.8f)
             drawCircle(
                 brush = Brush.radialGradient(
@@ -162,24 +186,13 @@ private fun AmplitudeVisualizer(
         // Horizontal center baseline glow
         drawLine(
             brush = Brush.horizontalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    colorMiddle.copy(alpha = if (isPlaying) 0.35f else 0.12f),
-                    colorStart.copy(alpha = if (isPlaying) 0.55f else 0.2f),
-                    colorMiddle.copy(alpha = if (isPlaying) 0.35f else 0.12f),
-                    Color.Transparent
-                )
+                colors = if (isPlaying) baselineColorsPlaying else baselineColorsPaused,
+                startX = 0f,
+                endX = width
             ),
             start = Offset(0f, midY),
             end = Offset(width, midY),
             strokeWidth = 2f
-        )
-
-        // Symmetrical dynamic amplitude bars mirrored across center axis
-        val brush = Brush.verticalGradient(
-            colors = listOf(colorStart, colorMiddle, colorEnd),
-            startY = 0f,
-            endY = height
         )
 
         for (i in 0 until barCount) {
@@ -194,7 +207,7 @@ private fun AmplitudeVisualizer(
             val barHeight = barHalfHeight * 2f
 
             drawRoundRect(
-                brush = brush,
+                brush = verticalBrush,
                 topLeft = Offset(left, top),
                 size = Size(barWidth, barHeight),
                 cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
@@ -227,20 +240,19 @@ private fun SpectrumVisualizer(
     colorEnd: Color,
     modifier: Modifier = Modifier
 ) {
-    val barCount = data.size.coerceAtLeast(16)
+    val isLowPower = com.example.ui.util.rememberIsLowPowerDevice()
+    val spectrumBrush = remember(colorEnd, colorMiddle, colorStart) {
+        Brush.verticalGradient(listOf(colorEnd, colorMiddle, colorStart))
+    }
 
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
         val totalSpacing = width * 0.25f
+        val maxBars = if (isLowPower) 24 else 48
+        val barCount = data.size.coerceIn(16, maxBars)
         val barWidth = ((width - totalSpacing) / barCount).coerceAtLeast(2f)
         val spacing = totalSpacing / (barCount - 1).coerceAtLeast(1)
-
-        val brush = Brush.verticalGradient(
-            colors = listOf(colorEnd, colorMiddle, colorStart),
-            startY = 0f,
-            endY = height
-        )
 
         for (i in 0 until barCount) {
             val rawVal = if (i < data.size) data[i] else 0.05f
@@ -250,7 +262,7 @@ private fun SpectrumVisualizer(
             val top = height - barHeight
 
             drawRoundRect(
-                brush = brush,
+                brush = spectrumBrush,
                 topLeft = Offset(left, top),
                 size = Size(barWidth, barHeight),
                 cornerRadius = CornerRadius(barWidth / 2, barWidth / 2)
@@ -279,6 +291,14 @@ private fun WaveVisualizer(
 ) {
     val path = remember { Path() }
     val fillPath = remember { Path() }
+    val waveLineBrush = remember(colorStart, colorMiddle, colorEnd) {
+        Brush.horizontalGradient(listOf(colorStart, colorMiddle, colorEnd))
+    }
+    val fillGradient = remember(colorMiddle) {
+        Brush.verticalGradient(
+            colors = listOf(colorMiddle.copy(alpha = 0.25f), Color.Transparent)
+        )
+    }
 
     Canvas(modifier = modifier) {
         val width = size.width
@@ -310,7 +330,6 @@ private fun WaveVisualizer(
                 val prevAmp = if (isPlaying) prevV * (height * 0.42f) else 4f
                 val prevSign = if ((i - 1) % 2 == 0) 1f else -1f
                 val prevY = midY + (prevAmp * prevSign)
-
                 val cx = (prevX + x) / 2f
                 path.cubicTo(cx, prevY, cx, y, x, y)
                 fillPath.cubicTo(cx, prevY, cx, y, x, y)
@@ -323,17 +342,13 @@ private fun WaveVisualizer(
         // Draw soft ambient gradient below wave
         drawPath(
             path = fillPath,
-            brush = Brush.verticalGradient(
-                colors = listOf(colorMiddle.copy(alpha = 0.25f), Color.Transparent),
-                startY = midY,
-                endY = height
-            )
+            brush = fillGradient
         )
 
         // Draw glowing neon line
         drawPath(
             path = path,
-            brush = Brush.horizontalGradient(listOf(colorStart, colorMiddle, colorEnd)),
+            brush = waveLineBrush,
             style = Stroke(width = 6f, cap = StrokeCap.Round)
         )
     }
@@ -349,6 +364,7 @@ private fun CircleVisualizer(
     colorEnd: Color,
     modifier: Modifier = Modifier
 ) {
+    val isLowPower = com.example.ui.util.rememberIsLowPowerDevice()
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseGlow by infiniteTransition.animateFloat(
         initialValue = 0.85f,
@@ -362,6 +378,13 @@ private fun CircleVisualizer(
 
     val pulse = if (isPlaying) pulseGlow + (amplitude * 0.25f) else 1.0f
 
+    val outerOrbColors = remember(colorStart, colorMiddle) {
+        listOf(colorStart.copy(alpha = 0.35f), colorMiddle.copy(alpha = 0.15f), Color.Transparent)
+    }
+    val innerOrbColors = remember(colorMiddle, colorEnd) {
+        listOf(colorMiddle, colorEnd)
+    }
+
     Canvas(modifier = modifier) {
         val centerX = size.width / 2f
         val centerY = size.height / 2f
@@ -369,29 +392,38 @@ private fun CircleVisualizer(
         val baseRadius = (minDim * 0.22f) * (if (isPlaying) pulse else 1.0f)
         val maxBarLen = minDim * 0.22f
 
-        val bands = data.size.coerceAtLeast(24)
+        val bands = if (isLowPower) 24 else data.size.coerceAtLeast(24)
         val angleStep = (2 * Math.PI) / bands
 
-        // Center ambient orb
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(colorStart.copy(alpha = 0.35f), colorMiddle.copy(alpha = 0.15f), Color.Transparent),
-                center = Offset(centerX, centerY),
-                radius = baseRadius * 1.3f
-            ),
-            radius = baseRadius * 1.3f,
-            center = Offset(centerX, centerY)
-        )
+        if (!isLowPower) {
+            // Center ambient orb
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = outerOrbColors,
+                    center = Offset(centerX, centerY),
+                    radius = baseRadius * 1.3f
+                ),
+                radius = baseRadius * 1.3f,
+                center = Offset(centerX, centerY)
+            )
 
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(colorMiddle, colorEnd),
-                center = Offset(centerX, centerY),
-                radius = baseRadius
-            ),
-            radius = baseRadius * 0.75f,
-            center = Offset(centerX, centerY)
-        )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = innerOrbColors,
+                    center = Offset(centerX, centerY),
+                    radius = baseRadius
+                ),
+                radius = baseRadius * 0.75f,
+                center = Offset(centerX, centerY)
+            )
+        } else {
+            // Light solid ambient circle for low-power devices
+            drawCircle(
+                color = colorMiddle.copy(alpha = 0.35f),
+                radius = baseRadius * 0.75f,
+                center = Offset(centerX, centerY)
+            )
+        }
 
         // Radial bars
         for (i in 0 until bands) {
@@ -406,11 +438,7 @@ private fun CircleVisualizer(
             val endY = centerY + ((baseRadius + barLen) * sin(angle)).toFloat()
 
             drawLine(
-                brush = Brush.linearGradient(
-                    colors = listOf(colorStart, colorEnd),
-                    start = Offset(startX, startY),
-                    end = Offset(endX, endY)
-                ),
+                color = if (i % 2 == 0) colorStart else colorEnd,
                 start = Offset(startX, startY),
                 end = Offset(endX, endY),
                 strokeWidth = 5f,
@@ -419,3 +447,4 @@ private fun CircleVisualizer(
         }
     }
 }
+
