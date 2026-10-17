@@ -462,13 +462,13 @@ fun ExpandablePlayerSheet(
                                             isTrackSwiping = false
                                         }
                                     } else {
-                                        // Light quick swipe without full drag engagement
+                                        // Quick vertical swipe without full drag engagement
                                         if (isExpanded) {
-                                            if (velocityY > 20f || totalDragY > 3f) {
+                                            if ((velocityY > 300f || totalDragY > 30f) && totalDragY > abs(totalDragX) * 1.2f) {
                                                 collapseToMini()
                                             }
                                         } else {
-                                            if (velocityY < -20f || totalDragY < -3f) {
+                                            if ((velocityY < -300f || totalDragY < -30f) && abs(totalDragY) > abs(totalDragX) * 1.2f) {
                                                 expandToFull()
                                             }
                                         }
@@ -485,18 +485,15 @@ fun ExpandablePlayerSheet(
 
                                     if (!isDraggingSheet && !isHorizontalTrackSwipe) {
                                         if (isExpanded) {
-                                            // When expanded: slight downward swipe collapses sheet
-                                            if (totalDragY > 3f && totalDragY > abs(totalDragX) * 0.4f) {
+                                            // When expanded: downward swipe collapses sheet (horizontal swipes handled by artwork and title)
+                                            if (totalDragY > 10f && totalDragY > abs(totalDragX) * 0.8f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
-                                            } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
-                                                isHorizontalTrackSwipe = true
-                                                isTrackSwiping = true
                                             }
                                         } else {
-                                            // When collapsed (mini player): slight upward swipe expands sheet
-                                            if (totalDragY < -3f && abs(totalDragY) > abs(totalDragX) * 0.4f) {
+                                            // When collapsed (mini player): slight upward swipe expands sheet, horizontal swipe changes track
+                                            if (totalDragY < -5f && abs(totalDragY) > abs(totalDragX) * 0.6f) {
                                                 isDraggingSheet = true
                                                 isDragging = true
                                                 dragOffsetY = animOffsetY.value
@@ -869,7 +866,33 @@ fun ExpandablePlayerSheet(
                                 Column(
                                     modifier = Modifier
                                         .weight(0.52f)
-                                        .padding(start = 16.dp),
+                                        .padding(start = 16.dp)
+                                        .pointerInput(track.id) {
+                                            var totalDragX = 0f
+                                            var velocityTracker = VelocityTracker()
+                                            detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    velocityTracker = VelocityTracker()
+                                                    totalDragX = 0f
+                                                },
+                                                onDragEnd = {
+                                                    val velocity = velocityTracker.calculateVelocity().x
+                                                    val thresholdPx = 90f
+                                                    val minFlingVelocity = 450f
+                                                    if (totalDragX < -thresholdPx || (velocity < -minFlingVelocity && totalDragX < -15f)) {
+                                                        onSwipeNextTrack()
+                                                    } else if (totalDragX > thresholdPx || (velocity > minFlingVelocity && totalDragX > 15f)) {
+                                                        onSwipePreviousTrack()
+                                                    }
+                                                },
+                                                onDragCancel = {},
+                                                onHorizontalDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    totalDragX += dragAmount
+                                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                                }
+                                            )
+                                        },
                                     verticalArrangement = Arrangement.SpaceEvenly,
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
@@ -1003,12 +1026,38 @@ fun ExpandablePlayerSheet(
                                     }
                                 }
 
-                                // Track Title & Artist & Album with edge-to-edge slide transition
+                                // Track Title & Artist & Album with edge-to-edge slide transition and swipe gesture
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 8.dp)
+                                        .pointerInput(track.id) {
+                                            var totalDragX = 0f
+                                            var velocityTracker = VelocityTracker()
+                                            detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    velocityTracker = VelocityTracker()
+                                                    totalDragX = 0f
+                                                },
+                                                onDragEnd = {
+                                                    val velocity = velocityTracker.calculateVelocity().x
+                                                    val thresholdPx = 90f
+                                                    val minFlingVelocity = 450f
+                                                    if (totalDragX < -thresholdPx || (velocity < -minFlingVelocity && totalDragX < -15f)) {
+                                                        onSwipeNextTrack()
+                                                    } else if (totalDragX > thresholdPx || (velocity > minFlingVelocity && totalDragX > 15f)) {
+                                                        onSwipePreviousTrack()
+                                                    }
+                                                },
+                                                onDragCancel = {},
+                                                onHorizontalDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    totalDragX += dragAmount
+                                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                                }
+                                            )
+                                        }
                                 ) {
                                     AnimatedContent(
                                         targetState = track,
