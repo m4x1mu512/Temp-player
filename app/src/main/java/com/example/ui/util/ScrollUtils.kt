@@ -57,3 +57,25 @@ suspend fun LazyListState.smoothScrollToTrackIndex(targetIndex: Int) {
     }
 }
 
+/**
+ * Instantly scrolls to center the target track item in the viewport
+ * without animating through preceding items.
+ */
+suspend fun LazyListState.centerTrackIndexInstantly(targetIndex: Int) {
+    if (targetIndex < 0) return
+    val totalCount = layoutInfo.totalItemsCount
+    if (totalCount == 0 || targetIndex >= totalCount) return
+
+    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    val itemHeight = layoutInfo.visibleItemsInfo.firstOrNull()?.size ?: 180
+    val offset = -((viewportHeight - itemHeight) / 2).coerceAtLeast(0)
+
+    try {
+        scrollToItem(index = targetIndex, scrollOffset = offset)
+    } catch (_: Exception) {
+        try {
+            scrollToItem(targetIndex)
+        } catch (_: Exception) {}
+    }
+}
+

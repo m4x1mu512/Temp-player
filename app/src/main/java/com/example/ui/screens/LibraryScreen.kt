@@ -118,6 +118,7 @@ import com.example.ui.components.ScrollToCurrentTrackFab
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
 import com.example.ui.util.smoothScrollToTrackIndex
+import com.example.ui.util.centerTrackIndexInstantly
 import com.example.ui.viewmodel.MainViewModel
 
 @Composable
@@ -252,15 +253,12 @@ fun LibraryScreen(
         coroutineScope.launch {
             resetAllDrilldowns()
             if (pagerState.currentPage != 0) {
-                pagerState.animateScrollToPage(
-                    page = 0,
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
-                )
+                pagerState.scrollToPage(0)
             }
             val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
             val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
             if (targetIdx >= 0) {
-                queueListState.smoothScrollToTrackIndex(targetIdx)
+                queueListState.centerTrackIndexInstantly(targetIdx)
             }
         }
     }

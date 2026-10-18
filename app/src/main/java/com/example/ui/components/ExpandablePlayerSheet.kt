@@ -354,6 +354,16 @@ fun ExpandablePlayerSheet(
                 )
             }
         }
+        val collapseToMiniFast: () -> Unit = {
+            isExpanded = false
+            isDragging = false
+            coroutineScope.launch {
+                animOffsetY.animateTo(
+                    targetValue = maxDragPx,
+                    animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessHigh)
+                )
+            }
+        }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
             val lightThresholdPx = with(density) { 4.dp.toPx() }
@@ -1216,7 +1226,7 @@ fun ExpandablePlayerSheet(
 
                                     IconButton(
                                         onClick = {
-                                            collapseToMini()
+                                            collapseToMiniFast()
                                             onNavigateToQueue()
                                         },
                                         modifier = Modifier.testTag("player_bottom_queue_button")
