@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -185,6 +186,20 @@ fun ExpandablePlayerSheet(
     val isCurrentTrackFavorite = remember(favoriteIds, track.id) {
         favoriteIds.contains(track.id)
     }
+
+    val favoriteHeartScale by animateFloatAsState(
+        targetValue = if (isCurrentTrackFavorite) 1.25f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "player_favorite_heart_scale"
+    )
+    val favoriteHeartColor by animateColorAsState(
+        targetValue = if (isCurrentTrackFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 220),
+        label = "player_favorite_heart_color"
+    )
 
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val currentQueueIndex by viewModel.currentQueueIndex.collectAsStateWithLifecycle()
@@ -718,7 +733,12 @@ fun ExpandablePlayerSheet(
                                     imageVector = if (isCurrentTrackFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = if (isCurrentTrackFavorite) "Удалить из избранного" else "В избранное",
                                     tint = if (isCurrentTrackFavorite) FavoriteRed else colorScheme.onSurfaceVariantColor,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer {
+                                            scaleX = favoriteHeartScale
+                                            scaleY = favoriteHeartScale
+                                        }
                                 )
                             }
 
@@ -899,6 +919,7 @@ fun ExpandablePlayerSheet(
                                      // Title, Artist & Album with edge-to-edge slide transition
                                     AnimatedContent(
                                         targetState = track,
+                                        contentKey = { it.id },
                                         transitionSpec = {
                                             if (transitionDirection >= 0) {
                                                 (slideInHorizontally(
@@ -1061,6 +1082,7 @@ fun ExpandablePlayerSheet(
                                 ) {
                                     AnimatedContent(
                                         targetState = track,
+                                        contentKey = { it.id },
                                         transitionSpec = {
                                             if (transitionDirection >= 0) {
                                                 (slideInHorizontally(
@@ -1162,7 +1184,11 @@ fun ExpandablePlayerSheet(
                                         Icon(
                                             imageVector = if (isCurrentTrackFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                             contentDescription = if (isCurrentTrackFavorite) "Удалить из избранного" else "В избранное",
-                                            tint = if (isCurrentTrackFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant
+                                            tint = favoriteHeartColor,
+                                            modifier = Modifier.graphicsLayer {
+                                                scaleX = favoriteHeartScale
+                                                scaleY = favoriteHeartScale
+                                            }
                                         )
                                     }
 
@@ -1549,6 +1575,7 @@ private fun ExpandedSlidingArtwork(
     ) {
         AnimatedContent(
             targetState = currentTrack,
+            contentKey = { it.id },
             transitionSpec = {
                 if (direction >= 0) {
                     (slideInHorizontally(
