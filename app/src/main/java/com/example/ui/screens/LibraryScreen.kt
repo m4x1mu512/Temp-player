@@ -1,13 +1,23 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import com.example.ui.util.PlayerEmphasizedDecelerateEasing
+import com.example.ui.util.PlayerEmphasizedAccelerateEasing
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -290,9 +300,9 @@ fun LibraryScreen(
             coroutineScope.launch {
                 pagerState.animateScrollToPage(
                     page = targetPage,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMediumLow
+                    animationSpec = tween(
+                        durationMillis = 240,
+                        easing = PlayerEmphasizedDecelerateEasing
                     )
                 )
             }
@@ -882,6 +892,46 @@ fun LibraryScreen(
     }
 }
 
+private val DrilldownSharedAxisTransition: androidx.compose.animation.AnimatedContentTransitionScope<Boolean>.() -> androidx.compose.animation.ContentTransform = {
+    if (targetState) {
+        // Forward transition: entering drilldown (detail screen)
+        (slideInHorizontally(
+            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+            initialOffsetX = { (it * 0.18f).toInt() }
+        ) + scaleIn(
+            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+            initialScale = 0.92f
+        ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing)))
+        .togetherWith(
+            slideOutHorizontally(
+                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                targetOffsetX = { -(it * 0.14f).toInt() }
+            ) + scaleOut(
+                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                targetScale = 0.94f
+            ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
+        )
+    } else {
+        // Reverse transition: returning back to root screen
+        (slideInHorizontally(
+            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+            initialOffsetX = { -(it * 0.14f).toInt() }
+        ) + scaleIn(
+            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+            initialScale = 0.94f
+        ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing)))
+        .togetherWith(
+            slideOutHorizontally(
+                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                targetOffsetX = { (it * 0.18f).toInt() }
+            ) + scaleOut(
+                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                targetScale = 0.92f
+            ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
+        )
+    }
+}
+
 @Composable
 private fun GroupedListSection(
     groups: Map<String, List<Track>>,
@@ -899,7 +949,12 @@ private fun GroupedListSection(
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
-    if (selectedTitle != null) {
+    AnimatedContent(
+        targetState = selectedTitle != null,
+        transitionSpec = DrilldownSharedAxisTransition,
+        label = "artist_drilldown_transition"
+    ) { hasSelectedTitle ->
+        if (hasSelectedTitle && selectedTitle != null) {
         val tracks = groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
@@ -1162,6 +1217,7 @@ private fun GroupedListSection(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -1296,8 +1352,13 @@ private fun FoldersSection(
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
-    if (selectedTitle != null) {
-        val tracks = folderGroups[selectedTitle] ?: emptyList()
+    AnimatedContent(
+        targetState = selectedTitle != null,
+        transitionSpec = DrilldownSharedAxisTransition,
+        label = "folders_drilldown_transition"
+    ) { hasSelectedTitle ->
+        if (hasSelectedTitle && selectedTitle != null) {
+            val tracks = folderGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
             tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
@@ -1533,6 +1594,7 @@ private fun FoldersSection(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -1553,7 +1615,12 @@ private fun AlbumsSection(
 ) {
     val context = LocalContext.current
 
-    if (selectedTitle != null) {
+    AnimatedContent(
+        targetState = selectedTitle != null,
+        transitionSpec = DrilldownSharedAxisTransition,
+        label = "albums_drilldown_transition"
+    ) { hasSelectedTitle ->
+        if (hasSelectedTitle && selectedTitle != null) {
         val tracks = albumGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val albumArtUri = remember(tracks) {
@@ -1859,6 +1926,7 @@ private fun AlbumsSection(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -1890,8 +1958,13 @@ private fun PlaylistsSection(
 ) {
     val isDrilldown = selectedCategoryTitle != null || selectedPlaylist != null
 
-    if (isDrilldown) {
-        val currentPlaylist = remember(selectedPlaylist?.id, playlists) {
+    AnimatedContent(
+        targetState = isDrilldown,
+        transitionSpec = DrilldownSharedAxisTransition,
+        label = "playlists_drilldown_transition"
+    ) { hasDrilldown ->
+        if (hasDrilldown) {
+            val currentPlaylist = remember(selectedPlaylist?.id, playlists) {
             if (selectedPlaylist != null) {
                 playlists.find { it.id == selectedPlaylist.id } ?: selectedPlaylist
             } else null
@@ -2401,5 +2474,6 @@ private fun PlaylistsSection(
                 }
             }
         }
+    }
     }
 }

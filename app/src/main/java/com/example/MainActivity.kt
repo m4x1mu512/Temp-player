@@ -29,6 +29,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -295,10 +297,10 @@ fun AppNavigation(viewModel: MainViewModel) {
             startDestination = "library",
             modifier = Modifier.fillMaxSize(),
             enterTransition = {
-                fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                fadeIn(animationSpec = tween(220, easing = PlayerEmphasizedDecelerateEasing))
             },
             exitTransition = {
-                fadeOut(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedAccelerateEasing))
+                fadeOut(animationSpec = tween(180, easing = PlayerEmphasizedAccelerateEasing))
             }
         ) {
             composable(
@@ -307,27 +309,39 @@ fun AppNavigation(viewModel: MainViewModel) {
                     if (initialState.destination.route == "settings") {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
-                            animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
-                        ) + fadeIn(animationSpec = tween(220))
+                            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                            initialOffset = { -(it * 0.16f).toInt() }
+                        ) + scaleIn(
+                            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                            initialScale = 0.94f
+                        ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                     } else {
-                        fadeIn(animationSpec = tween(PLAYER_TRANSITION_DURATION, easing = PlayerEmphasizedDecelerateEasing))
+                        fadeIn(animationSpec = tween(220, easing = PlayerEmphasizedDecelerateEasing))
                     }
                 },
                 exitTransition = {
                     if (targetState.destination.route == "settings") {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
-                            animationSpec = tween(280, easing = PlayerEmphasizedAccelerateEasing)
-                        ) + fadeOut(animationSpec = tween(220))
+                            animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                            targetOffset = { -(it * 0.14f).toInt() }
+                        ) + scaleOut(
+                            animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                            targetScale = 0.94f
+                        ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
                     } else {
-                        fadeOut(animationSpec = tween(220))
+                        fadeOut(animationSpec = tween(180, easing = PlayerEmphasizedAccelerateEasing))
                     }
                 },
                 popEnterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(280, easing = PlayerEmphasizedDecelerateEasing)
-                    ) + fadeIn(animationSpec = tween(220))
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialOffset = { -(it * 0.16f).toInt() }
+                    ) + scaleIn(
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialScale = 0.94f
+                    ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                 }
             ) {
                 LibraryScreen(
@@ -342,26 +356,42 @@ fun AppNavigation(viewModel: MainViewModel) {
                 enterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(220))
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialOffset = { (it * 0.18f).toInt() }
+                    ) + scaleIn(
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialScale = 0.92f
+                    ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                 },
                 exitTransition = {
                     slideOutOfContainer(
-                        AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing)
-                    ) + fadeOut(animationSpec = tween(220))
+                        AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                        targetOffset = { -(it * 0.14f).toInt() }
+                    ) + scaleOut(
+                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                        targetScale = 0.94f
+                    ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
                 },
                 popEnterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing)
-                    ) + fadeIn(animationSpec = tween(220))
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialOffset = { -(it * 0.16f).toInt() }
+                    ) + scaleIn(
+                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
+                        initialScale = 0.94f
+                    ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                 },
                 popExitTransition = {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(280, easing = FastOutSlowInEasing)
-                    ) + fadeOut(animationSpec = tween(220))
+                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                        targetOffset = { (it * 0.18f).toInt() }
+                    ) + scaleOut(
+                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
+                        targetScale = 0.92f
+                    ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
                 }
             ) {
                 SettingsScreen(
