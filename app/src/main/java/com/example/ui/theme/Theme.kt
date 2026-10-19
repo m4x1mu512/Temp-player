@@ -11,13 +11,17 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme =
+import com.example.data.model.AccentColor
+import com.example.data.model.ThemeMode
+import androidx.compose.material3.ColorScheme
+
+private fun createDarkColorScheme(accentColor: AccentColor): ColorScheme =
   darkColorScheme(
-    primary = TempDarkPrimary,
-    onPrimary = TempDarkOnPrimary,
-    secondary = TempDarkSecondary,
+    primary = accentColor.darkPrimary,
+    onPrimary = accentColor.darkOnPrimary,
+    secondary = accentColor.darkSecondary,
     onSecondary = TempDarkOnSecondary,
-    tertiary = TempDarkTertiary,
+    tertiary = accentColor.darkTertiary,
     background = TempDarkBackground,
     onBackground = TempDarkOnBackground,
     surface = TempDarkSurface,
@@ -26,13 +30,13 @@ private val DarkColorScheme =
     onSurfaceVariant = TempDarkOnSurfaceVariant,
   )
 
-private val LightColorScheme =
+private fun createLightColorScheme(accentColor: AccentColor): ColorScheme =
   lightColorScheme(
-    primary = TempLightPrimary,
-    onPrimary = TempLightOnPrimary,
-    secondary = TempLightSecondary,
+    primary = accentColor.lightPrimary,
+    onPrimary = accentColor.lightOnPrimary,
+    secondary = accentColor.lightSecondary,
     onSecondary = TempLightOnSecondary,
-    tertiary = TempLightTertiary,
+    tertiary = accentColor.lightTertiary,
     background = TempLightBackground,
     onBackground = TempLightOnBackground,
     surface = TempLightSurface,
@@ -43,15 +47,16 @@ private val LightColorScheme =
 
 @Composable
 fun MyApplicationTheme(
-  themeMode: com.example.data.model.ThemeMode = com.example.data.model.ThemeMode.SYSTEM,
+  themeMode: ThemeMode = ThemeMode.SYSTEM,
+  accentColor: AccentColor = AccentColor.TURQUOISE,
   darkTheme: Boolean = when (themeMode) {
-    com.example.data.model.ThemeMode.LIGHT -> false
-    com.example.data.model.ThemeMode.DARK -> true
-    com.example.data.model.ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
   },
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+  val colorScheme = if (darkTheme) createDarkColorScheme(accentColor) else createLightColorScheme(accentColor)
 
   val view = LocalView.current
   if (!view.isInEditMode) {

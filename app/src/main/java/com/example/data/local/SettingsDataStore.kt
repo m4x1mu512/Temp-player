@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.data.model.AccentColor
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
@@ -29,6 +30,7 @@ class SettingsDataStore(private val context: Context) {
     companion object {
         private const val PREFS_CACHE_NAME = "app_theme_cache"
         private const val KEY_CACHED_THEME_MODE = "cached_theme_mode"
+        private const val KEY_CACHED_ACCENT_COLOR = "cached_accent_color"
         private const val KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER = "cached_custom_all_tracks_order"
         private const val KEY_CACHED_QUEUE_TRACK_IDS = "cached_queue_track_ids"
         private const val KEY_CACHED_LAST_QUEUE_INDEX = "cached_last_queue_index"
@@ -79,7 +81,30 @@ class SettingsDataStore(private val context: Context) {
             } catch (_: Exception) {}
         }
 
+        fun getInitialAccentColor(context: Context): AccentColor {
+            val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+            val name = prefs.getString(KEY_CACHED_ACCENT_COLOR, null)
+            if (name != null) {
+                return try {
+                    AccentColor.valueOf(name)
+                } catch (_: Exception) {
+                    AccentColor.TURQUOISE
+                }
+            }
+            return AccentColor.TURQUOISE
+        }
+
+        fun saveCachedAccentColor(context: Context, accentColor: AccentColor) {
+            try {
+                context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_CACHED_ACCENT_COLOR, accentColor.name)
+                    .commit()
+            } catch (_: Exception) {}
+        }
+
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+        private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
         private val KEY_VISUALIZER_ENABLED = booleanPreferencesKey("visualizer_enabled")
         private val KEY_VISUALIZER_MODE = stringPreferencesKey("visualizer_mode")
         private val KEY_VISUALIZER_BANDS = intPreferencesKey("visualizer_bands")
@@ -284,6 +309,21 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    val accentColorFlow: Flow<AccentColor> = context.dataStore.data.map { preferences ->
+        val name = preferences[KEY_ACCENT_COLOR]
+        if (name != null) {
+            try {
+                saveCachedAccentColor(context, AccentColor.valueOf(name))
+            } catch (_: Exception) {}
+        }
+        val currentName = name ?: getInitialAccentColor(context).name
+        try {
+            AccentColor.valueOf(currentName)
+        } catch (_: Exception) {
+            AccentColor.TURQUOISE
+        }
+    }
+
     val visualizerEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_VISUALIZER_ENABLED] ?: true
     }
@@ -397,6 +437,13 @@ class SettingsDataStore(private val context: Context) {
         saveCachedThemeMode(context, mode)
         context.dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
+        }
+    }
+
+    suspend fun setAccentColor(accentColor: AccentColor) {
+        saveCachedAccentColor(context, accentColor)
+        context.dataStore.edit { preferences ->
+            preferences[KEY_ACCENT_COLOR] = accentColor.name
         }
     }
 

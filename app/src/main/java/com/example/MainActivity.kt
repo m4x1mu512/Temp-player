@@ -150,6 +150,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
             val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
             val isSystemDark = isSystemInDarkTheme()
             val isDarkTheme = when (themeMode) {
@@ -195,7 +196,7 @@ class MainActivity : ComponentActivity() {
                 onDispose { }
             }
 
-            MyApplicationTheme(themeMode = themeMode) {
+            MyApplicationTheme(themeMode = themeMode, accentColor = accentColor) {
                 var hasAudioPermission by remember {
                     mutableStateOf(checkAudioPermission())
                 }

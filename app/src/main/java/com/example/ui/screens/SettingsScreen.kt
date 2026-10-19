@@ -4,7 +4,12 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.shadow
+import com.example.data.model.AccentColor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,6 +92,7 @@ fun SettingsScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
@@ -195,6 +201,90 @@ fun SettingsScreen(
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                 )
                             )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Accent Color Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_accent_color_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Акцентный цвет интерфейса",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Неоновые цвета кнопок, вкладок, ползунков и индикаторов",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AccentColor.values().forEach { accent ->
+                            val isSelected = accentColor == accent
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        viewModel.setAccentColor(accent)
+                                    }
+                                    .testTag("accent_color_${accent.id}")
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .shadow(
+                                            elevation = if (isSelected) 8.dp else 2.dp,
+                                            shape = CircleShape,
+                                            spotColor = accent.previewColor,
+                                            ambientColor = accent.previewColor.copy(alpha = 0.5f)
+                                        )
+                                        .border(
+                                            width = if (isSelected) 2.5.dp else 1.dp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                        .clip(CircleShape)
+                                        .background(accent.previewColor),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Выбрано",
+                                            tint = if (accent == AccentColor.CYBER_YELLOW || accent == AccentColor.MATRIX_GREEN) Color.Black else Color.White,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = accent.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
                         }
                     }
                 }

@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.SettingsDataStore
+import com.example.data.model.AccentColor
 import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
@@ -283,6 +284,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = SettingsDataStore.getInitialThemeMode(application)
+    )
+
+    val accentColor: StateFlow<AccentColor> = settingsDataStore.accentColorFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SettingsDataStore.getInitialAccentColor(application)
     )
 
     val visualizerEnabled: StateFlow<Boolean> = settingsDataStore.visualizerEnabledFlow.stateIn(
@@ -770,6 +777,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             settingsDataStore.setThemeMode(mode)
+        }
+    }
+
+    fun setAccentColor(accentColor: AccentColor) {
+        viewModelScope.launch {
+            settingsDataStore.setAccentColor(accentColor)
         }
     }
 
