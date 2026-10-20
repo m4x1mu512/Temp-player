@@ -573,9 +573,26 @@ fun ExpandablePlayerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
-                            .blur(16.dp)
-                            .background(Color.White.copy(alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.10f))
-                            .background(miniPlayerHorizontalBrush)
+                            .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
+                            // Translucent layered tint and a soft highlight give the collapsed bar
+                            // a frosted-glass appearance while preserving the album-art palette.
+                            .background(
+                                miniPlayerHorizontalBrush,
+                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                            )
+                            .background(
+                                Color.White.copy(
+                                    alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.08f
+                                ),
+                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(
+                                    alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.16f
+                                ),
+                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                            )
                     )
                 }
 
@@ -764,6 +781,8 @@ fun ExpandablePlayerSheet(
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
+                                // Keep the controls' vertical center on the album artwork's center line.
+                                .offset(y = currentArtY + currentArtSize / 2 - miniBarHeight / 2)
                                 .padding(end = 8.dp)
                         ) {
                             IconButton(
