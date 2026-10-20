@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -17,19 +18,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.palette.graphics.Palette
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.example.data.model.MiniPlayerBgMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
 
 data class PlayerColorScheme(
     val backgroundColor: Color,
     val backgroundBrush: Brush? = null,
     val miniPlayerBrush: Brush? = null,
     val gradientColors: List<Color> = emptyList(),
+    val vibrantColor: Color = Color.Unspecified,
+    val darkVibrantColor: Color = Color.Unspecified,
+    val mutedColor: Color = Color.Unspecified,
     val onSurfaceColor: Color,
     val onSurfaceVariantColor: Color,
     val accentColor: Color,
@@ -42,116 +46,66 @@ data class PlayerColorScheme(
 typealias MiniPlayerColorScheme = PlayerColorScheme
 
 data class ExtractedAlbumCoverTones(
+    val vibrant: Color,
+    val darkVibrant: Color,
+    val muted: Color,
     val dominant: Color,
-    val topTone: Color,
-    val bottomTone: Color,
     val accent: Color
 )
 
 /**
- * Extracts multiple coherent tonal points from the album cover bitmap
- * to construct an authentic, rich gradient reflecting the artwork.
+ * Extracts VibrantColor, DarkVibrantColor, and MutedColor from the album cover bitmap
+ * using AndroidX Palette API (androidx.palette:palette-ktx).
  */
 fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     val width = bitmap.width
     val height = bitmap.height
     if (width == 0 || height == 0) {
-        val fallback = Color(0xFF232530)
-        return ExtractedAlbumCoverTones(fallback, fallback, fallback, Color(0xFF5B8DEF))
+        val fallback = Color(0xFF1B1C24)
+        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFF5B8DEF))
     }
 
-    val hsv = FloatArray(3)
-    val halfH = (height / 2).coerceAtLeast(1)
+    val palette = Palette.from(bitmap)
+        .maximumColorCount(24)
+        .generate()
 
-    var topScore = -1f
-    var topPixel = android.graphics.Color.DKGRAY
+    val fallbackVibrant = android.graphics.Color.parseColor("#4A6FA5")
+    val fallbackDarkVibrant = android.graphics.Color.parseColor("#1B1E2B")
+    val fallbackMuted = android.graphics.Color.parseColor("#262938")
+    val fallbackDominant = android.graphics.Color.parseColor("#171822")
 
-    var bottomScore = -1f
-    var bottomPixel = android.graphics.Color.DKGRAY
+    // 1. Vibrant Color
+    val vibrantRgb = palette.getVibrantColor(
+        palette.getLightVibrantColor(
+            palette.getDominantColor(fallbackVibrant)
+        )
+    )
 
-    var maxVibrancyScore = -1f
-    var dominantPixel = android.graphics.Color.DKGRAY
+    // 2. Dark Vibrant Color
+    val darkVibrantRgb = palette.getDarkVibrantColor(
+        palette.getDarkMutedColor(fallbackDarkVibrant)
+    )
 
-    // 1. Sample upper half
-    for (y in 0 until halfH step 2) {
-        for (x in 0 until width step 2) {
-            val pixel = bitmap.getPixel(x, y)
-            if (android.graphics.Color.alpha(pixel) < 120) continue
-            android.graphics.Color.colorToHSV(pixel, hsv)
-            val sat = hsv[1]
-            val value = hsv[2]
-            if (value in 0.12f..0.96f) {
-                val score = sat * 2.5f + (1f - abs(value - 0.5f))
-                if (score > topScore) {
-                    topScore = score
-                    topPixel = pixel
-                }
-                if (score > maxVibrancyScore) {
-                    maxVibrancyScore = score
-                    dominantPixel = pixel
-                }
-            }
-        }
-    }
+    // 3. Muted Color
+    val mutedRgb = palette.getMutedColor(
+        palette.getLightMutedColor(fallbackMuted)
+    )
 
-    // 2. Sample lower half
-    for (y in halfH until height step 2) {
-        for (x in 0 until width step 2) {
-            val pixel = bitmap.getPixel(x, y)
-            if (android.graphics.Color.alpha(pixel) < 120) continue
-            android.graphics.Color.colorToHSV(pixel, hsv)
-            val sat = hsv[1]
-            val value = hsv[2]
-            if (value in 0.12f..0.96f) {
-                val score = sat * 2.5f + (1f - abs(value - 0.5f))
-                if (score > bottomScore) {
-                    bottomScore = score
-                    bottomPixel = pixel
-                }
-                if (score > maxVibrancyScore) {
-                    maxVibrancyScore = score
-                    dominantPixel = pixel
-                }
-            }
-        }
-    }
+    // Dominant Color
+    val dominantRgb = palette.getDominantColor(fallbackDominant)
 
-    if (dominantPixel == android.graphics.Color.DKGRAY && width > 0 && height > 0) {
-        dominantPixel = bitmap.getPixel(width / 2, height / 2)
-        topPixel = bitmap.getPixel(width / 2, height / 4)
-        bottomPixel = bitmap.getPixel(width / 2, (height * 3) / 4)
-    }
-
-    // 3. Find distinct vibrant accent pixel
-    val domHsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(dominantPixel, domHsv)
-    var bestAccentPixel = dominantPixel
-    var bestAccentScore = -1f
-
-    for (y in 0 until height step 3) {
-        for (x in 0 until width step 3) {
-            val pixel = bitmap.getPixel(x, y)
-            if (android.graphics.Color.alpha(pixel) < 120) continue
-            android.graphics.Color.colorToHSV(pixel, hsv)
-            val sat = hsv[1]
-            val value = hsv[2]
-            if (sat > 0.35f && value in 0.35f..0.95f) {
-                val diff = abs(hsv[0] - domHsv[0])
-                val hueDiff = if (diff > 180f) 360f - diff else diff
-                val accentScore = sat * 2f + (hueDiff / 180f) * 2.5f
-                if (accentScore > bestAccentScore) {
-                    bestAccentScore = accentScore
-                    bestAccentPixel = pixel
-                }
-            }
-        }
-    }
+    // Vibrant accent swatch
+    val accentRgb = palette.vibrantSwatch?.rgb
+        ?: palette.lightVibrantSwatch?.rgb
+        ?: palette.dominantSwatch?.rgb
+        ?: fallbackVibrant
 
     return ExtractedAlbumCoverTones(
-        dominant = Color(dominantPixel),
-        topTone = Color(topPixel),
-        bottomTone = Color(bottomPixel),
-        accent = Color(bestAccentPixel)
+        vibrant = Color(vibrantRgb),
+        darkVibrant = Color(darkVibrantRgb),
+        muted = Color(mutedRgb),
+        dominant = Color(dominantRgb),
+        accent = Color(accentRgb)
     )
 }
 
@@ -161,7 +115,7 @@ suspend fun loadAlbumCoverTones(context: Context, uri: Uri?): ExtractedAlbumCove
         val loader = ImageLoader(context)
         val request = ImageRequest.Builder(context)
             .data(uri)
-            .size(64, 64)
+            .size(128, 128)
             .allowHardware(false)
             .build()
         val result = loader.execute(request)
@@ -179,7 +133,7 @@ suspend fun loadAlbumCoverTones(context: Context, uri: Uri?): ExtractedAlbumCove
 }
 
 /**
- * Generates an atmospheric 3-stop gradient in the exact tones of the album cover.
+ * Generates vertical gradient stops using VibrantColor, DarkVibrantColor, and MutedColor.
  */
 data class AlbumGradientStops(
     val top: Color,
@@ -191,35 +145,30 @@ data class AlbumGradientStops(
 fun generateAlbumGradientStops(tones: ExtractedAlbumCoverTones): AlbumGradientStops {
     val hsv = FloatArray(3)
 
-    // Top stop: atmospheric tone with top hue and balanced darkness
-    val topHsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(tones.topTone.toArgb(), topHsv)
-    val baseTop = if (topHsv[1] > 0.12f) tones.topTone else tones.dominant
-    android.graphics.Color.colorToHSV(baseTop.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.72f).coerceIn(0.28f, 0.75f)
-    hsv[2] = 0.28f // Deep atmospheric luminance for superior contrast with white text
+    // 1. Top stop (derived from VibrantColor with controlled value for contrast with white text)
+    android.graphics.Color.colorToHSV(tones.vibrant.toArgb(), hsv)
+    hsv[1] = (hsv[1] * 0.75f).coerceIn(0.25f, 0.85f)
+    hsv[2] = 0.28f // Deep atmospheric luminance for superior readability
     val topStop = Color(android.graphics.Color.HSVToColor(hsv))
 
-    // Middle stop: ambient transition derived from dominant tone
-    android.graphics.Color.colorToHSV(tones.dominant.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.58f).coerceIn(0.20f, 0.65f)
-    hsv[2] = 0.17f
+    // 2. Middle stop (derived from DarkVibrantColor)
+    android.graphics.Color.colorToHSV(tones.darkVibrant.toArgb(), hsv)
+    hsv[1] = (hsv[1] * 0.65f).coerceIn(0.20f, 0.70f)
+    hsv[2] = 0.16f
     val middleStop = Color(android.graphics.Color.HSVToColor(hsv))
 
-    // Bottom stop: rich, deep dark foundation tone
-    val bottomHsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(tones.bottomTone.toArgb(), bottomHsv)
-    val baseBottom = if (bottomHsv[1] > 0.12f) tones.bottomTone else tones.dominant
-    android.graphics.Color.colorToHSV(baseBottom.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.42f).coerceIn(0.15f, 0.50f)
-    hsv[2] = 0.09f // Sleek deep tone
+    // 3. Bottom stop (derived from MutedColor)
+    android.graphics.Color.colorToHSV(tones.muted.toArgb(), hsv)
+    hsv[1] = (hsv[1] * 0.45f).coerceIn(0.12f, 0.55f)
+    hsv[2] = 0.08f // Deep sleek background base
     val bottomStop = Color(android.graphics.Color.HSVToColor(hsv))
 
-    // Vibrant accent for play button, sliders, and active controls
-    android.graphics.Color.colorToHSV(tones.accent.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 1.8f).coerceIn(0.68f, 0.96f)
-    hsv[2] = 0.90f
-    val accentColor = Color(android.graphics.Color.HSVToColor(hsv))
+    // 4. Accent color (high saturation for thumb glow and playback controls)
+    val accentHsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(tones.accent.toArgb(), accentHsv)
+    accentHsv[1] = (accentHsv[1] * 1.5f).coerceIn(0.65f, 0.98f)
+    accentHsv[2] = 0.92f
+    val accentColor = Color(android.graphics.Color.HSVToColor(accentHsv))
 
     return AlbumGradientStops(
         top = topStop,
@@ -361,35 +310,45 @@ fun rememberPlayerColors(
             }
         }
 
-    // Smoothly animate each color stop
-    val animTop by animateColorAsState(targetTop, animationSpec = tween(450), label = "grad_top")
-    val animMiddle by animateColorAsState(targetMiddle, animationSpec = tween(450), label = "grad_middle")
-    val animBottom by animateColorAsState(targetBottom, animationSpec = tween(450), label = "grad_bottom")
-    val animAccent by animateColorAsState(targetAccent, animationSpec = tween(450), label = "grad_accent")
-    val animOnSurface by animateColorAsState(onSurface, animationSpec = tween(450), label = "grad_on_surface")
-    val animOnSurfaceVariant by animateColorAsState(onSurfaceVariant, animationSpec = tween(450), label = "grad_on_var")
-    val animOnAccent by animateColorAsState(onAccent, animationSpec = tween(450), label = "grad_on_acc")
-    val animTrack by animateColorAsState(trackColor, animationSpec = tween(450), label = "grad_track")
+    // Smoothly animate each color stop over 800–1000 ms (~900 ms) using FastOutSlowInEasing
+    val colorAnimSpec = tween<Color>(durationMillis = 900, easing = FastOutSlowInEasing)
+    val animTop by animateColorAsState(targetTop, animationSpec = colorAnimSpec, label = "grad_vibrant")
+    val animMiddle by animateColorAsState(targetMiddle, animationSpec = colorAnimSpec, label = "grad_dark_vibrant")
+    val animBottom by animateColorAsState(targetBottom, animationSpec = colorAnimSpec, label = "grad_muted")
+    val animAccent by animateColorAsState(targetAccent, animationSpec = colorAnimSpec, label = "grad_accent")
+    val animOnSurface by animateColorAsState(onSurface, animationSpec = colorAnimSpec, label = "grad_on_surface")
+    val animOnSurfaceVariant by animateColorAsState(onSurfaceVariant, animationSpec = colorAnimSpec, label = "grad_on_var")
+    val animOnAccent by animateColorAsState(onAccent, animationSpec = colorAnimSpec, label = "grad_on_acc")
+    val animTrack by animateColorAsState(trackColor, animationSpec = colorAnimSpec, label = "grad_track")
 
     val gradientStopsList = remember(animTop, animMiddle, animBottom) {
         listOf(animTop, animMiddle, animBottom)
     }
 
-    // Vertical gradient for full expanded PlayerScreen
+    // Vertical gradient for full expanded PlayerScreen occupying Modifier.fillMaxSize()
     val playerScreenBrush = if (isGradient) {
         Brush.verticalGradient(colors = gradientStopsList)
     } else null
 
-    // Linear gradient for collapsed MiniPlayer
-    val miniPlayerBrush = if (isGradient) {
-        Brush.linearGradient(colors = gradientStopsList)
+    // Horizontal gradient for MiniPlayer with depth alpha values
+    val miniPlayerHorizontalBrush = if (isGradient) {
+        Brush.horizontalGradient(
+            colors = listOf(
+                animTop.copy(alpha = 0.35f),
+                animMiddle.copy(alpha = 0.20f),
+                animBottom.copy(alpha = 0.35f)
+            )
+        )
     } else null
 
     return PlayerColorScheme(
         backgroundColor = animTop,
         backgroundBrush = playerScreenBrush,
-        miniPlayerBrush = miniPlayerBrush,
+        miniPlayerBrush = miniPlayerHorizontalBrush,
         gradientColors = gradientStopsList,
+        vibrantColor = animTop,
+        darkVibrantColor = animMiddle,
+        mutedColor = animBottom,
         onSurfaceColor = animOnSurface,
         onSurfaceVariantColor = animOnSurfaceVariant,
         accentColor = animAccent,

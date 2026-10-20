@@ -119,8 +119,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1612,6 +1615,8 @@ private fun PlayerProgressSection(
         val currentFloat = if (isUserScrubbing) scrubPosition else smoothAnimatedPos.value
         val sliderVal = if (duration > 0) currentFloat.coerceIn(0f, duration.toFloat()) else 0f
 
+        val accentColor = MaterialTheme.colorScheme.primary
+
         Slider(
             value = sliderVal,
             onValueChange = {
@@ -1624,12 +1629,35 @@ private fun PlayerProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
+                thumbColor = accentColor,
+                activeTrackColor = accentColor,
                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             modifier = Modifier
                 .fillMaxWidth()
+                .drawBehind {
+                    val maxVal = if (duration > 0) duration.toFloat() else 1f
+                    val progressFraction = (sliderVal / maxVal).coerceIn(0f, 1f)
+                    val thumbRadiusPx = 10.dp.toPx()
+                    val availableWidth = size.width - thumbRadiusPx * 2
+                    val thumbX = thumbRadiusPx + availableWidth * progressFraction
+                    val centerY = size.height / 2f
+                    val glowRadiusPx = 18.dp.toPx()
+
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.5f),
+                                accentColor.copy(alpha = 0.25f),
+                                Color.Transparent
+                            ),
+                            center = Offset(thumbX, centerY),
+                            radius = glowRadiusPx
+                        ),
+                        topLeft = Offset(thumbX - glowRadiusPx, centerY - glowRadiusPx),
+                        size = Size(glowRadiusPx * 2f, glowRadiusPx * 2f)
+                    )
+                }
                 .testTag(sliderTestTag)
         )
 

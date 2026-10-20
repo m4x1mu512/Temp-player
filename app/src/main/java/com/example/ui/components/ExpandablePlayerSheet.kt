@@ -104,8 +104,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -544,6 +548,25 @@ fun ExpandablePlayerSheet(
                     }
                     .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
             ) {
+                // Frosted glass background layer for MiniPlayer state (TifyApp style)
+                if (expandProgress < 0.35f) {
+                    val miniPlayerHorizontalBrush = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
+                        colors = listOf(
+                            colorScheme.backgroundColor.copy(alpha = 0.35f),
+                            colorScheme.accentColor.copy(alpha = 0.20f),
+                            colorScheme.backgroundColor.copy(alpha = 0.35f)
+                        )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(collapsedVisibleHeight)
+                            .blur(16.dp)
+                            .background(Color.White.copy(alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.10f))
+                            .background(miniPlayerHorizontalBrush)
+                    )
+                }
+
                 // 1. ALBUM ARTWORK: Smoothly interpolates size, position, and corner radius!
                 val context = LocalContext.current
                 val miniArtSize = if (isLandscape) 50.dp else 54.dp
@@ -1414,6 +1437,8 @@ private fun SheetProgressSection(
         val currentFloat = if (isUserScrubbing) scrubPosition else smoothAnimatedPos.value
         val sliderVal = if (duration > 0) currentFloat.coerceIn(0f, duration.toFloat()) else 0f
 
+        val accentColor = MaterialTheme.colorScheme.primary
+
         Slider(
             value = sliderVal,
             onValueChange = {
@@ -1426,12 +1451,35 @@ private fun SheetProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
+                thumbColor = accentColor,
+                activeTrackColor = accentColor,
                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             modifier = Modifier
                 .fillMaxWidth()
+                .drawBehind {
+                    val maxVal = if (duration > 0) duration.toFloat() else 1f
+                    val progressFraction = (sliderVal / maxVal).coerceIn(0f, 1f)
+                    val thumbRadiusPx = 10.dp.toPx()
+                    val availableWidth = size.width - thumbRadiusPx * 2
+                    val thumbX = thumbRadiusPx + availableWidth * progressFraction
+                    val centerY = size.height / 2f
+                    val glowRadiusPx = 18.dp.toPx()
+
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.5f),
+                                accentColor.copy(alpha = 0.25f),
+                                Color.Transparent
+                            ),
+                            center = Offset(thumbX, centerY),
+                            radius = glowRadiusPx
+                        ),
+                        topLeft = Offset(thumbX - glowRadiusPx, centerY - glowRadiusPx),
+                        size = Size(glowRadiusPx * 2f, glowRadiusPx * 2f)
+                    )
+                }
                 .testTag("player_progress_slider")
         )
 

@@ -61,7 +61,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -166,7 +168,7 @@ fun MiniPlayer(
         Card(
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (colorScheme.isGradient) Color.Transparent else colorScheme.backgroundColor
+                containerColor = Color.Transparent
             ),
             border = if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF)),
             elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
@@ -191,16 +193,25 @@ fun MiniPlayer(
                 .testTag("mini_player")
         ) {
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (colorScheme.isGradient && colorScheme.miniPlayerBrush != null) {
-                            Modifier.background(colorScheme.miniPlayerBrush)
-                        } else {
-                            Modifier.background(colorScheme.backgroundColor)
-                        }
-                    )
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // Frosted glass background layer with blur, semi-transparent base, and horizontal gradient
+                val horizontalGradient = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
+                    colors = listOf(
+                        colorScheme.backgroundColor.copy(alpha = 0.35f),
+                        colorScheme.accentColor.copy(alpha = 0.20f),
+                        colorScheme.backgroundColor.copy(alpha = 0.35f)
+                    )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(16.dp)
+                        .background(if (colorScheme.isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.15f))
+                        .background(horizontalGradient)
+                )
+
                 Column(modifier = Modifier.fillMaxWidth()) {
                 val getMiniControlsAlpha: () -> Float = { 1f }
 

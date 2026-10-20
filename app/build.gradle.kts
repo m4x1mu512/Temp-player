@@ -102,6 +102,7 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.coil.compose)
   implementation(libs.reorderable)
+  implementation(libs.androidx.palette.ktx)
 
   // Media3 ExoPlayer & Session
   implementation(libs.androidx.media3.exoplayer)
