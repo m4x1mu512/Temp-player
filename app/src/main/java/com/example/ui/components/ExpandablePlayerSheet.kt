@@ -240,8 +240,6 @@ fun ExpandablePlayerSheet(
         showVisualizerModeHint = false
     }
 
-    var isMiniScrubbing by remember { mutableStateOf(false) }
-    var miniScrubPos by remember { mutableLongStateOf(0L) }
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -315,7 +313,7 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val miniBarHeight = if (isLandscape) 56.dp else 64.dp
+        val miniBarHeight = if (isLandscape) 76.dp else 80.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
@@ -701,19 +699,19 @@ fun ExpandablePlayerSheet(
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)
                 val miniAlpha = (1f - expandProgress * 2.5f).coerceIn(0f, 1f)
                 if (miniAlpha > 0f) {
-                    // Interactive scrubbable progress bar at top of mini player allowing seeking & rewinding
+                    // Non-interactive playback progress at the bottom, below artwork, text and controls.
                     InteractiveMiniProgressBar(
                         position = position,
                         duration = duration,
                         isPlaying = isPlaying,
-                        onSeek = { viewModel.seekTo(it) },
+                        onSeek = {},
                         accentColor = colorScheme.accentColor,
                         trackColor = colorScheme.progressTrackColor,
+                        modifier = Modifier
+                            .offset(y = miniBarHeight - 20.dp)
+                            .padding(horizontal = 14.dp),
                         alpha = miniAlpha,
-                        onScrubbingStateChanged = { scrubbing, seekPos ->
-                            isMiniScrubbing = scrubbing
-                            miniScrubPos = seekPos
-                        },
+                        interactive = false,
                         testTag = "mini_player_progress"
                     )
 
@@ -723,7 +721,7 @@ fun ExpandablePlayerSheet(
                             .fillMaxWidth()
                             .height(miniBarHeight)
                             .graphicsLayer { alpha = miniAlpha }
-                            .clickable(enabled = expandProgress < 0.35f && !isMiniScrubbing) {
+                            .clickable(enabled = expandProgress < 0.35f) {
                                 expandToFull()
                             }
                     ) {
@@ -751,30 +749,13 @@ fun ExpandablePlayerSheet(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            val displayPos = if (isMiniScrubbing) miniScrubPos else position
-                            val formattedPos = remember((displayPos / 1000L)) { formatTime(displayPos) }
-                            val formattedDur = remember(duration) { formatTime(duration) }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = track.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colorScheme.accentColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "• $formattedPos / $formattedDur",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isMiniScrubbing) colorScheme.accentColor else colorScheme.onSurfaceVariantColor,
-                                    fontWeight = if (isMiniScrubbing) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
-                                )
-                            }
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colorScheme.accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
                         // Mini Player Control Buttons (Favorite, Previous/Rewind, Play/Pause, Next/Fast-Forward)
@@ -804,21 +785,17 @@ fun ExpandablePlayerSheet(
                                 )
                             }
 
-                            @OptIn(ExperimentalFoundationApi::class)
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onButtonPreviousTrack,
-                                        onLongClick = { viewModel.seekBackward10s() }
-                                    )
+                                    .clickable(onClick = onButtonPreviousTrack)
                                     .testTag("mini_player_previous"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Предыдущий трек (удержание: перемотка назад на 10 сек)",
+                                    contentDescription = "Предыдущий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -850,21 +827,17 @@ fun ExpandablePlayerSheet(
                                 }
                             }
 
-                            @OptIn(ExperimentalFoundationApi::class)
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onSwipeNextTrack,
-                                        onLongClick = { viewModel.seekForward10s() }
-                                    )
+                                    .clickable(onClick = onSwipeNextTrack)
                                     .testTag("mini_player_next"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Следующий трек (удержание: перемотка вперед на 10 сек)",
+                                    contentDescription = "Следующий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(22.dp)
                                 )
