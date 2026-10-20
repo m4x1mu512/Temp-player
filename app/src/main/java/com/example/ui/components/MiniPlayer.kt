@@ -53,7 +53,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -89,9 +88,6 @@ import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
 import com.example.ui.util.KEY_PLAYER_CONTAINER
 import com.example.ui.util.KEY_PLAYER_TRACK_TEXT
-import com.example.ui.util.formatTime
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import com.example.ui.components.InteractiveMiniProgressBar
 import com.example.ui.util.playerSharedBounds
@@ -231,24 +227,6 @@ fun MiniPlayer(
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                 val getMiniControlsAlpha: () -> Float = { 1f }
-                var isMiniScrubbing by remember { mutableStateOf(false) }
-                var miniScrubPos by remember { mutableLongStateOf(0L) }
-
-                InteractiveMiniProgressBar(
-                    position = position,
-                    duration = duration,
-                    isPlaying = isPlaying,
-                    onSeek = { onSeek?.invoke(it) },
-                    accentColor = colorScheme.accentColor,
-                    trackColor = colorScheme.progressTrackColor,
-                    alpha = getMiniControlsAlpha(),
-                    onScrubbingStateChanged = { scrubbing, seekPos ->
-                        isMiniScrubbing = scrubbing
-                        miniScrubPos = seekPos
-                    },
-                    testTag = "mini_player_progress"
-                )
-
                 val context = LocalContext.current
 
                 if (isLandscape) {
@@ -364,23 +342,6 @@ fun MiniPlayer(
                             }
                         }
 
-                        // Time badge in landscape
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = colorScheme.onSurfaceColor.copy(alpha = 0.08f),
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp)
-                                .graphicsLayer { alpha = getMiniControlsAlpha() }
-                                .clickable { onClick() }
-                        ) {
-                            Text(
-                                text = "${formatTime(position)} / ${formatTime(duration)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colorScheme.onSurfaceVariantColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
                         // Favorite button if available
                         if (onToggleFavorite != null) {
                             IconButton(
@@ -466,7 +427,7 @@ fun MiniPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
                         // Clickable info section: Album art + Title/Artist opens full player
                         Row(
@@ -552,30 +513,13 @@ fun MiniPlayer(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
-                                val displayPos = if (isMiniScrubbing) miniScrubPos else position
-                                val formattedPos = remember((displayPos / 1000L)) { formatTime(displayPos) }
-                                val formattedDur = remember(duration) { formatTime(duration) }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = currentTrack.artist,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = colorScheme.accentColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "• $formattedPos / $formattedDur",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isMiniScrubbing) colorScheme.accentColor else colorScheme.onSurfaceVariantColor,
-                                        fontWeight = if (isMiniScrubbing) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1
-                                    )
-                                }
+                                Text(
+                                    text = currentTrack.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colorScheme.accentColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
 
@@ -587,22 +531,18 @@ fun MiniPlayer(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.graphicsLayer { alpha = getMiniControlsAlpha() }
                         ) {
-                            // Previous track button (long press rewinds 10s)
-                            @OptIn(ExperimentalFoundationApi::class)
+                            // Previous track button
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onPreviousTrack,
-                                        onLongClick = { onSeekBackward10s?.invoke() }
-                                    )
+                                    .clickable(onClick = onPreviousTrack)
                                     .testTag("mini_player_previous"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Предыдущий трек (удержание: перемотка назад на 10 сек)",
+                                    contentDescription = "Предыдущий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
@@ -635,22 +575,18 @@ fun MiniPlayer(
                                 }
                             }
 
-                            // Next track button (long press forwards 10s)
-                            @OptIn(ExperimentalFoundationApi::class)
+                            // Next track button
                             Box(
                                 modifier = Modifier
                                     .size(42.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onNextTrack,
-                                        onLongClick = { onSeekForward10s?.invoke() }
-                                    )
+                                    .clickable(onClick = onNextTrack)
                                     .testTag("mini_player_next"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Следующий трек (удержание: перемотка вперед на 10 сек)",
+                                    contentDescription = "Следующий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
@@ -658,6 +594,20 @@ fun MiniPlayer(
                         }
                     }
                 }
+
+                // Non-interactive playback progress, placed beneath the artwork, metadata and controls.
+                InteractiveMiniProgressBar(
+                    position = position,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    onSeek = {},
+                    accentColor = colorScheme.accentColor,
+                    trackColor = colorScheme.progressTrackColor,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    alpha = getMiniControlsAlpha(),
+                    interactive = false,
+                    testTag = "mini_player_progress"
+                )
             }
         }
     }
