@@ -2,9 +2,13 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - agent/mini-player-height-no-seek
+
   pull_request:
-    branches: [ "main", "master" ]
+    branches:
+      - agent/mini-player-height-no-seek
+
   workflow_dispatch:
 
 jobs:
@@ -20,7 +24,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+          cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew || true
@@ -28,6 +32,7 @@ jobs:
       - name: Generate debug keystore
         run: |
           mkdir -p ~/.android
+
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore
             cp debug.keystore ~/.android/debug.keystore
@@ -41,6 +46,7 @@ jobs:
               -keysize 2048 \
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
+
             cp ~/.android/debug.keystore ./debug.keystore
           fi
 
