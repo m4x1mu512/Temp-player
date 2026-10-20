@@ -109,27 +109,57 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     )
 }
 
-suspend fun loadAlbumCoverTones(context: Context, uri: Uri?): ExtractedAlbumCoverTones? = withContext(Dispatchers.IO) {
-    if (uri == null) return@withContext null
-    try {
-        val loader = ImageLoader(context)
-        val request = ImageRequest.Builder(context)
-            .data(uri)
-            .size(128, 128)
-            .allowHardware(false)
-            .build()
-        val result = loader.execute(request)
-        if (result is SuccessResult) {
-            val drawable = result.drawable
-            val bitmap = (drawable as? BitmapDrawable)?.bitmap
-            if (bitmap != null) {
-                return@withContext extractCoverTonesFromBitmap(bitmap)
+fun generateDeterministicTones(seed: String): ExtractedAlbumCoverTones {
+    val hash = kotlin.math.abs(seed.hashCode())
+    val hue = (hash % 360).toFloat()
+    val vibrant = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.72f, 0.70f)))
+    val darkVibrant = Color(android.graphics.Color.HSVToColor(floatArrayOf((hue + 15f) % 360f, 0.65f, 0.35f)))
+    val muted = Color(android.graphics.Color.HSVToColor(floatArrayOf((hue + 30f) % 360f, 0.40f, 0.20f)))
+    val dominant = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.50f, 0.25f)))
+    val accent = Color(android.graphics.Color.HSVToColor(floatArrayOf((hue + 180f) % 360f, 0.85f, 0.95f)))
+    return ExtractedAlbumCoverTones(vibrant, darkVibrant, muted, dominant, accent)
+}
+
+suspend fun loadAlbumCoverTones(
+    context: Context,
+    uri: Uri?,
+    fallbackSeed: String = ""
+): ExtractedAlbumCoverTones = withContext(Dispatchers.IO) {
+    if (uri != null) {
+        try {
+            val loader = ImageLoader(context)
+            val request = ImageRequest.Builder(context)
+                .data(uri)
+                .size(128, 128)
+                .allowHardware(false)
+                .build()
+            val result = loader.execute(request)
+            if (result is SuccessResult) {
+                val drawable = result.drawable
+                val bitmap = (drawable as? BitmapDrawable)?.bitmap
+                if (bitmap != null) {
+                    return@withContext extractCoverTonesFromBitmap(bitmap)
+                }
             }
+        } catch (_: Exception) {
+            // ignore and fallback
         }
-        null
-    } catch (_: Exception) {
-        null
     }
+    try {
+        val defaultDrawable = androidx.core.content.ContextCompat.getDrawable(context, com.example.R.drawable.ic_default_art)
+        if (defaultDrawable != null && fallbackSeed.isBlank()) {
+            val bitmap = (defaultDrawable as? BitmapDrawable)?.bitmap
+                ?: Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).also { bmp ->
+                    val canvas = android.graphics.Canvas(bmp)
+                    defaultDrawable.setBounds(0, 0, 128, 128)
+                    defaultDrawable.draw(canvas)
+                }
+            return@withContext extractCoverTonesFromBitmap(bitmap)
+        }
+    } catch (_: Exception) {
+        // ignore
+    }
+    generateDeterministicTones(fallbackSeed.ifEmpty { "DefaultAlbumCoverTones" })
 }
 
 /**
@@ -147,27 +177,27 @@ fun generateAlbumGradientStops(tones: ExtractedAlbumCoverTones): AlbumGradientSt
 
     // 1. Top stop (derived from VibrantColor with controlled value for contrast with white text)
     android.graphics.Color.colorToHSV(tones.vibrant.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.75f).coerceIn(0.25f, 0.85f)
-    hsv[2] = 0.28f // Deep atmospheric luminance for superior readability
+    hsv[1] = (hsv[1] * 0.80f).coerceIn(0.35f, 0.85f)
+    hsv[2] = 0.36f // Atmospheric luminance for rich album color wash
     val topStop = Color(android.graphics.Color.HSVToColor(hsv))
 
     // 2. Middle stop (derived from DarkVibrantColor)
     android.graphics.Color.colorToHSV(tones.darkVibrant.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.65f).coerceIn(0.20f, 0.70f)
-    hsv[2] = 0.16f
+    hsv[1] = (hsv[1] * 0.70f).coerceIn(0.25f, 0.75f)
+    hsv[2] = 0.22f
     val middleStop = Color(android.graphics.Color.HSVToColor(hsv))
 
     // 3. Bottom stop (derived from MutedColor)
     android.graphics.Color.colorToHSV(tones.muted.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.45f).coerceIn(0.12f, 0.55f)
-    hsv[2] = 0.08f // Deep sleek background base
+    hsv[1] = (hsv[1] * 0.50f).coerceIn(0.15f, 0.60f)
+    hsv[2] = 0.11f // Deep sleek background base
     val bottomStop = Color(android.graphics.Color.HSVToColor(hsv))
 
     // 4. Accent color (high saturation for thumb glow and playback controls)
     val accentHsv = FloatArray(3)
     android.graphics.Color.colorToHSV(tones.accent.toArgb(), accentHsv)
-    accentHsv[1] = (accentHsv[1] * 1.5f).coerceIn(0.65f, 0.98f)
-    accentHsv[2] = 0.92f
+    accentHsv[1] = (accentHsv[1] * 1.5f).coerceIn(0.70f, 0.98f)
+    accentHsv[2] = 0.95f
     val accentColor = Color(android.graphics.Color.HSVToColor(accentHsv))
 
     return AlbumGradientStops(
@@ -186,7 +216,8 @@ fun generateAlbumGradientStops(tones: ExtractedAlbumCoverTones): AlbumGradientSt
 fun rememberPlayerColors(
     bgMode: MiniPlayerBgMode,
     albumArtUri: Uri?,
-    customColorLong: Long
+    customColorLong: Long,
+    trackKey: String = albumArtUri?.toString() ?: ""
 ): PlayerColorScheme {
     val context = LocalContext.current
     val systemSurface = MaterialTheme.colorScheme.surface
@@ -196,11 +227,11 @@ fun rememberPlayerColors(
     val systemOnPrimary = MaterialTheme.colorScheme.onPrimary
     val systemSurfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
-    var extractedTones by remember(albumArtUri) { mutableStateOf<ExtractedAlbumCoverTones?>(null) }
+    var extractedTones by remember(albumArtUri, trackKey) { mutableStateOf<ExtractedAlbumCoverTones?>(null) }
 
-    LaunchedEffect(albumArtUri, bgMode) {
-        if (bgMode == MiniPlayerBgMode.ALBUM_ART && albumArtUri != null) {
-            extractedTones = loadAlbumCoverTones(context, albumArtUri)
+    LaunchedEffect(albumArtUri, bgMode, trackKey) {
+        if (bgMode == MiniPlayerBgMode.ALBUM_ART) {
+            extractedTones = loadAlbumCoverTones(context, albumArtUri, trackKey)
         } else {
             extractedTones = null
         }
@@ -363,8 +394,9 @@ fun rememberPlayerColors(
 fun rememberMiniPlayerColors(
     bgMode: MiniPlayerBgMode,
     albumArtUri: Uri?,
-    customColorLong: Long
-): PlayerColorScheme = rememberPlayerColors(bgMode, albumArtUri, customColorLong)
+    customColorLong: Long,
+    trackKey: String = albumArtUri?.toString() ?: ""
+): PlayerColorScheme = rememberPlayerColors(bgMode, albumArtUri, customColorLong, trackKey)
 
 private data class TargetParams(
     val top: Color,

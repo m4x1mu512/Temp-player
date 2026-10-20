@@ -83,6 +83,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -139,6 +140,7 @@ import com.example.ui.screens.AudioSpecsBadge
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
+import com.example.ui.components.GlowProgressSlider
 import com.example.ui.util.formatTime
 import com.example.ui.util.rememberPlayerColors
 import com.example.ui.util.rememberShouldUseSimplifiedShadows
@@ -260,7 +262,8 @@ fun ExpandablePlayerSheet(
     val colorScheme = rememberPlayerColors(
         bgMode = miniPlayerBgMode,
         albumArtUri = track.albumArtUri,
-        customColorLong = miniPlayerCustomColor
+        customColorLong = miniPlayerCustomColor,
+        trackKey = "${track.id}_${track.title}_${track.albumArtUriString}"
     )
 
     val playerMaterialColorScheme = remember(colorScheme) {
@@ -441,10 +444,14 @@ fun ExpandablePlayerSheet(
                     )
                     .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
                     .then(
-                        if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
-                            Modifier.background(colorScheme.backgroundBrush)
+                        if (expandProgress > 0.02f) {
+                            if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
+                                Modifier.background(colorScheme.backgroundBrush)
+                            } else {
+                                Modifier.background(colorScheme.backgroundColor)
+                            }
                         } else {
-                            Modifier.background(colorScheme.backgroundColor)
+                            Modifier
                         }
                     )
                     .border(
@@ -1439,7 +1446,7 @@ private fun SheetProgressSection(
 
         val accentColor = MaterialTheme.colorScheme.primary
 
-        Slider(
+        GlowProgressSlider(
             value = sliderVal,
             onValueChange = {
                 isUserScrubbing = true
@@ -1450,37 +1457,13 @@ private fun SheetProgressSection(
                 isUserScrubbing = false
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
-            colors = SliderDefaults.colors(
-                thumbColor = accentColor,
-                activeTrackColor = accentColor,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .drawBehind {
-                    val maxVal = if (duration > 0) duration.toFloat() else 1f
-                    val progressFraction = (sliderVal / maxVal).coerceIn(0f, 1f)
-                    val thumbRadiusPx = 10.dp.toPx()
-                    val availableWidth = size.width - thumbRadiusPx * 2
-                    val thumbX = thumbRadiusPx + availableWidth * progressFraction
-                    val centerY = size.height / 2f
-                    val glowRadiusPx = 18.dp.toPx()
-
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                accentColor.copy(alpha = 0.5f),
-                                accentColor.copy(alpha = 0.25f),
-                                Color.Transparent
-                            ),
-                            center = Offset(thumbX, centerY),
-                            radius = glowRadiusPx
-                        ),
-                        topLeft = Offset(thumbX - glowRadiusPx, centerY - glowRadiusPx),
-                        size = Size(glowRadiusPx * 2f, glowRadiusPx * 2f)
-                    )
-                }
-                .testTag("player_progress_slider")
+            accentColor = accentColor,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            trackHeight = 3.dp,
+            thumbRadius = 5.5.dp,
+            glowRadius = 18.dp,
+            glowAlpha = 0.55f,
+            testTag = "player_progress_slider"
         )
 
         val currentSeconds = (currentFloat / 1000f).toLong().coerceAtLeast(0L)

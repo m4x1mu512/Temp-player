@@ -162,7 +162,8 @@ fun MiniPlayer(
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
             albumArtUri = currentTrack.albumArtUri,
-            customColorLong = customColor
+            customColorLong = customColor,
+            trackKey = "${currentTrack.id}_${currentTrack.title}_${currentTrack.albumArtUriString}"
         )
 
         Card(
