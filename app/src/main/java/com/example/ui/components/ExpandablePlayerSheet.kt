@@ -313,7 +313,7 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val miniBarHeight = if (isLandscape) 76.dp else 80.dp
+        val miniBarHeight = if (isLandscape) 84.dp else 88.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
