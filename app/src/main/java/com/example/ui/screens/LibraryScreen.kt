@@ -572,7 +572,7 @@ fun LibraryScreen(
                                             },
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
-                                                .padding(end = 16.dp, bottom = 16.dp)
+                                                .padding(end = 16.dp, bottom = 124.dp)
                                         )
                                     }
                                 }
@@ -791,7 +791,7 @@ fun LibraryScreen(
                                                 },
                                                 modifier = Modifier
                                                     .align(Alignment.BottomEnd)
-                                                    .padding(end = 16.dp, bottom = 16.dp)
+                                                    .padding(end = 16.dp, bottom = 124.dp)
                                             )
                                         }
                                     }
@@ -1136,7 +1136,7 @@ private fun GroupedListSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -1526,7 +1526,7 @@ private fun FoldersSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -1809,7 +1809,7 @@ private fun AlbumsSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -2199,7 +2199,7 @@ private fun PlaylistsSection(
                         },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 16.dp)
+                            .padding(end = 16.dp, bottom = 124.dp)
                     )
                 }
             }
