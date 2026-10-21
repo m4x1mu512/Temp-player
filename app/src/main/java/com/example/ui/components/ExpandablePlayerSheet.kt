@@ -163,6 +163,7 @@ fun ExpandablePlayerSheet(
     viewModel: MainViewModel,
     onNavigateToQueue: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
+    onBackgroundBlurChange: (Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
@@ -330,6 +331,11 @@ fun ExpandablePlayerSheet(
         val expandProgress = if (maxDragPx > 0f) {
             (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
         } else if (isExpanded) 1f else 0f
+
+        // Blur the screen underneath the sheet progressively as it collapses.
+        LaunchedEffect(expandProgress) {
+            onBackgroundBlurChange((1f - expandProgress).coerceIn(0f, 1f))
+        }
 
         LaunchedEffect(maxDragPx) {
             if (maxDragPx > 0f) {
