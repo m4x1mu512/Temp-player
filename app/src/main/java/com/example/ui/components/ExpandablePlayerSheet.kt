@@ -566,26 +566,32 @@ fun ExpandablePlayerSheet(
                     }
                     .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
             ) {
-                // The collapsed sheet itself is the only glass surface.
-                // Avoid a nested pane, which can appear as a lighter rectangle.
+                // One uniform frosted-glass surface for the collapsed player.
+                // Keep the tint translucent and avoid nested backgrounds that could
+                // create the lighter inset rectangle seen in earlier screenshots.
                 if (expandProgress <= 0.02f) {
                     val glassTint = if (colorScheme.isDark) {
-                        Color(0xFF202226)
+                        Color(0xFF777B80)
                     } else {
-                        Color(0xFFF1F2F4)
+                        Color(0xFFE9EBEE)
                     }
-                    // Keep the surface uniform; translucency lets the screen beneath
-                    // softly show through without adding a second inset rectangle.
+                    val glassShape = RoundedCornerShape(
+                        topStart = sheetCornerRadius,
+                        topEnd = sheetCornerRadius
+                    )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
                             .background(
-                                glassTint.copy(alpha = 1f),
-                                shape = RoundedCornerShape(
-                                    topStart = sheetCornerRadius,
-                                    topEnd = sheetCornerRadius
-                                )
+                                glassTint.copy(alpha = 0.78f),
+                                shape = glassShape
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = (if (colorScheme.isDark) Color.White else Color.Black)
+                                    .copy(alpha = 0.08f),
+                                shape = glassShape
                             )
                     )
                 }
