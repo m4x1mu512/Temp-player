@@ -566,42 +566,26 @@ fun ExpandablePlayerSheet(
                     }
                     .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
             ) {
-                // A single, neutral frosted-glass pane spans the whole collapsed player.
-                // Keep it behind the artwork, labels, controls and progress indicator.
-                if (expandProgress < 0.35f) {
-                    val miniPlayerShape = RoundedCornerShape(
-                        topStart = sheetCornerRadius,
-                        topEnd = sheetCornerRadius
-                    )
-                    val glassVisibility = (1f - expandProgress * 2.5f).coerceIn(0f, 1f)
+                // The collapsed sheet itself is the only glass surface.
+                // Avoid a nested pane, which can appear as a lighter rectangle.
+                if (expandProgress <= 0.02f) {
                     val glassTint = if (colorScheme.isDark) {
                         Color(0xFF202226)
                     } else {
                         Color(0xFFF1F2F4)
                     }
+                    // Keep the surface uniform; translucency lets the screen beneath
+                    // softly show through without adding a second inset rectangle.
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
-                            .clip(miniPlayerShape)
                             .background(
-                                glassTint.copy(alpha = 0.76f * glassVisibility),
-                                shape = miniPlayerShape
-                            )
-                            // A restrained inner sheen and hairline edge make it read as glass
-                            // without a colored gradient or a rectangular blur patch.
-                            .background(
-                                Color.White.copy(
-                                    alpha = (if (colorScheme.isDark) 0.055f else 0.22f) * glassVisibility
-                                ),
-                                shape = miniPlayerShape
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = (if (colorScheme.isDark) Color.White else Color.Black).copy(
-                                    alpha = 0.09f * glassVisibility
-                                ),
-                                shape = miniPlayerShape
+                                glassTint.copy(alpha = 0.82f),
+                                shape = RoundedCornerShape(
+                                    topStart = sheetCornerRadius,
+                                    topEnd = sheetCornerRadius
+                                )
                             )
                     )
                 }
