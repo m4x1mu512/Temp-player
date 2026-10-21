@@ -39,9 +39,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
@@ -276,6 +278,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
+    var backgroundBlurProgress by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         viewModel.navigateToQueueEvent.collect {
@@ -295,7 +298,9 @@ fun AppNavigation(viewModel: MainViewModel) {
         NavHost(
             navController = navController,
             startDestination = "library",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .blur((backgroundBlurProgress * 14f).dp),
             enterTransition = {
                 fadeIn(animationSpec = tween(220, easing = PlayerEmphasizedDecelerateEasing))
             },
@@ -412,7 +417,8 @@ fun AppNavigation(viewModel: MainViewModel) {
             },
             onNavigateToSettings = {
                 navController.navigate("settings")
-            }
+            },
+            onBackgroundBlurChange = { backgroundBlurProgress = it }
         )
     }
 }
