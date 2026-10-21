@@ -387,18 +387,16 @@ fun ExpandablePlayerSheet(
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
-            val lightThresholdPx = with(density) { 4.dp.toPx() }
+            // Resolve the gesture from direction, meaningful travel, and current sheet position.
+            // Tiny accidental movements settle to the nearest endpoint instead of toggling the player.
+            val flingThreshold = with(density) { 420.dp.toPx() }
+            val travelThreshold = (maxDragPx * 0.12f).coerceAtLeast(with(density) { 36.dp.toPx() })
             val targetExpanded = when {
-                velocityY < -25f -> true // Any light flick up -> expand
-                velocityY > 25f -> false // Any light flick down -> collapse
-                isExpanded -> {
-                    // Was expanded: light downward drag (4dp or positive delta) or slight progress drop collapses
-                    !(totalDragY > lightThresholdPx || expandProgress < 0.98f)
-                }
-                else -> {
-                    // Was collapsed (mini): light upward drag (4dp or negative delta) or slight progress gain expands
-                    totalDragY < -lightThresholdPx || expandProgress > 0.02f
-                }
+                velocityY < -flingThreshold -> true
+                velocityY > flingThreshold -> false
+                totalDragY < -travelThreshold -> true
+                totalDragY > travelThreshold -> false
+                else -> expandProgress >= 0.5f
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
