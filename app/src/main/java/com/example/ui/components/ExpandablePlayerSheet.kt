@@ -603,7 +603,7 @@ fun ExpandablePlayerSheet(
                                 }
                             )
                             .background(
-                                glassTint.copy(alpha = if (colorScheme.isDark) 0.70f else 0.72f),
+                                glassTint.copy(alpha = if (colorScheme.isDark) 0.62f else 0.64f),
                                 shape = glassShape
                             )
                             .border(
