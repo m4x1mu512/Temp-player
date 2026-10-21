@@ -39,20 +39,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.graphics.BlurEffect
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -285,8 +275,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
-    var backgroundBlurProgress by remember { mutableFloatStateOf(0f) }
-    val backdropLayer = rememberGraphicsLayer()
 
     LaunchedEffect(Unit) {
         viewModel.navigateToQueueEvent.collect {
@@ -306,42 +294,7 @@ fun AppNavigation(viewModel: MainViewModel) {
         NavHost(
             navController = navController,
             startDestination = "library",
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithContent {
-                    // Record the normal screen once, then redraw a blurred copy only
-                    // inside the collapsed mini-player's bottom backdrop region.
-                    backdropLayer.record {
-                        this@drawWithContent.drawContent()
-                    }
-                    drawContent()
-
-                    val blurRadius = with(this) { (backgroundBlurProgress * 14f).dp.toPx() }
-                    if (blurRadius > 0.5f) {
-                        backdropLayer.renderEffect = BlurEffect(blurRadius, blurRadius)
-                        val backdropTop = (size.height - 112.dp.toPx()).coerceAtLeast(0f)
-                        val cornerRadius = 20.dp.toPx()
-                        val miniPlayerBackdropShape = Path().apply {
-                            addRoundRect(
-                                RoundRect(
-                                    left = 0f,
-                                    top = backdropTop,
-                                    right = size.width,
-                                    bottom = size.height,
-                                    topLeftCornerRadius = CornerRadius(cornerRadius),
-                                    topRightCornerRadius = CornerRadius(cornerRadius)
-                                )
-                            )
-                        }
-                        // Keep the blurred copy inside the mini-player silhouette so its
-                        // edges never show as a rectangular patch above or beside the glass.
-                        clipPath(miniPlayerBackdropShape) {
-                            drawLayer(backdropLayer)
-                        }
-                    } else {
-                        backdropLayer.renderEffect = null
-                    }
-                },
+            modifier = Modifier.fillMaxSize(),
             enterTransition = {
                 fadeIn(animationSpec = tween(220, easing = PlayerEmphasizedDecelerateEasing))
             },
@@ -459,7 +412,6 @@ fun AppNavigation(viewModel: MainViewModel) {
             onNavigateToSettings = {
                 navController.navigate("settings")
             },
-            onBackgroundBlurChange = { backgroundBlurProgress = it }
         )
     }
 }
