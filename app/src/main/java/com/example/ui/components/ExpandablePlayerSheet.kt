@@ -566,38 +566,30 @@ fun ExpandablePlayerSheet(
                     }
                     .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
             ) {
-                // Frosted glass background layer for MiniPlayer state (TifyApp style)
+                // Uniform matte-glass tint for the collapsed mini player.
+                // The backdrop blur is clipped to this same rounded silhouette in MainActivity.
                 if (expandProgress < 0.35f) {
-                    val miniPlayerHorizontalBrush = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
-                        colors = listOf(
-                            colorScheme.backgroundColor.copy(alpha = 0.35f),
-                            colorScheme.accentColor.copy(alpha = 0.20f),
-                            colorScheme.backgroundColor.copy(alpha = 0.35f)
-                        )
+                    val miniPlayerShape = RoundedCornerShape(
+                        topStart = sheetCornerRadius,
+                        topEnd = sheetCornerRadius
                     )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
-                            .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
-                            // Translucent layered tint and a soft highlight give the collapsed bar
-                            // a frosted-glass appearance while preserving the album-art palette.
+                            .clip(miniPlayerShape)
                             .background(
-                                miniPlayerHorizontalBrush,
-                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
-                            )
-                            .background(
-                                Color.White.copy(
-                                    alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.08f
+                                colorScheme.backgroundColor.copy(
+                                    alpha = 0.82f * (1f - expandProgress * 2.5f).coerceAtLeast(0f)
                                 ),
-                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                                shape = miniPlayerShape
                             )
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(
-                                    alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.16f
+                                color = (if (colorScheme.isDark) Color.White else Color.Black).copy(
+                                    alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.10f
                                 ),
-                                shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
+                                shape = miniPlayerShape
                             )
                     )
                 }
