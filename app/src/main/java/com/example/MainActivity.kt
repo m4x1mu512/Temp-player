@@ -42,6 +42,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.MaterialTheme
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -274,6 +278,10 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
+    // Record only the destination content. The mini-player is a sibling reader above it,
+    // never part of the recorded layer, preventing recursive capture and self-blur.
+    val appBackdrop = rememberLayerBackdrop()
+    val backdropSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     val navController = rememberNavController()
 
     LaunchedEffect(Unit) {
@@ -294,7 +302,18 @@ fun AppNavigation(viewModel: MainViewModel) {
         NavHost(
             navController = navController,
             startDestination = "library",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (backdropSupported) {
+                        Modifier
+                            .layerBackdrop(appBackdrop)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .graphicsLayer()
+                    } else {
+                        Modifier
+                    }
+                ),
             enterTransition = {
                 fadeIn(animationSpec = tween(220, easing = PlayerEmphasizedDecelerateEasing))
             },
@@ -403,6 +422,7 @@ fun AppNavigation(viewModel: MainViewModel) {
 
         ExpandablePlayerSheet(
             viewModel = viewModel,
+            backdrop = if (backdropSupported) appBackdrop else null,
             onNavigateToQueue = {
                 viewModel.openPlaybackQueue()
                 if (navController.currentDestination?.route != "library") {
