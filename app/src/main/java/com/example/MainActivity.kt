@@ -44,9 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -316,11 +319,23 @@ fun AppNavigation(viewModel: MainViewModel) {
                     val blurRadius = with(this) { (backgroundBlurProgress * 14f).dp.toPx() }
                     if (blurRadius > 0.5f) {
                         backdropLayer.renderEffect = BlurEffect(blurRadius, blurRadius)
-                        val backdropHeight = 112.dp.toPx()
-                        clipRect(
-                            top = (size.height - backdropHeight).coerceAtLeast(0f),
-                            bottom = size.height
-                        ) {
+                        val backdropTop = (size.height - 112.dp.toPx()).coerceAtLeast(0f)
+                        val cornerRadius = 20.dp.toPx()
+                        val miniPlayerBackdropShape = Path().apply {
+                            addRoundRect(
+                                RoundRect(
+                                    left = 0f,
+                                    top = backdropTop,
+                                    right = size.width,
+                                    bottom = size.height,
+                                    topLeftCornerRadius = CornerRadius(cornerRadius),
+                                    topRightCornerRadius = CornerRadius(cornerRadius)
+                                )
+                            )
+                        }
+                        // Keep the blurred copy inside the mini-player silhouette so its
+                        // edges never show as a rectangular patch above or beside the glass.
+                        clipPath(miniPlayerBackdropShape) {
                             drawLayer(backdropLayer)
                         }
                     } else {
