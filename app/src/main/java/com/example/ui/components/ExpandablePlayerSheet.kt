@@ -106,6 +106,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur as backdropBlur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -164,6 +166,7 @@ fun ExpandablePlayerSheet(
     onNavigateToQueue: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
     onBackgroundBlurChange: (Float) -> Unit = {},
+    backdrop: com.kyant.backdrop.backdrops.LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
@@ -583,8 +586,24 @@ fun ExpandablePlayerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
+                            // Read only the page layer behind this sibling surface. The backdrop
+                            // is clipped to the same rounded shape, so no rectangular blur layer
+                            // can leak over the mini-player's text or controls.
+                            .then(
+                                if (backdrop != null) {
+                                    Modifier.drawBackdrop(
+                                        backdrop = backdrop,
+                                        shape = { glassShape },
+                                        effects = {
+                                            backdropBlur(24.dp.toPx())
+                                        }
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .background(
-                                glassTint.copy(alpha = 0.78f),
+                                glassTint.copy(alpha = if (colorScheme.isDark) 0.70f else 0.72f),
                                 shape = glassShape
                             )
                             .border(
