@@ -581,7 +581,7 @@ fun ExpandablePlayerSheet(
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
                             .background(
-                                glassTint.copy(alpha = 0.82f),
+                                glassTint.copy(alpha = 1f),
                                 shape = RoundedCornerShape(
                                     topStart = sheetCornerRadius,
                                     topEnd = sheetCornerRadius
