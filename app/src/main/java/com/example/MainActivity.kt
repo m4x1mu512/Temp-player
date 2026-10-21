@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.drawLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
