@@ -558,9 +558,11 @@ fun ExpandablePlayerSheet(
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
                                     } else if (isHorizontalTrackSwipe) {
                                         change.consume()
-                                        // pointerInput is already a coroutine. Update the drag offset
-                                        // directly instead of launching a new coroutine for every pointer event.
-                                        trackSwipeOffset.snapTo(totalDragX)
+                                        // awaitEachGesture is a restricted suspension scope, so
+                                        // Animatable.snapTo must run in a regular child coroutine.
+                                        coroutineScope.launch {
+                                            trackSwipeOffset.snapTo(totalDragX)
+                                        }
                                     }
                                 }
                             }
