@@ -1269,10 +1269,19 @@ private fun GroupedListSection(
                 }
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                            ),
+                            RoundedCornerShape(16.dp)
+                        )
                         .clickable { onSelectGroup(groupKey, groupTracks) }
                 ) {
                     Row(
@@ -1668,10 +1677,19 @@ private fun FoldersSection(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
                             .clickable { onSelectGroup(folderName, folderTracks) }
                             .testTag("folder_card_$folderName")
                     ) {
@@ -1958,10 +1976,19 @@ private fun AlbumsSection(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
                             .clickable { onSelectGroup(albumTitle, tracks) }
                             .testTag("album_card_$albumTitle")
                     ) {
