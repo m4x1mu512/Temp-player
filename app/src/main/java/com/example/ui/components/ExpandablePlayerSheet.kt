@@ -102,6 +102,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -336,9 +337,18 @@ fun ExpandablePlayerSheet(
             (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
         } else if (isExpanded) 1f else 0f
 
-        // Blur the screen underneath the sheet progressively as it collapses.
-        LaunchedEffect(expandProgress) {
-            onBackgroundBlurChange((1f - expandProgress).coerceIn(0f, 1f))
+        // Keep the latest callback without restarting a coroutine for every animation frame.
+        val latestBackgroundBlurChange by rememberUpdatedState(onBackgroundBlurChange)
+        LaunchedEffect(animOffsetY, maxDragPx) {
+            snapshotFlow {
+                val offsetY = if (isDragging) dragOffsetY else animOffsetY.value
+                val progress = if (maxDragPx > 0f) {
+                    (1f - (offsetY / maxDragPx)).coerceIn(0f, 1f)
+                } else if (isExpanded) 1f else 0f
+                (1f - progress).coerceIn(0f, 1f)
+            }.collect { blurProgress ->
+                latestBackgroundBlurChange(blurProgress)
+            }
         }
 
         LaunchedEffect(maxDragPx) {
