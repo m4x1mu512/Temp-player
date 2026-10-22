@@ -890,7 +890,8 @@ fun LibraryScreen(
                                     if (displayedTracks.isEmpty()) {
                                         EmptyState(
                                             title = if (searchQuery.isBlank()) "Введите поисковый запрос" else "Ничего не найдено",
-                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено",
+                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено. Попробуйте изменить запрос",
+                                            icon = if (searchQuery.isBlank()) Icons.Default.Search else Icons.Default.MusicNote,
                                             actionButtonText = null,
                                             onActionClick = null
                                         )
