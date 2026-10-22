@@ -436,6 +436,7 @@ fun ExpandablePlayerSheet(
 
         val screenWidthPx = with(density) { screenWidth.toPx() }
         val trackSwipeOffset = remember { Animatable(0f) }
+        var trackSwipeDragOffset by remember { mutableFloatStateOf(0f) }
         var isTrackSwiping by remember { mutableStateOf(false) }
 
         val onSwipeNextTrack: () -> Unit = {
@@ -514,11 +515,13 @@ fun ExpandablePlayerSheet(
                                             onSwipePreviousTrack()
                                         }
                                         coroutineScope.launch {
+                                            // Transfer the final pointer position once, then animate back.
+                                            trackSwipeOffset.snapTo(trackSwipeDragOffset)
+                                            isTrackSwiping = false
                                             trackSwipeOffset.animateTo(
                                                 targetValue = 0f,
                                                 animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
                                             )
-                                            isTrackSwiping = false
                                         }
                                     } else {
                                         // Quick vertical swipe without full drag engagement
@@ -558,6 +561,7 @@ fun ExpandablePlayerSheet(
                                                 dragOffsetY = animOffsetY.value
                                             } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
                                                 isHorizontalTrackSwipe = true
+                                                trackSwipeDragOffset = totalDragX
                                                 isTrackSwiping = true
                                             }
                                         }
@@ -568,11 +572,8 @@ fun ExpandablePlayerSheet(
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
                                     } else if (isHorizontalTrackSwipe) {
                                         change.consume()
-                                        // awaitEachGesture is a restricted suspension scope, so
-                                        // Animatable.snapTo must run in a regular child coroutine.
-                                        coroutineScope.launch {
-                                            trackSwipeOffset.snapTo(totalDragX)
-                                        }
+                                        // Pointer movement updates the layer state directly; no coroutine per event.
+                                        trackSwipeDragOffset = totalDragX
                                     }
                                 }
                             }
@@ -722,7 +723,7 @@ fun ExpandablePlayerSheet(
                             .offset(x = currentArtX, y = currentArtY)
                             .size(currentArtSize)
                             .graphicsLayer {
-                                val swipe = trackSwipeOffset.value
+                                val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
                                 translationX = swipe * 0.4f
                             }
                             .shadow(
@@ -810,7 +811,8 @@ fun ExpandablePlayerSheet(
                                 .width(textWidth)
                                 .graphicsLayer {
                                     if (expandProgress < 0.35f) {
-                                        translationX = trackSwipeOffset.value * 0.45f
+                                        val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
+                                        translationX = swipe * 0.45f
                                     }
                                 }
                         ) {
