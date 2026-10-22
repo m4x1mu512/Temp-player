@@ -114,6 +114,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -317,7 +318,7 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val miniBarHeight = if (isLandscape) 84.dp else 88.dp
+        val miniBarHeight = if (isLandscape) 84.dp else 92.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
@@ -601,19 +602,13 @@ fun ExpandablePlayerSheet(
                                 }
                             )
                             .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        colorScheme.accentColor.copy(
-                                            alpha = if (colorScheme.isDark) 0.24f else 0.20f
-                                        ),
-                                        glassTint.copy(
-                                            alpha = if (colorScheme.isDark) 0.40f else 0.42f
-                                        ),
-                                        colorScheme.accentColor.copy(
-                                            alpha = if (colorScheme.isDark) 0.15f else 0.13f
-                                        )
-                                    )
-                                ),
+                                // A single translucent tint keeps the glass uniform; the
+                                // backdrop blur supplies depth without a visible inner band.
+                                color = colorScheme.accentColor
+                                    .copy(alpha = if (colorScheme.isDark) 0.12f else 0.10f)
+                                    .compositeOver(
+                                        glassTint.copy(alpha = if (colorScheme.isDark) 0.35f else 0.32f)
+                                    ),
                                 shape = glassShape
                             )
                             .border(
