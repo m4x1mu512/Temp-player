@@ -30,12 +30,15 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val playbackManager = PlaybackManager.getInstance(application)
     private val repository = playbackManager.repository
     private val settingsDataStore = playbackManager.settingsDataStore
+    private val playlistOrderSaveMutex = Mutex()
 
     // Search and Filter State
     private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -652,12 +655,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         current.add(toIndex, item)
         val newIds = current.map { it.id }
         _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }.value = newIds
+        // Commit the new order to the local cache immediately so it survives process restarts.
         settingsDataStore.saveCachedPlaylistOrder(playlistId, newIds)
         viewModelScope.launch {
-            try {
-                repository.reorderPlaylistTracks(playlistId, newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            playlistOrderSaveMutex.withLock {
+                try {
+                    // A second drag may finish before the previous database write starts.
+                    // Persist the latest in-memory order, not a stale snapshot from an earlier drag.
+                    val latestIds = _inMemoryPlaylistOrder[playlistId]?.value ?: newIds
+                    settingsDataStore.saveCachedPlaylistOrder(playlistId, latestIds)
+                    repository.reorderPlaylistTracks(playlistId, latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
