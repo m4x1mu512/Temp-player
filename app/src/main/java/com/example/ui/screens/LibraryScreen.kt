@@ -1307,6 +1307,7 @@ private fun GroupedListSection(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -1715,6 +1716,7 @@ private fun FoldersSection(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -1730,11 +1732,11 @@ private fun FoldersSection(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(14.dp)
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             FolderCoverCollage(
                                 artUris = distinctArtUris,
-                                size = 56.dp,
+                                size = 52.dp,
                                 shape = RoundedCornerShape(12.dp)
                             )
 
