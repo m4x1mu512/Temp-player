@@ -779,11 +779,10 @@ fun ExpandablePlayerSheet(
                             .background(colorScheme.progressTrackColor)
                     ) {
                         Crossfade(
-                            targetState = track.id,
-                            animationSpec = tween(durationMillis = 180),
+                            targetState = track.albumArtUri,
+                            animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
                             label = "expandable_player_art_crossfade"
-                        ) { _ ->
-                            val artUri = track.albumArtUri
+                        ) { artUri ->
                             if (artUri == null) {
                                 Image(
                                     painter = painterResource(R.drawable.ic_default_art),
@@ -1660,7 +1659,8 @@ private fun PlayerArtworkCard(
             val artRequest = remember(artUri) {
                 ImageRequest.Builder(context)
                     .data(artUri)
-                    .crossfade(false)
+                    // Fade decoded artwork in instead of replacing the placeholder in one frame.
+                    .crossfade(180)
                     .placeholder(R.drawable.ic_default_art)
                     .error(R.drawable.ic_default_art)
                     .build()
@@ -1755,25 +1755,25 @@ private fun ExpandedSlidingArtwork(
             transitionSpec = {
                 if (direction >= 0) {
                     (slideInHorizontally(
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
                         initialOffsetX = { fullWidth -> fullWidth }
-                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    ) + fadeIn(animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing)))
                     .togetherWith(
                         slideOutHorizontally(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            animationSpec = tween(durationMillis = 230, easing = FastOutSlowInEasing),
                             targetOffsetX = { fullWidth -> -fullWidth }
-                        ) + fadeOut(animationSpec = tween(180))
+                        ) + fadeOut(animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing))
                     )
                 } else {
                     (slideInHorizontally(
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
                         initialOffsetX = { fullWidth -> -fullWidth }
-                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    ) + fadeIn(animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing)))
                     .togetherWith(
                         slideOutHorizontally(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            animationSpec = tween(durationMillis = 230, easing = FastOutSlowInEasing),
                             targetOffsetX = { fullWidth -> fullWidth }
-                        ) + fadeOut(animationSpec = tween(180))
+                        ) + fadeOut(animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing))
                     )
                 }
             },
