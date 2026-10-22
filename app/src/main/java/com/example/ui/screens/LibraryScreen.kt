@@ -1326,8 +1326,8 @@ private fun GroupedListSection(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -2075,7 +2075,7 @@ private fun AlbumsSection(
                                 }
                             }
 
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
                                     text = albumTitle,
                                     style = MaterialTheme.typography.titleSmall,
