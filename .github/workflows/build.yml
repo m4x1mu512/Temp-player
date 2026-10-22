@@ -49,6 +49,9 @@ jobs:
       - name: Build Debug APK with Gradle
         run: ./gradlew assembleDebug || gradle assembleDebug
 
+      - name: Run Kotlin unit tests
+        run: ./gradlew testDebugUnitTest
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
