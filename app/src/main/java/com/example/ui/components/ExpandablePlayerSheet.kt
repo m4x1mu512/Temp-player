@@ -471,11 +471,19 @@ fun ExpandablePlayerSheet(
                 modifier = Modifier
                     .fillMaxSize()
                     .offset { IntOffset(0, currentOffsetY.roundToInt()) }
-                    .shadow(
-                        elevation = lerp(12.dp, 0.dp, expandProgress),
-                        shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
-                    )
-                    .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
+                    // Keep continuously changing sheet shadow and corner clipping in the layer phase.
+                    .graphicsLayer {
+                        val drawProgress = progressForDrawing()
+                        val drawCornerRadius = lerp(20.dp, 0.dp, drawProgress)
+                        shape = RoundedCornerShape(
+                            topStart = drawCornerRadius,
+                            topEnd = drawCornerRadius
+                        )
+                        clip = true
+                        shadowElevation = with(density) {
+                            lerp(12.dp, 0.dp, drawProgress).toPx()
+                        }
+                    }
                     .then(
                         if (expandProgress > 0.02f) {
                             if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
