@@ -693,10 +693,10 @@ fun ExpandablePlayerSheet(
                                 translationX = swipe * 0.4f
                             }
                             .shadow(
-                                elevation = lerp(2.dp, if (simplifiedShadows) 10.dp else 24.dp, expandProgress),
+                                elevation = lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, expandProgress),
                                 shape = RoundedCornerShape(currentArtCornerRadius),
-                                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.5f * expandProgress) else Color.Black.copy(alpha = 0.2f),
-                                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.35f * expandProgress) else Color.Transparent
+                                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.18f * expandProgress) else Color.Black.copy(alpha = 0.16f),
+                                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.10f * expandProgress) else Color.Transparent
                             )
                             .clip(RoundedCornerShape(currentArtCornerRadius))
                             .background(colorScheme.progressTrackColor)
