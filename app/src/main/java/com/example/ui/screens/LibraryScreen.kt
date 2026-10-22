@@ -829,30 +829,63 @@ fun LibraryScreen(
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { viewModel.onSearchQueryChanged(it) },
-                                        placeholder = { Text("Поиск по названию, артисту или альбому") },
+                                        placeholder = {
+                                            Text(
+                                                "Поиск по названию, артисту или альбому",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
                                         leadingIcon = {
-                                            Icon(Icons.Default.Search, contentDescription = null)
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = if (searchQuery.isNotBlank()) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
                                         },
                                         trailingIcon = {
                                             if (searchQuery.isNotEmpty()) {
-                                                IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                                                    Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                                                IconButton(
+                                                    onClick = { viewModel.onSearchQueryChanged("") }
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Clear,
+                                                        contentDescription = "Очистить поиск"
+                                                    )
                                                 }
                                             }
                                         },
                                         singleLine = true,
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(20.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
+                                            cursorColor = MaterialTheme.colorScheme.primary
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 8.dp)
                                             .testTag("search_input")
                                     )
+
+                                    if (searchQuery.isNotBlank() && displayedTracks.isNotEmpty()) {
+                                        Text(
+                                            text = "Найдено треков: ${displayedTracks.size}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(
+                                                start = 22.dp,
+                                                end = 22.dp,
+                                                bottom = 4.dp
+                                            )
+                                        )
+                                    }
 
                                     if (displayedTracks.isEmpty()) {
                                         EmptyState(
