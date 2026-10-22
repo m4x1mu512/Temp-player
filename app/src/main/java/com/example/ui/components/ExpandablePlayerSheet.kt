@@ -381,7 +381,7 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = 0f,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
                 )
             }
         }
@@ -391,7 +391,7 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = maxDragPx,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = tween(durationMillis = 290, easing = FastOutSlowInEasing)
                 )
             }
         }
@@ -401,7 +401,7 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = maxDragPx,
-                    animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessHigh)
+                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
                 )
             }
         }
