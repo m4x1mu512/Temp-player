@@ -599,7 +599,7 @@ fun PlayerScreen(
                                 Text(
                                     text = track.artist,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -983,7 +983,7 @@ fun PlayerScreen(
                         Text(
                             text = track.artist,
                             style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1632,10 +1632,10 @@ private fun PlayerProgressSection(
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            trackHeight = 3.dp,
-            thumbRadius = 5.5.dp,
-            glowRadius = 18.dp,
-            glowAlpha = 0.55f,
+            trackHeight = 4.dp,
+            thumbRadius = 5.dp,
+            glowRadius = 14.dp,
+            glowAlpha = 0.36f,
             testTag = sliderTestTag
         )
 
