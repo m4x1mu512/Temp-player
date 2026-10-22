@@ -39,6 +39,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = playbackManager.repository
     private val settingsDataStore = playbackManager.settingsDataStore
     private val playlistOrderSaveMutex = Mutex()
+    private val favoriteOrderSaveMutex = Mutex()
 
     // Search and Filter State
     private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -679,12 +680,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         current.add(toIndex, item)
         val newIds = current.map { it.id }
         _inMemoryFavoriteOrder.value = newIds
+        // Persist the visible order immediately; serialize database writes so a
+        // previous drag cannot overwrite a newer order.
         settingsDataStore.saveCachedFavoritesOrder(newIds)
         viewModelScope.launch {
-            try {
-                repository.reorderFavorites(newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            favoriteOrderSaveMutex.withLock {
+                try {
+                    val latestIds = _inMemoryFavoriteOrder.value ?: newIds
+                    settingsDataStore.saveCachedFavoritesOrder(latestIds)
+                    repository.reorderFavorites(latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
