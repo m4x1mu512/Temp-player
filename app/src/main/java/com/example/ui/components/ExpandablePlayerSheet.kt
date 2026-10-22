@@ -470,9 +470,11 @@ fun ExpandablePlayerSheet(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset { IntOffset(0, currentOffsetY.roundToInt()) }
-                    // Keep continuously changing sheet shadow and corner clipping in the layer phase.
+                    // Translate the whole sheet in the layer phase instead of the layout phase.
+                    // This avoids a full remeasure/re-layout of the player on every animation frame,
+                    // which is especially noticeable on the first expansion after app startup.
                     .graphicsLayer {
+                        translationY = if (isDragging) dragOffsetY else animOffsetY.value
                         val drawProgress = progressForDrawing()
                         val drawCornerRadius = lerp(20.dp, 0.dp, drawProgress)
                         shape = RoundedCornerShape(
