@@ -1538,10 +1538,10 @@ private fun PlayerArtworkCard(
                 modifier = Modifier
                     .fillMaxSize(0.94f)
                     .shadow(
-                        elevation = if (isPlaying) (if (isLandscape) 20.dp else 28.dp) else (if (isLandscape) 8.dp else 10.dp),
+                        elevation = if (isPlaying) (if (isLandscape) 16.dp else 22.dp) else (if (isLandscape) 7.dp else 9.dp),
                         shape = RoundedCornerShape(if (isLandscape) 22.dp else 28.dp),
-                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
+                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.16f),
+                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.18f) else Color.Transparent
                     )
             )
             Box(
