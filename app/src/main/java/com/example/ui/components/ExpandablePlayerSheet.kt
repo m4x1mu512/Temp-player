@@ -337,6 +337,15 @@ fun ExpandablePlayerSheet(
             (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
         } else if (isExpanded) 1f else 0f
 
+        // Read continuous progress inside draw/layer callbacks where possible, so purely visual
+        // effects can update without invalidating the whole composition on every animation frame.
+        val progressForDrawing: () -> Float = {
+            val offsetY = if (isDragging) dragOffsetY else animOffsetY.value
+            if (maxDragPx > 0f) {
+                (1f - (offsetY / maxDragPx)).coerceIn(0f, 1f)
+            } else if (isExpanded) 1f else 0f
+        }
+
         // Keep the latest callback without restarting a coroutine for every animation frame.
         val latestBackgroundBlurChange by rememberUpdatedState(onBackgroundBlurChange)
         LaunchedEffect(animOffsetY, maxDragPx) {
@@ -675,7 +684,10 @@ fun ExpandablePlayerSheet(
                             .offset(y = (fullArtY - 44.dp).coerceAtLeast(0.dp))
                             .fillMaxWidth()
                             .height(fullArtSize + 88.dp)
-                            .graphicsLayer { alpha = ((expandProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) * 0.72f }
+                            .graphicsLayer {
+                                val drawProgress = progressForDrawing()
+                                alpha = ((drawProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) * 0.72f
+                            }
                             .blur(44.dp)
                             .background(
                                 Brush.radialGradient(
