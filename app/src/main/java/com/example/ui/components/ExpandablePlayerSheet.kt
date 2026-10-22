@@ -732,19 +732,37 @@ fun ExpandablePlayerSheet(
                     val simplifiedShadows = rememberShouldUseSimplifiedShadows()
                     Box(
                         modifier = Modifier
-                            .offset(x = currentArtX, y = currentArtY)
+                            // Keep the layout anchor at the mini-player position. Continuous movement
+                            // toward the expanded position is applied in the graphics layer instead.
+                            .offset(x = miniArtX, y = miniArtY)
                             .size(currentArtSize)
                             .graphicsLayer {
+                                val drawProgress = progressForDrawing()
+                                val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
                                 val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
-                                translationX = swipe * 0.4f
+
+                                translationX = with(density) {
+                                    (lerp(miniArtX, fullArtX, drawProgress) - miniArtX).toPx()
+                                } + swipe * 0.4f
+                                translationY = with(density) {
+                                    (lerp(miniArtY, fullArtY, drawProgress) - miniArtY).toPx()
+                                }
+                                shape = RoundedCornerShape(drawCornerRadius)
+                                clip = true
+                                shadowElevation = with(density) {
+                                    lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress).toPx()
+                                }
+                                spotShadowColor = if (!simplifiedShadows && isPlaying) {
+                                    NeonCyan.copy(alpha = 0.18f * drawProgress)
+                                } else {
+                                    Color.Black.copy(alpha = 0.16f)
+                                }
+                                ambientShadowColor = if (!simplifiedShadows && isPlaying) {
+                                    NeonPurple.copy(alpha = 0.10f * drawProgress)
+                                } else {
+                                    Color.Transparent
+                                }
                             }
-                            .shadow(
-                                elevation = lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, expandProgress),
-                                shape = RoundedCornerShape(currentArtCornerRadius),
-                                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.18f * expandProgress) else Color.Black.copy(alpha = 0.16f),
-                                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.10f * expandProgress) else Color.Transparent
-                            )
-                            .clip(RoundedCornerShape(currentArtCornerRadius))
                             .background(colorScheme.progressTrackColor)
                             .clickable(enabled = expandProgress < 0.35f) {
                                 expandToFull()
