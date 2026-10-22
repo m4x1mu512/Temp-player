@@ -652,6 +652,7 @@ fun LibraryScreen(
                                     EmptyState(
                                         title = "Список воспроизведения пуст",
                                         message = "Выберите трек из папки, альбома, плейлиста или исполнителя",
+                                        icon = Icons.Default.QueueMusic,
                                         actionButtonText = null,
                                         onActionClick = null
                                     )
