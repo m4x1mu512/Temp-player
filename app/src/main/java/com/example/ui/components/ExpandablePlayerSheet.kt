@@ -738,7 +738,8 @@ fun ExpandablePlayerSheet(
                             .size(fullArtSize)
                             .graphicsLayer {
                                 val drawProgress = progressForDrawing()
-                                val scale = (lerp(miniArtSize / fullArtSize, 1f, drawProgress)).coerceAtLeast(0.01f)
+                                val miniScale = miniArtSize / fullArtSize
+                                val scale = (miniScale + (1f - miniScale) * drawProgress).coerceAtLeast(0.01f)
                                 val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
                                 val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
 
