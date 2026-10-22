@@ -732,25 +732,29 @@ fun ExpandablePlayerSheet(
                     val simplifiedShadows = rememberShouldUseSimplifiedShadows()
                     Box(
                         modifier = Modifier
-                            // Keep the layout anchor at the mini-player position. Continuous movement
-                            // toward the expanded position is applied in the graphics layer instead.
+                            // Measure the artwork at its expanded size once; scale and translation
+                            // happen in the graphics layer to avoid per-frame layout-size changes.
                             .offset(x = miniArtX, y = miniArtY)
-                            .size(currentArtSize)
+                            .size(fullArtSize)
                             .graphicsLayer {
                                 val drawProgress = progressForDrawing()
+                                val scale = (lerp(miniArtSize / fullArtSize, 1f, drawProgress)).coerceAtLeast(0.01f)
                                 val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
                                 val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
 
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                                scaleX = scale
+                                scaleY = scale
                                 translationX = with(density) {
                                     (lerp(miniArtX, fullArtX, drawProgress) - miniArtX).toPx()
                                 } + swipe * 0.4f
                                 translationY = with(density) {
                                     (lerp(miniArtY, fullArtY, drawProgress) - miniArtY).toPx()
                                 }
-                                shape = RoundedCornerShape(drawCornerRadius)
+                                shape = RoundedCornerShape(drawCornerRadius / scale)
                                 clip = true
                                 shadowElevation = with(density) {
-                                    lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress).toPx()
+                                    (lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress) / scale).toPx()
                                 }
                                 spotShadowColor = if (!simplifiedShadows && isPlaying) {
                                     NeonCyan.copy(alpha = 0.18f * drawProgress)
@@ -764,9 +768,6 @@ fun ExpandablePlayerSheet(
                                 }
                             }
                             .background(colorScheme.progressTrackColor)
-                            .clickable(enabled = expandProgress < 0.35f) {
-                                expandToFull()
-                            }
                     ) {
                         Crossfade(
                             targetState = track.id,
