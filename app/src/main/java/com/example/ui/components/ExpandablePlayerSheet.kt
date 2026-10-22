@@ -1228,7 +1228,7 @@ fun ExpandablePlayerSheet(
                                         ) {
                                             Text(
                                                 text = currentT.title,
-                                                style = MaterialTheme.typography.titleLarge,
+                                                style = MaterialTheme.typography.headlineSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
@@ -1237,8 +1237,8 @@ fun ExpandablePlayerSheet(
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
                                                 text = currentT.artist,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
