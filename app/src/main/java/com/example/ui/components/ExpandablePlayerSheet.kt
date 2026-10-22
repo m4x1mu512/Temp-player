@@ -873,7 +873,17 @@ fun ExpandablePlayerSheet(
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
                                 // Keep the controls' vertical center on the album artwork's center line.
-                                .offset(y = currentArtY + currentArtSize / 2 - miniBarHeight / 2)
+                                .offset(y = miniArtY + miniArtSize / 2 - miniBarHeight / 2)
+                                // Keep the controls' visual travel in the graphics layer rather than
+                                // recalculating their layout position on every animation frame.
+                                .graphicsLayer {
+                                    val drawProgress = progressForDrawing()
+                                    val miniCenterOffset = miniArtY + miniArtSize / 2 - miniBarHeight / 2
+                                    val fullCenterOffset = fullArtY + fullArtSize / 2 - miniBarHeight / 2
+                                    translationY = with(density) {
+                                        (lerp(miniCenterOffset, fullCenterOffset, drawProgress) - miniCenterOffset).toPx()
+                                    }
+                                }
                                 .padding(end = 8.dp)
                         ) {
                             IconButton(
