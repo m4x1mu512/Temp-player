@@ -655,6 +655,27 @@ fun ExpandablePlayerSheet(
                 val currentArtY = lerp(miniArtY, fullArtY, expandProgress)
                 val currentArtCornerRadius = lerp(miniCornerRadius, fullCornerRadius, expandProgress)
 
+                // Soft album-art accent glow: adds depth to the full player without competing with the cover.
+                if (expandProgress > 0.35f) {
+                    Box(
+                        modifier = Modifier
+                            .offset(y = (fullArtY - 44.dp).coerceAtLeast(0.dp))
+                            .fillMaxWidth()
+                            .height(fullArtSize + 88.dp)
+                            .graphicsLayer { alpha = ((expandProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) * 0.72f }
+                            .blur(44.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        colorScheme.accentColor.copy(alpha = 0.22f),
+                                        colorScheme.accentColor.copy(alpha = 0.07f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                }
+
                 // 1. ALBUM ARTWORK: 3D Flip Card when expanded, morphing box during transition / mini player
                 if (expandProgress >= 0.85f) {
                     Box(
@@ -1555,10 +1576,10 @@ private fun PlayerArtworkCard(
         modifier = modifier
             .size(size)
             .shadow(
-                elevation = if (simplifiedShadows) 8.dp else 20.dp,
+                elevation = if (simplifiedShadows) 6.dp else 14.dp,
                 shape = RoundedCornerShape(cornerRadius),
-                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.25f),
-                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.3f) else Color.Transparent
+                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.18f),
+                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.10f) else Color.Transparent
             )
             .clip(RoundedCornerShape(cornerRadius))
             .background(progressTrackColor)
