@@ -1529,11 +1529,11 @@ private fun SheetProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            trackHeight = 3.dp,
-            thumbRadius = 5.5.dp,
-            glowRadius = 18.dp,
-            glowAlpha = 0.55f,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+            trackHeight = 4.dp,
+            thumbRadius = 5.dp,
+            glowRadius = 14.dp,
+            glowAlpha = 0.36f,
             testTag = "player_progress_slider"
         )
 
