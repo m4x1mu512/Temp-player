@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,8 +77,8 @@ fun TrackListItem(
 
     val targetBgColor = when {
         isDragging -> MaterialTheme.colorScheme.surfaceVariant
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
         else -> Color.Transparent
     }
 
@@ -87,16 +88,28 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 16.dp)
+    val itemBorderColor = when {
+        isDragging -> MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        else -> Color.Transparent
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 3.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
-            .padding(start = 16.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)
+            .border(
+                width = 1.dp,
+                color = itemBorderColor,
+                shape = itemShape
+            )
+            .padding(start = 10.dp, end = 4.dp, top = 7.dp, bottom = 7.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
