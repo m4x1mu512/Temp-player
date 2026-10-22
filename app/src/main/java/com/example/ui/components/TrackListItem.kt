@@ -117,7 +117,12 @@ fun TrackListItem(
             modifier = Modifier
                 .size(50.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                    shape = RoundedCornerShape(12.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             val thumbnailRequest = remember(track.albumArtUri) {
@@ -137,10 +142,15 @@ fun TrackListItem(
             )
 
             if (isCurrent) {
+                val playingOverlayAlpha by animateFloatAsState(
+                    targetValue = if (isPlaying) 0.46f else 0.28f,
+                    animationSpec = tween(durationMillis = 260),
+                    label = "playing_overlay_alpha_${track.id}"
+                )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = playingOverlayAlpha)),
                     contentAlignment = Alignment.Center
                 ) {
                     val eqScale by animateFloatAsState(
