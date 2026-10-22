@@ -1368,7 +1368,7 @@ fun ExpandablePlayerSheet(
                                         ),
                                         modifier = Modifier
                                             .size(66.dp)
-                                            .shadow(12.dp, CircleShape, spotColor = NeonCyan)
+                                            .shadow(7.dp, CircleShape, spotColor = NeonCyan.copy(alpha = 0.24f))
                                             .testTag("player_play_pause_button")
                                     ) {
                                         AnimatedContent(
