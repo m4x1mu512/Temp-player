@@ -711,103 +711,111 @@ fun ExpandablePlayerSheet(
                     )
                 }
 
-                // 1. ALBUM ARTWORK: 3D Flip Card when expanded, morphing box during transition / mini player
-                if (expandProgress >= 0.85f) {
-                    Box(
-                        modifier = if (isLandscape) {
-                            Modifier
-                                .offset(x = fullArtX, y = fullArtY)
-                                .size(fullArtSize)
-                        } else {
-                            Modifier
-                                .offset(y = fullArtY)
-                                .fillMaxWidth()
-                                .height(fullArtSize)
-                        },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ExpandedSlidingArtwork(
-                            currentTrack = track,
-                            direction = transitionDirection,
-                            artSize = fullArtSize,
-                            cornerRadius = fullCornerRadius,
-                            isPlaying = isPlaying,
-                            progressTrackColor = colorScheme.progressTrackColor,
-                            onSwipeNext = onSwipeNextTrack,
-                            onSwipePrevious = onSwipePreviousTrack
-                        )
-                    }
-                } else {
-                    // Single Smoothly Morphing Artwork Box (used when mini player or during transition)
-                    val simplifiedShadows = rememberShouldUseSimplifiedShadows()
-                    Box(
-                        modifier = Modifier
-                            // Measure the artwork at its expanded size once; scale and translation
-                            // happen in the graphics layer to avoid per-frame layout-size changes.
-                            .offset(x = miniArtX, y = miniArtY)
-                            .size(fullArtSize)
-                            .graphicsLayer {
-                                val drawProgress = progressForDrawing()
-                                val miniScale = miniArtSize / fullArtSize
-                                val scale = (miniScale + (1f - miniScale) * drawProgress).coerceAtLeast(0.01f)
-                                val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
-                                val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
+                // Keep one artwork composable alive for the entire transition.
+                // Swapping to a separate ExpandedSlidingArtwork at 85% progress used to
+                // compose a new image/shadow/gesture subtree mid-animation and could stall
+                // the first expansion. The same artwork now morphs continuously from mini
+                // to expanded geometry without a late compositional hand-off.
+                val simplifiedShadows = rememberShouldUseSimplifiedShadows()
+                Box(
+                    modifier = Modifier
+                        .offset(x = miniArtX, y = miniArtY)
+                        .size(fullArtSize)
+                        .graphicsLayer {
+                            val drawProgress = progressForDrawing()
+                            val miniScale = miniArtSize / fullArtSize
+                            val scale = (miniScale + (1f - miniScale) * drawProgress).coerceAtLeast(0.01f)
+                            val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
+                            val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
 
-                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
-                                scaleX = scale
-                                scaleY = scale
-                                translationX = with(density) {
-                                    (lerp(miniArtX, fullArtX, drawProgress) - miniArtX).toPx()
-                                } + swipe * 0.4f
-                                translationY = with(density) {
-                                    (lerp(miniArtY, fullArtY, drawProgress) - miniArtY).toPx()
-                                }
-                                shape = RoundedCornerShape(drawCornerRadius / scale)
-                                clip = true
-                                shadowElevation = with(density) {
-                                    (lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress) / scale).toPx()
-                                }
-                                spotShadowColor = if (!simplifiedShadows && isPlaying) {
-                                    NeonCyan.copy(alpha = 0.18f * drawProgress)
-                                } else {
-                                    Color.Black.copy(alpha = 0.16f)
-                                }
-                                ambientShadowColor = if (!simplifiedShadows && isPlaying) {
-                                    NeonPurple.copy(alpha = 0.10f * drawProgress)
-                                } else {
-                                    Color.Transparent
-                                }
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = with(density) {
+                                (lerp(miniArtX, fullArtX, drawProgress) - miniArtX).toPx()
+                            } + swipe * 0.4f
+                            translationY = with(density) {
+                                (lerp(miniArtY, fullArtY, drawProgress) - miniArtY).toPx()
                             }
-                            .background(colorScheme.progressTrackColor)
-                    ) {
-                        Crossfade(
-                            targetState = track.albumArtUri,
-                            animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-                            label = "expandable_player_art_crossfade"
-                        ) { artUri ->
-                            if (artUri == null) {
-                                Image(
-                                    painter = painterResource(R.drawable.ic_default_art),
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                            shape = RoundedCornerShape(drawCornerRadius / scale)
+                            clip = true
+                            shadowElevation = with(density) {
+                                (lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress) / scale).toPx()
+                            }
+                            spotShadowColor = if (!simplifiedShadows && isPlaying) {
+                                NeonCyan.copy(alpha = 0.18f * drawProgress)
                             } else {
-                                val artRequest = remember(artUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(artUri)
-                                        .crossfade(false)
-                                        .placeholder(R.drawable.ic_default_art)
-                                        .error(R.drawable.ic_default_art)
-                                        .build()
-                                }
-                                AsyncImage(
-                                    model = artRequest,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                Color.Black.copy(alpha = 0.16f)
                             }
+                            ambientShadowColor = if (!simplifiedShadows && isPlaying) {
+                                NeonPurple.copy(alpha = 0.10f * drawProgress)
+                            } else {
+                                Color.Transparent
+                            }
+                        }
+                        .background(colorScheme.progressTrackColor)
+                        .then(
+                            if (isExpanded) {
+                                Modifier.pointerInput(track.id, isExpanded) {
+                                    var totalDragX = 0f
+                                    var velocityTracker = VelocityTracker()
+                                    detectHorizontalDragGestures(
+                                        onDragStart = {
+                                            totalDragX = 0f
+                                            velocityTracker = VelocityTracker()
+                                        },
+                                        onDragEnd = {
+                                            val velocity = velocityTracker.calculateVelocity().x
+                                            val thresholdPx = size.width * 0.20f
+                                            if (totalDragX < -thresholdPx || (velocity < -600f && totalDragX < -20f)) {
+                                                onSwipeNextTrack()
+                                            } else if (totalDragX > thresholdPx || (velocity > 600f && totalDragX > 20f)) {
+                                                onSwipePreviousTrack()
+                                            }
+                                            trackSwipeDragOffset = 0f
+                                            isTrackSwiping = false
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            totalDragX += dragAmount
+                                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                            trackSwipeDragOffset = totalDragX
+                                            isTrackSwiping = true
+                                        }
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    Crossfade(
+                        targetState = track.albumArtUri,
+                        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                        label = "expandable_player_art_crossfade"
+                    ) { artUri ->
+                        if (artUri == null) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_default_art),
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val artRequest = remember(artUri) {
+                                ImageRequest.Builder(context)
+                                    .data(artUri)
+                                    .crossfade(false)
+                                    .placeholder(R.drawable.ic_default_art)
+                                    .error(R.drawable.ic_default_art)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = artRequest,
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
