@@ -221,12 +221,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Акцентный цвет интерфейса",
+                        text = "Акцент фона",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Неоновые цвета кнопок, вкладок, ползунков и индикаторов",
+                        text = "Выбери оттенок фона и акцентных элементов приложения",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
