@@ -485,17 +485,17 @@ fun ExpandablePlayerSheet(
                             lerp(12.dp, 0.dp, drawProgress).toPx()
                         }
                     }
-                    .then(
-                        if (isExpanded || animOffsetY.isRunning) {
-                            if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
-                                Modifier.background(colorScheme.backgroundBrush)
-                            } else {
-                                Modifier.background(colorScheme.backgroundColor)
-                            }
+                    .drawBehind {
+                        // Draw the sheet surface on the render pass, blending it in with the
+                        // same progress as the sheet motion instead of switching backgrounds
+                        // abruptly when the expanded state changes.
+                        val backgroundAlpha = progressForDrawing()
+                        if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
+                            drawRect(brush = colorScheme.backgroundBrush, alpha = backgroundAlpha)
                         } else {
-                            Modifier
+                            drawRect(color = colorScheme.backgroundColor, alpha = backgroundAlpha)
                         }
-                    )
+                    }
                     .border(
                         border = if (!isExpanded || animOffsetY.isRunning) {
                             if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF))
@@ -616,6 +616,9 @@ fun ExpandablePlayerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
+                            .graphicsLayer {
+                                alpha = (1f - progressForDrawing()).coerceIn(0f, 1f)
+                            }
                             // Read only the page layer behind this sibling surface. The backdrop
                             // is clipped to the same rounded shape, so no rectangular blur layer
                             // can leak over the mini-player's text or controls.
@@ -846,7 +849,9 @@ fun ExpandablePlayerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(miniBarHeight)
-                            .graphicsLayer { alpha = miniAlpha }
+                            .graphicsLayer {
+                                alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f)
+                            }
                             .clickable(enabled = expandProgress < 0.35f) {
                                 expandToFull()
                             }
