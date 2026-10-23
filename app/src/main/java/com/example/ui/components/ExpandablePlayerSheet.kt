@@ -332,10 +332,9 @@ fun ExpandablePlayerSheet(
         var isDragging by remember { mutableStateOf(false) }
         var isInitialized by remember { mutableStateOf(false) }
 
-        val currentOffsetY = if (isDragging) dragOffsetY else animOffsetY.value
-        val expandProgress = if (maxDragPx > 0f) {
-            (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
-        } else if (isExpanded) 1f else 0f
+        // Keep animation progress out of composition. Continuous values are read only by
+        // graphics layers; composition sees endpoint/gesture state and stays stable per frame.
+        val expandProgress = if (isExpanded) 1f else 0f
 
         // Read continuous progress inside draw/layer callbacks where possible, so purely visual
         // effects can update without invalidating the whole composition on every animation frame.
@@ -416,7 +415,7 @@ fun ExpandablePlayerSheet(
                 velocityY > flingThreshold -> false
                 totalDragY < -travelThreshold -> true
                 totalDragY > travelThreshold -> false
-                else -> expandProgress >= 0.5f
+                else -> progressForDrawing() >= 0.5f
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
@@ -439,7 +438,7 @@ fun ExpandablePlayerSheet(
         }
 
         // BackHandler: collapses player when expanded
-        BackHandler(enabled = isExpanded || expandProgress > 0.05f) {
+        BackHandler(enabled = isExpanded || isDragging || animOffsetY.isRunning) {
             collapseToMini()
         }
 
@@ -463,7 +462,7 @@ fun ExpandablePlayerSheet(
             viewModel.previousTrack(forcePrevious = false)
         }
 
-        val sheetCornerRadius = lerp(20.dp, 0.dp, expandProgress)
+        val sheetCornerRadius = if (isExpanded) 0.dp else 20.dp
 
         // Sheet Container with real-time translationY revealing whatever screen is underneath
         MaterialTheme(colorScheme = playerMaterialColorScheme) {
@@ -487,7 +486,7 @@ fun ExpandablePlayerSheet(
                         }
                     }
                     .then(
-                        if (expandProgress > 0.02f) {
+                        if (isExpanded || animOffsetY.isRunning) {
                             if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
                                 Modifier.background(colorScheme.backgroundBrush)
                             } else {
@@ -498,7 +497,7 @@ fun ExpandablePlayerSheet(
                         }
                     )
                     .border(
-                        border = if (expandProgress < 0.2f) {
+                        border = if (!isExpanded || animOffsetY.isRunning) {
                             if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF))
                         } else BorderStroke(0.dp, Color.Transparent),
                         shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
@@ -598,12 +597,12 @@ fun ExpandablePlayerSheet(
                             }
                         }
                     }
-                    .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
+                    .testTag(if (isExpanded) "player_screen" else "mini_player")
             ) {
                 // One uniform frosted-glass surface for the collapsed player.
                 // Keep the tint translucent and avoid nested backgrounds that could
                 // create the lighter inset rectangle seen in earlier screenshots.
-                if (expandProgress <= 0.02f) {
+                if (!isExpanded || animOffsetY.isRunning) {
                     val glassTint = if (colorScheme.isDark) {
                         Color(0xFF777B80)
                     } else {
@@ -682,13 +681,15 @@ fun ExpandablePlayerSheet(
 
                 val fullCornerRadius = if (isLandscape) 20.dp else 26.dp
 
-                val currentArtSize = lerp(miniArtSize, fullArtSize, expandProgress)
-                val currentArtX = lerp(miniArtX, fullArtX, expandProgress)
-                val currentArtY = lerp(miniArtY, fullArtY, expandProgress)
-                val currentArtCornerRadius = lerp(miniCornerRadius, fullCornerRadius, expandProgress)
+                // Mini-player text fades out during expansion, so keep its layout anchored
+                // to the collapsed artwork instead of recomputing it for every animation frame.
+                val currentArtSize = miniArtSize
+                val currentArtX = miniArtX
+                val currentArtY = miniArtY
+                val currentArtCornerRadius = miniCornerRadius
 
                 // Soft album-art accent glow: adds depth to the full player without competing with the cover.
-                if (expandProgress > 0.35f) {
+                if (isExpanded || animOffsetY.isRunning) {
                     Box(
                         modifier = Modifier
                             .offset(y = (fullArtY - 44.dp).coerceAtLeast(0.dp))
@@ -821,8 +822,8 @@ fun ExpandablePlayerSheet(
                 }
 
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)
-                val miniAlpha = (1f - expandProgress * 2.5f).coerceIn(0f, 1f)
-                if (miniAlpha > 0f) {
+                val miniAlpha = 1f
+                if (!isExpanded || animOffsetY.isRunning) {
                     // Non-interactive playback progress at the bottom, below artwork, text and controls.
                     InteractiveMiniProgressBar(
                         position = position,
@@ -833,7 +834,8 @@ fun ExpandablePlayerSheet(
                         trackColor = colorScheme.progressTrackColor,
                         modifier = Modifier
                             .offset(y = miniBarHeight - 20.dp)
-                            .padding(horizontal = 14.dp),
+                            .padding(horizontal = 14.dp)
+                            .graphicsLayer { alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f) },
                         alpha = miniAlpha,
                         interactive = false,
                         testTag = "mini_player_progress"
@@ -984,12 +986,14 @@ fun ExpandablePlayerSheet(
                 }
 
                 // 3. FULL PLAYER ELEMENTS (Visible when expanded, fades in smoothly)
-                val fullAlpha = ((expandProgress - 0.20f) / 0.60f).coerceIn(0f, 1f)
-                if (fullAlpha > 0f) {
+                val fullAlpha = 1f
+                if (isExpanded || animOffsetY.isRunning) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { alpha = fullAlpha }
+                            .graphicsLayer {
+                                alpha = ((progressForDrawing() - 0.20f) / 0.60f).coerceIn(0f, 1f)
+                            }
                     ) {
                         // Top Bar with Drag Handle & Collapse Icon
                         Column(
