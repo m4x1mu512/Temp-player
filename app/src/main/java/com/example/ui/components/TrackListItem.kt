@@ -88,19 +88,19 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 16.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 20.dp else 18.dp)
     val itemBorderColor = when {
-        isDragging -> MaterialTheme.colorScheme.primary.copy(alpha = 0.34f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-        else -> Color.Transparent
+        isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+        isHighlighted -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f)
+        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.035f)
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 3.dp)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
@@ -109,19 +109,19 @@ fun TrackListItem(
                 color = itemBorderColor,
                 shape = itemShape
             )
-            .padding(start = 10.dp, end = 4.dp, top = 7.dp, bottom = 7.dp)
+            .padding(start = 10.dp, end = 4.dp, top = 9.dp, bottom = 9.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
         Box(
             modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .size(58.dp)
+                .clip(RoundedCornerShape(15.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(15.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -138,7 +138,7 @@ fun TrackListItem(
                 model = thumbnailRequest,
                 contentDescription = "Обложка ${track.title}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier.size(58.dp)
             )
 
             if (isCurrent) {
