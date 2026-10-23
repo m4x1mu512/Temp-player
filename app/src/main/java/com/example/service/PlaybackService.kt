@@ -184,6 +184,21 @@ class PlaybackService : MediaSessionService() {
                 playbackManager.seekTo(positionMs)
             }
 
+            // Some MP3 files (especially VBR files without a Xing/Info header) can
+            // report TIME_UNSET from the extractor even though the library has a
+            // known duration. Expose that known duration to MediaSession/system UI.
+            override fun getDuration(): Long {
+                val playerDuration = super.getDuration()
+                if (playerDuration != C.TIME_UNSET && playerDuration > 0L) {
+                    return playerDuration
+                }
+                return playbackManager.duration.value.takeIf { it > 0L } ?: C.TIME_UNSET
+            }
+
+            override fun isCurrentMediaItemSeekable(): Boolean {
+                return super.isCurrentMediaItemSeekable() || playbackManager.duration.value > 0L
+            }
+
             override fun getAvailableCommands(): Player.Commands {
                 return super.getAvailableCommands().buildUpon()
                     .add(Player.COMMAND_SEEK_TO_NEXT)
