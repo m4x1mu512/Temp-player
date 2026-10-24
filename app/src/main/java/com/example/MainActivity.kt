@@ -425,10 +425,10 @@ fun AppNavigation(viewModel: MainViewModel) {
             viewModel = viewModel,
             backdrop = if (backdropSupported) appBackdrop else null,
             onNavigateToQueue = {
-                viewModel.openPlaybackQueue()
                 if (navController.currentDestination?.route != "library") {
                     navController.popBackStack("library", inclusive = false)
                 }
+                viewModel.openPlaybackQueue()
             },
             onNavigateToSettings = {
                 navController.navigate("settings")
