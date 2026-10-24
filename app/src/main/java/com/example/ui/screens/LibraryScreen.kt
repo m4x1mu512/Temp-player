@@ -370,7 +370,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.QueueMusic,
                             contentDescription = "Список воспроизведения",
-                            tint = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -399,7 +399,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = "Папки",
-                            tint = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -428,7 +428,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = "Плейлисты",
-                            tint = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -457,7 +457,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Album,
                             contentDescription = "Альбомы",
-                            tint = if (pagerState.currentPage == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -486,7 +486,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Исполнители",
-                            tint = if (pagerState.currentPage == 4) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -515,7 +515,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Поиск",
-                            tint = if (pagerState.currentPage == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.Gray,
                             modifier = Modifier.size(22.dp)
                         )
                     }
