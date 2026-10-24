@@ -540,7 +540,7 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Меню",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = Color.Gray
                             )
                         }
                     }
@@ -551,7 +551,7 @@ fun LibraryScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Эквалайзер") },
-                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showEqualizerDialog = true
@@ -559,7 +559,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Таймер сна") },
-                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showSleepTimerDialog = true
@@ -567,7 +567,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сканировать") },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 viewModel.scanMusic()
@@ -575,7 +575,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сортировка") },
-                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 sortMenuExpanded = true
@@ -583,7 +583,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Настройки") },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 onNavigateToSettings()
