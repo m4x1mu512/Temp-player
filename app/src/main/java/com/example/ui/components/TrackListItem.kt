@@ -250,7 +250,11 @@ fun TrackListItem(
 
                 DropdownMenu(
                     expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(26.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 8.dp
                 ) {
                     if (onEditTrackInfo != null) {
                         DropdownMenuItem(
