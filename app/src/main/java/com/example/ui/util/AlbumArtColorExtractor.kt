@@ -326,10 +326,15 @@ fun rememberPlayerColors(
                 }
             }
             MiniPlayerBgMode.SYSTEM -> {
+                // Match the current-track row highlight in the playback list:
+                // TrackListItem uses primary at 9% alpha over the normal surface.
+                val selectedTrackBackground = systemPrimary
+                    .copy(alpha = 0.09f)
+                    .compositeOver(systemSurface)
                 TargetParams(
-                    top = systemSurface,
-                    middle = systemSurface,
-                    bottom = systemSurface,
+                    top = selectedTrackBackground,
+                    middle = selectedTrackBackground,
+                    bottom = selectedTrackBackground,
                     accent = systemPrimary,
                     isGradient = false,
                     isDark = false,
