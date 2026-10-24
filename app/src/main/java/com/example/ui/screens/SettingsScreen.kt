@@ -203,6 +203,7 @@ fun SettingsScreen(
                                 )
                             )
                         }
+                        MiniPlayerBgMode.CUSTOM -> Unit
                     }
                 }
             }
@@ -402,16 +403,6 @@ fun SettingsScreen(
                             )
                         )
 
-                        FilterChip(
-                            selected = miniPlayerBgMode == MiniPlayerBgMode.CUSTOM,
-                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.CUSTOM) },
-                            label = { Text("Палитра") },
-                            modifier = Modifier.testTag("mini_player_bg_custom"),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -451,12 +442,12 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK, MiniPlayerBgMode.CUSTOM -> {
+                        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK -> {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 val paletteTitle = when (miniPlayerBgMode) {
                                     MiniPlayerBgMode.LIGHT -> "Светлые однотонные оттенки:"
                                     MiniPlayerBgMode.DARK -> "Тёмные однотонные оттенки:"
-                                    else -> "Выбор оттенка фона:"
+                                    else -> ""
                                 }
                                 Text(
                                     text = paletteTitle,
@@ -482,16 +473,7 @@ fun SettingsScreen(
                                         0xFF27131BL to "Винный бордо",
                                         0xFF20132DL to "Тёмный аметист"
                                     )
-                                    else -> listOf(
-                                        0xFFFFFFFFL to "Белый",
-                                        0xFFFAF6F0L to "Крем",
-                                        0xFFEBF4F6L to "Голубой",
-                                        0xFF17171AL to "Оникс",
-                                        0xFF1F2026L to "Графит",
-                                        0xFF141D2CL to "Синий",
-                                        0xFF0E221BL to "Изумруд",
-                                        0xFF27131BL to "Бордо"
-                                    )
+                                    else -> emptyList()
                                 }
 
                                 Row(
