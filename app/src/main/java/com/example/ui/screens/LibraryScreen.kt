@@ -548,6 +548,7 @@ fun LibraryScreen(
                     DropdownMenu(
                         expanded = moreMenuExpanded,
                         onDismissRequest = { moreMenuExpanded = false },
+                        shape = RoundedCornerShape(24.dp),
                         containerColor = MaterialTheme.colorScheme.surface,
                         tonalElevation = 0.dp,
                         shadowElevation = 8.dp
