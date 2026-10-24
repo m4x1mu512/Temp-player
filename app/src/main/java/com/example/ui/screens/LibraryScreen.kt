@@ -547,7 +547,10 @@ fun LibraryScreen(
 
                     DropdownMenu(
                         expanded = moreMenuExpanded,
-                        onDismissRequest = { moreMenuExpanded = false }
+                        onDismissRequest = { moreMenuExpanded = false },
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 8.dp
                     ) {
                         DropdownMenuItem(
                             text = { Text("Эквалайзер") },
