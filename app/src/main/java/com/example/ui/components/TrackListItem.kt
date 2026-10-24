@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,8 +77,8 @@ fun TrackListItem(
 
     val targetBgColor = when {
         isDragging -> MaterialTheme.colorScheme.surfaceVariant
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
         else -> Color.Transparent
     }
 
@@ -87,24 +88,41 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 20.dp else 18.dp)
+    val itemBorderColor = when {
+        isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+        isHighlighted -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f)
+        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.035f)
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 5.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
-            .padding(start = 16.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)
+            .border(
+                width = 1.dp,
+                color = itemBorderColor,
+                shape = itemShape
+            )
+            .padding(start = 10.dp, end = 4.dp, top = 9.dp, bottom = 9.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
         Box(
             modifier = Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .size(58.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                    shape = RoundedCornerShape(15.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             val thumbnailRequest = remember(track.albumArtUri) {
@@ -120,14 +138,19 @@ fun TrackListItem(
                 model = thumbnailRequest,
                 contentDescription = "Обложка ${track.title}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier.size(58.dp)
             )
 
             if (isCurrent) {
+                val playingOverlayAlpha by animateFloatAsState(
+                    targetValue = if (isPlaying) 0.46f else 0.28f,
+                    animationSpec = tween(durationMillis = 260),
+                    label = "playing_overlay_alpha_${track.id}"
+                )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = playingOverlayAlpha)),
                     contentAlignment = Alignment.Center
                 ) {
                     val eqScale by animateFloatAsState(
@@ -227,7 +250,11 @@ fun TrackListItem(
 
                 DropdownMenu(
                     expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(26.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 8.dp
                 ) {
                     if (onEditTrackInfo != null) {
                         DropdownMenuItem(

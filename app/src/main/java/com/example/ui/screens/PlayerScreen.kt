@@ -599,7 +599,7 @@ fun PlayerScreen(
                                 Text(
                                     text = track.artist,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -983,7 +983,7 @@ fun PlayerScreen(
                         Text(
                             text = track.artist,
                             style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1538,10 +1538,10 @@ private fun PlayerArtworkCard(
                 modifier = Modifier
                     .fillMaxSize(0.94f)
                     .shadow(
-                        elevation = if (isPlaying) (if (isLandscape) 20.dp else 28.dp) else (if (isLandscape) 8.dp else 10.dp),
+                        elevation = if (isPlaying) (if (isLandscape) 16.dp else 22.dp) else (if (isLandscape) 7.dp else 9.dp),
                         shape = RoundedCornerShape(if (isLandscape) 22.dp else 28.dp),
-                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
+                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.16f),
+                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.18f) else Color.Transparent
                     )
             )
             Box(
@@ -1632,10 +1632,10 @@ private fun PlayerProgressSection(
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            trackHeight = 3.dp,
-            thumbRadius = 5.5.dp,
-            glowRadius = 18.dp,
-            glowAlpha = 0.55f,
+            trackHeight = 4.dp,
+            thumbRadius = 5.dp,
+            glowRadius = 14.dp,
+            glowAlpha = 0.36f,
             testTag = sliderTestTag
         )
 

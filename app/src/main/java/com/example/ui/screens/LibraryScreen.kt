@@ -19,7 +19,9 @@ import androidx.compose.animation.core.tween
 import com.example.ui.util.PlayerEmphasizedDecelerateEasing
 import com.example.ui.util.PlayerEmphasizedAccelerateEasing
 import com.example.ui.theme.FavoriteRed
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -101,6 +103,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
@@ -314,10 +317,31 @@ fun LibraryScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             // 7 top bar icons: 6 tabs + 1 more menu
+            val glassShape = RoundedCornerShape(
+                bottomStart = 22.dp,
+                bottomEnd = 22.dp
+            )
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
+                    .clip(glassShape)
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                            )
+                        ),
+                        shape = glassShape
+                    )
+                    .border(
+                        BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+                        ),
+                        shape = glassShape
+                    )
                     .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -330,11 +354,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_queue_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.QueueMusic,
-                        contentDescription = "Список воспроизведения",
-                        tint = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 0) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QueueMusic,
+                            contentDescription = "Список воспроизведения",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 2. Папки (Folders)
@@ -344,11 +383,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_folders_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = "Папки",
-                        tint = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 1) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = "Папки",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 3. Плейлисты (Playlists)
@@ -358,11 +412,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_playlists_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = "Плейлисты",
-                        tint = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 2) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = "Плейлисты",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 4. Альбомы (Albums)
@@ -372,11 +441,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_albums_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Album,
-                        contentDescription = "Альбомы",
-                        tint = if (pagerState.currentPage == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 3) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Album,
+                            contentDescription = "Альбомы",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 5. Исполнители (Artists)
@@ -386,11 +470,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_artists_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "Исполнители",
-                        tint = if (pagerState.currentPage == 4) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 4) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Исполнители",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 6. Поиск (Search)
@@ -400,11 +499,26 @@ fun LibraryScreen(
                         .weight(1f)
                         .testTag("nav_search_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Поиск",
-                        tint = if (pagerState.currentPage == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                if (pagerState.currentPage == 5) {
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                } else {
+                                    Color.Transparent
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Поиск",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
 
                 // 7. Три точки (Menu)
@@ -426,18 +540,22 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Меню",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = Color.Gray
                             )
                         }
                     }
 
                     DropdownMenu(
                         expanded = moreMenuExpanded,
-                        onDismissRequest = { moreMenuExpanded = false }
+                        onDismissRequest = { moreMenuExpanded = false },
+                        shape = RoundedCornerShape(24.dp),
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 8.dp
                     ) {
                         DropdownMenuItem(
                             text = { Text("Эквалайзер") },
-                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showEqualizerDialog = true
@@ -445,7 +563,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Таймер сна") },
-                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showSleepTimerDialog = true
@@ -453,7 +571,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сканировать") },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 viewModel.scanMusic()
@@ -461,7 +579,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сортировка") },
-                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 sortMenuExpanded = true
@@ -469,7 +587,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Настройки") },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.Gray) },
                             onClick = {
                                 moreMenuExpanded = false
                                 onNavigateToSettings()
@@ -538,6 +656,7 @@ fun LibraryScreen(
                                     EmptyState(
                                         title = "Список воспроизведения пуст",
                                         message = "Выберите трек из папки, альбома, плейлиста или исполнителя",
+                                        icon = Icons.Default.QueueMusic,
                                         actionButtonText = null,
                                         onActionClick = null
                                     )
@@ -572,7 +691,7 @@ fun LibraryScreen(
                                             },
                                             modifier = Modifier
                                                 .align(Alignment.BottomEnd)
-                                                .padding(end = 16.dp, bottom = 16.dp)
+                                                .padding(end = 16.dp, bottom = 124.dp)
                                         )
                                     }
                                 }
@@ -715,24 +834,44 @@ fun LibraryScreen(
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { viewModel.onSearchQueryChanged(it) },
-                                        placeholder = { Text("Поиск по названию, артисту или альбому") },
+                                        placeholder = {
+                                            Text(
+                                                "Поиск по названию, артисту или альбому",
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
                                         leadingIcon = {
-                                            Icon(Icons.Default.Search, contentDescription = null)
+                                            Icon(
+                                                Icons.Default.Search,
+                                                contentDescription = null,
+                                                tint = if (searchQuery.isNotBlank()) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
                                         },
                                         trailingIcon = {
                                             if (searchQuery.isNotEmpty()) {
-                                                IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
-                                                    Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                                                IconButton(
+                                                    onClick = { viewModel.onSearchQueryChanged("") }
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Clear,
+                                                        contentDescription = "Очистить поиск"
+                                                    )
                                                 }
                                             }
                                         },
                                         singleLine = true,
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(20.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            focusedContainerColor = MaterialTheme.colorScheme.surface,
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
+                                            cursorColor = MaterialTheme.colorScheme.primary
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -740,10 +879,24 @@ fun LibraryScreen(
                                             .testTag("search_input")
                                     )
 
+                                    if (searchQuery.isNotBlank() && displayedTracks.isNotEmpty()) {
+                                        Text(
+                                            text = "Найдено треков: ${displayedTracks.size}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(
+                                                start = 22.dp,
+                                                end = 22.dp,
+                                                bottom = 4.dp
+                                            )
+                                        )
+                                    }
+
                                     if (displayedTracks.isEmpty()) {
                                         EmptyState(
                                             title = if (searchQuery.isBlank()) "Введите поисковый запрос" else "Ничего не найдено",
-                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено",
+                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено. Попробуйте изменить запрос",
+                                            icon = if (searchQuery.isBlank()) Icons.Default.Search else Icons.Default.MusicNote,
                                             actionButtonText = null,
                                             onActionClick = null
                                         )
@@ -791,7 +944,7 @@ fun LibraryScreen(
                                                 },
                                                 modifier = Modifier
                                                     .align(Alignment.BottomEnd)
-                                                    .padding(end = 16.dp, bottom = 16.dp)
+                                                    .padding(end = 16.dp, bottom = 124.dp)
                                             )
                                         }
                                     }
@@ -1136,7 +1289,7 @@ private fun GroupedListSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -1155,10 +1308,20 @@ private fun GroupedListSection(
                 }
                 Card(
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .border(
+                            BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                            ),
+                            RoundedCornerShape(16.dp)
+                        )
                         .clickable { onSelectGroup(groupKey, groupTracks) }
                 ) {
                     Row(
@@ -1167,8 +1330,8 @@ private fun GroupedListSection(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(10.dp))
+                                .size(52.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1526,7 +1689,7 @@ private fun FoldersSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -1554,20 +1717,30 @@ private fun FoldersSection(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
                             .clickable { onSelectGroup(folderName, folderTracks) }
                             .testTag("folder_card_$folderName")
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(14.dp)
+                            modifier = Modifier.padding(16.dp)
                         ) {
                             FolderCoverCollage(
                                 artUris = distinctArtUris,
-                                size = 56.dp,
+                                size = 52.dp,
                                 shape = RoundedCornerShape(12.dp)
                             )
 
@@ -1809,7 +1982,7 @@ private fun AlbumsSection(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 16.dp, bottom = 16.dp)
+                        .padding(end = 16.dp, bottom = 124.dp)
                 )
             }
         }
@@ -1844,10 +2017,19 @@ private fun AlbumsSection(
 
                     Card(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .border(
+                                BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                ),
+                                RoundedCornerShape(16.dp)
+                            )
                             .clickable { onSelectGroup(albumTitle, tracks) }
                             .testTag("album_card_$albumTitle")
                     ) {
@@ -1897,7 +2079,7 @@ private fun AlbumsSection(
                                 }
                             }
 
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
                                     text = albumTitle,
                                     style = MaterialTheme.typography.titleSmall,
@@ -2199,7 +2381,7 @@ private fun PlaylistsSection(
                         },
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = 16.dp)
+                            .padding(end = 16.dp, bottom = 124.dp)
                     )
                 }
             }

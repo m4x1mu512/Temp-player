@@ -102,16 +102,20 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur as backdropBlur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -163,6 +167,8 @@ fun ExpandablePlayerSheet(
     viewModel: MainViewModel,
     onNavigateToQueue: () -> Unit,
     onNavigateToSettings: () -> Unit = {},
+    onBackgroundBlurChange: (Float) -> Unit = {},
+    backdrop: com.kyant.backdrop.backdrops.LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
@@ -240,8 +246,6 @@ fun ExpandablePlayerSheet(
         showVisualizerModeHint = false
     }
 
-    var isMiniScrubbing by remember { mutableStateOf(false) }
-    var miniScrubPos by remember { mutableLongStateOf(0L) }
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -315,7 +319,7 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val miniBarHeight = if (isLandscape) 56.dp else 64.dp
+        val miniBarHeight = if (isLandscape) 84.dp else 92.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
@@ -328,10 +332,32 @@ fun ExpandablePlayerSheet(
         var isDragging by remember { mutableStateOf(false) }
         var isInitialized by remember { mutableStateOf(false) }
 
-        val currentOffsetY = if (isDragging) dragOffsetY else animOffsetY.value
-        val expandProgress = if (maxDragPx > 0f) {
-            (1f - (currentOffsetY / maxDragPx)).coerceIn(0f, 1f)
-        } else if (isExpanded) 1f else 0f
+        // Keep animation progress out of composition. Continuous values are read only by
+        // graphics layers; composition sees endpoint/gesture state and stays stable per frame.
+        val expandProgress = if (isExpanded) 1f else 0f
+
+        // Read continuous progress inside draw/layer callbacks where possible, so purely visual
+        // effects can update without invalidating the whole composition on every animation frame.
+        val progressForDrawing: () -> Float = {
+            val offsetY = if (isDragging) dragOffsetY else animOffsetY.value
+            if (maxDragPx > 0f) {
+                (1f - (offsetY / maxDragPx)).coerceIn(0f, 1f)
+            } else if (isExpanded) 1f else 0f
+        }
+
+        // Keep the latest callback without restarting a coroutine for every animation frame.
+        val latestBackgroundBlurChange by rememberUpdatedState(onBackgroundBlurChange)
+        LaunchedEffect(animOffsetY, maxDragPx) {
+            snapshotFlow {
+                val offsetY = if (isDragging) dragOffsetY else animOffsetY.value
+                val progress = if (maxDragPx > 0f) {
+                    (1f - (offsetY / maxDragPx)).coerceIn(0f, 1f)
+                } else if (isExpanded) 1f else 0f
+                (1f - progress).coerceIn(0f, 1f)
+            }.collect { blurProgress ->
+                latestBackgroundBlurChange(blurProgress)
+            }
+        }
 
         LaunchedEffect(maxDragPx) {
             if (maxDragPx > 0f) {
@@ -354,7 +380,7 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = 0f,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
                 )
             }
         }
@@ -364,7 +390,7 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = maxDragPx,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = tween(durationMillis = 290, easing = FastOutSlowInEasing)
                 )
             }
         }
@@ -374,24 +400,22 @@ fun ExpandablePlayerSheet(
             coroutineScope.launch {
                 animOffsetY.animateTo(
                     targetValue = maxDragPx,
-                    animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessHigh)
+                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
                 )
             }
         }
 
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
-            val lightThresholdPx = with(density) { 4.dp.toPx() }
+            // Resolve the gesture from direction, meaningful travel, and current sheet position.
+            // Tiny accidental movements settle to the nearest endpoint instead of toggling the player.
+            val flingThreshold = with(density) { 420.dp.toPx() }
+            val travelThreshold = (maxDragPx * 0.12f).coerceAtLeast(with(density) { 36.dp.toPx() })
             val targetExpanded = when {
-                velocityY < -25f -> true // Any light flick up -> expand
-                velocityY > 25f -> false // Any light flick down -> collapse
-                isExpanded -> {
-                    // Was expanded: light downward drag (4dp or positive delta) or slight progress drop collapses
-                    !(totalDragY > lightThresholdPx || expandProgress < 0.98f)
-                }
-                else -> {
-                    // Was collapsed (mini): light upward drag (4dp or negative delta) or slight progress gain expands
-                    totalDragY < -lightThresholdPx || expandProgress > 0.02f
-                }
+                velocityY < -flingThreshold -> true
+                velocityY > flingThreshold -> false
+                totalDragY < -travelThreshold -> true
+                totalDragY > travelThreshold -> false
+                else -> progressForDrawing() >= 0.5f
             }
             isExpanded = targetExpanded
             coroutineScope.launch {
@@ -414,12 +438,13 @@ fun ExpandablePlayerSheet(
         }
 
         // BackHandler: collapses player when expanded
-        BackHandler(enabled = isExpanded || expandProgress > 0.05f) {
+        BackHandler(enabled = isExpanded || isDragging || animOffsetY.isRunning) {
             collapseToMini()
         }
 
         val screenWidthPx = with(density) { screenWidth.toPx() }
         val trackSwipeOffset = remember { Animatable(0f) }
+        var trackSwipeDragOffset by remember { mutableFloatStateOf(0f) }
         var isTrackSwiping by remember { mutableStateOf(false) }
 
         val onSwipeNextTrack: () -> Unit = {
@@ -437,32 +462,42 @@ fun ExpandablePlayerSheet(
             viewModel.previousTrack(forcePrevious = false)
         }
 
-        val sheetCornerRadius = lerp(20.dp, 0.dp, expandProgress)
+        val sheetCornerRadius = if (isExpanded) 0.dp else 20.dp
 
         // Sheet Container with real-time translationY revealing whatever screen is underneath
         MaterialTheme(colorScheme = playerMaterialColorScheme) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .offset { IntOffset(0, currentOffsetY.roundToInt()) }
-                    .shadow(
-                        elevation = lerp(12.dp, 0.dp, expandProgress),
-                        shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
-                    )
-                    .clip(RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius))
-                    .then(
-                        if (expandProgress > 0.02f) {
-                            if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
-                                Modifier.background(colorScheme.backgroundBrush)
-                            } else {
-                                Modifier.background(colorScheme.backgroundColor)
-                            }
-                        } else {
-                            Modifier
+                    // Translate the whole sheet in the layer phase instead of the layout phase.
+                    // This avoids a full remeasure/re-layout of the player on every animation frame,
+                    // which is especially noticeable on the first expansion after app startup.
+                    .graphicsLayer {
+                        translationY = if (isDragging) dragOffsetY else animOffsetY.value
+                        val drawProgress = progressForDrawing()
+                        val drawCornerRadius = lerp(20.dp, 0.dp, drawProgress)
+                        shape = RoundedCornerShape(
+                            topStart = drawCornerRadius,
+                            topEnd = drawCornerRadius
+                        )
+                        clip = true
+                        shadowElevation = with(density) {
+                            lerp(12.dp, 0.dp, drawProgress).toPx()
                         }
-                    )
+                    }
+                    .drawBehind {
+                        // Draw the sheet surface on the render pass, blending it in with the
+                        // same progress as the sheet motion instead of switching backgrounds
+                        // abruptly when the expanded state changes.
+                        val backgroundAlpha = progressForDrawing()
+                        if (colorScheme.isGradient && colorScheme.backgroundBrush != null) {
+                            drawRect(brush = colorScheme.backgroundBrush, alpha = backgroundAlpha)
+                        } else {
+                            drawRect(color = colorScheme.backgroundColor, alpha = backgroundAlpha)
+                        }
+                    }
                     .border(
-                        border = if (expandProgress < 0.2f) {
+                        border = if (!isExpanded || animOffsetY.isRunning) {
                             if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF))
                         } else BorderStroke(0.dp, Color.Transparent),
                         shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
@@ -498,11 +533,13 @@ fun ExpandablePlayerSheet(
                                             onSwipePreviousTrack()
                                         }
                                         coroutineScope.launch {
+                                            // Transfer the final pointer position once, then animate back.
+                                            trackSwipeOffset.snapTo(trackSwipeDragOffset)
+                                            isTrackSwiping = false
                                             trackSwipeOffset.animateTo(
                                                 targetValue = 0f,
                                                 animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)
                                             )
-                                            isTrackSwiping = false
                                         }
                                     } else {
                                         // Quick vertical swipe without full drag engagement
@@ -542,6 +579,7 @@ fun ExpandablePlayerSheet(
                                                 dragOffsetY = animOffsetY.value
                                             } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
                                                 isHorizontalTrackSwipe = true
+                                                trackSwipeDragOffset = totalDragX
                                                 isTrackSwiping = true
                                             }
                                         }
@@ -552,32 +590,67 @@ fun ExpandablePlayerSheet(
                                         dragOffsetY = (dragOffsetY + dy).coerceIn(0f, maxDragPx)
                                     } else if (isHorizontalTrackSwipe) {
                                         change.consume()
-                                        coroutineScope.launch {
-                                            trackSwipeOffset.snapTo(totalDragX)
-                                        }
+                                        // Pointer movement updates the layer state directly; no coroutine per event.
+                                        trackSwipeDragOffset = totalDragX
                                     }
                                 }
                             }
                         }
                     }
-                    .testTag(if (expandProgress > 0.5f) "player_screen" else "mini_player")
+                    .testTag(if (isExpanded) "player_screen" else "mini_player")
             ) {
-                // Frosted glass background layer for MiniPlayer state (TifyApp style)
-                if (expandProgress < 0.35f) {
-                    val miniPlayerHorizontalBrush = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
-                        colors = listOf(
-                            colorScheme.backgroundColor.copy(alpha = 0.35f),
-                            colorScheme.accentColor.copy(alpha = 0.20f),
-                            colorScheme.backgroundColor.copy(alpha = 0.35f)
-                        )
+                // One uniform frosted-glass surface for the collapsed player.
+                // Keep the tint translucent and avoid nested backgrounds that could
+                // create the lighter inset rectangle seen in earlier screenshots.
+                if (!isExpanded || animOffsetY.isRunning) {
+                    val glassTint = if (colorScheme.isDark) {
+                        Color(0xFF777B80)
+                    } else {
+                        Color(0xFFE9EBEE)
+                    }
+                    val glassShape = RoundedCornerShape(
+                        topStart = sheetCornerRadius,
+                        topEnd = sheetCornerRadius
                     )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(collapsedVisibleHeight)
-                            .blur(16.dp)
-                            .background(Color.White.copy(alpha = (1f - expandProgress * 2.5f).coerceAtLeast(0f) * 0.10f))
-                            .background(miniPlayerHorizontalBrush)
+                            .graphicsLayer {
+                                alpha = (1f - progressForDrawing()).coerceIn(0f, 1f)
+                            }
+                            // Read only the page layer behind this sibling surface. The backdrop
+                            // is clipped to the same rounded shape, so no rectangular blur layer
+                            // can leak over the mini-player's text or controls.
+                            .then(
+                                if (backdrop != null) {
+                                    Modifier.drawBackdrop(
+                                        backdrop = backdrop,
+                                        shape = { glassShape },
+                                        effects = {
+                                            backdropBlur(24.dp.toPx())
+                                        }
+                                    )
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .background(
+                                // A single translucent tint keeps the glass uniform; the
+                                // backdrop blur supplies depth without a visible inner band.
+                                color = colorScheme.accentColor
+                                    .copy(alpha = if (colorScheme.isDark) 0.12f else 0.10f)
+                                    .compositeOver(
+                                        glassTint.copy(alpha = if (colorScheme.isDark) 0.35f else 0.32f)
+                                    ),
+                                shape = glassShape
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = (if (colorScheme.isDark) Color.White else Color.Black)
+                                    .copy(alpha = 0.08f),
+                                shape = glassShape
+                            )
                     )
                 }
 
@@ -611,109 +684,163 @@ fun ExpandablePlayerSheet(
 
                 val fullCornerRadius = if (isLandscape) 20.dp else 26.dp
 
-                val currentArtSize = lerp(miniArtSize, fullArtSize, expandProgress)
-                val currentArtX = lerp(miniArtX, fullArtX, expandProgress)
-                val currentArtY = lerp(miniArtY, fullArtY, expandProgress)
-                val currentArtCornerRadius = lerp(miniCornerRadius, fullCornerRadius, expandProgress)
+                // Mini-player text fades out during expansion, so keep its layout anchored
+                // to the collapsed artwork instead of recomputing it for every animation frame.
+                val currentArtSize = miniArtSize
+                val currentArtX = miniArtX
+                val currentArtY = miniArtY
+                val currentArtCornerRadius = miniCornerRadius
 
-                // 1. ALBUM ARTWORK: 3D Flip Card when expanded, morphing box during transition / mini player
-                if (expandProgress >= 0.85f) {
-                    Box(
-                        modifier = if (isLandscape) {
-                            Modifier
-                                .offset(x = fullArtX, y = fullArtY)
-                                .size(fullArtSize)
-                        } else {
-                            Modifier
-                                .offset(y = fullArtY)
-                                .fillMaxWidth()
-                                .height(fullArtSize)
-                        },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        ExpandedSlidingArtwork(
-                            currentTrack = track,
-                            direction = transitionDirection,
-                            artSize = fullArtSize,
-                            cornerRadius = fullCornerRadius,
-                            isPlaying = isPlaying,
-                            progressTrackColor = colorScheme.progressTrackColor,
-                            onSwipeNext = onSwipeNextTrack,
-                            onSwipePrevious = onSwipePreviousTrack
-                        )
-                    }
-                } else {
-                    // Single Smoothly Morphing Artwork Box (used when mini player or during transition)
-                    val simplifiedShadows = rememberShouldUseSimplifiedShadows()
+                // Soft album-art accent glow: adds depth to the full player without competing with the cover.
+                if (isExpanded || animOffsetY.isRunning) {
                     Box(
                         modifier = Modifier
-                            .offset(x = currentArtX, y = currentArtY)
-                            .size(currentArtSize)
+                            .offset(y = (fullArtY - 44.dp).coerceAtLeast(0.dp))
+                            .fillMaxWidth()
+                            .height(fullArtSize + 88.dp)
                             .graphicsLayer {
-                                val swipe = trackSwipeOffset.value
-                                translationX = swipe * 0.4f
+                                val drawProgress = progressForDrawing()
+                                alpha = ((drawProgress - 0.35f) / 0.65f).coerceIn(0f, 1f) * 0.72f
                             }
-                            .shadow(
-                                elevation = lerp(2.dp, if (simplifiedShadows) 10.dp else 24.dp, expandProgress),
-                                shape = RoundedCornerShape(currentArtCornerRadius),
-                                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.5f * expandProgress) else Color.Black.copy(alpha = 0.2f),
-                                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.35f * expandProgress) else Color.Transparent
+                            .blur(44.dp)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        colorScheme.accentColor.copy(alpha = 0.22f),
+                                        colorScheme.accentColor.copy(alpha = 0.07f),
+                                        Color.Transparent
+                                    )
+                                )
                             )
-                            .clip(RoundedCornerShape(currentArtCornerRadius))
-                            .background(colorScheme.progressTrackColor)
-                            .clickable(enabled = expandProgress < 0.35f) {
-                                expandToFull()
+                    )
+                }
+
+                // Keep one artwork composable alive for the entire transition.
+                // Swapping to a separate ExpandedSlidingArtwork at 85% progress used to
+                // compose a new image/shadow/gesture subtree mid-animation and could stall
+                // the first expansion. The same artwork now morphs continuously from mini
+                // to expanded geometry without a late compositional hand-off.
+                val simplifiedShadows = rememberShouldUseSimplifiedShadows()
+                Box(
+                    modifier = Modifier
+                        .offset(x = miniArtX, y = miniArtY)
+                        .size(fullArtSize)
+                        .graphicsLayer {
+                            val drawProgress = progressForDrawing()
+                            val miniScale = miniArtSize / fullArtSize
+                            val scale = (miniScale + (1f - miniScale) * drawProgress).coerceAtLeast(0.01f)
+                            val drawCornerRadius = lerp(miniCornerRadius, fullCornerRadius, drawProgress)
+                            val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
+
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                            scaleX = scale
+                            scaleY = scale
+                            translationX = with(density) {
+                                (lerp(miniArtX, fullArtX, drawProgress) - miniArtX).toPx()
+                            } + swipe * 0.4f
+                            translationY = with(density) {
+                                (lerp(miniArtY, fullArtY, drawProgress) - miniArtY).toPx()
                             }
-                    ) {
-                        Crossfade(
-                            targetState = track.id,
-                            animationSpec = tween(durationMillis = 180),
-                            label = "expandable_player_art_crossfade"
-                        ) { _ ->
-                            val artUri = track.albumArtUri
-                            if (artUri == null) {
-                                Image(
-                                    painter = painterResource(R.drawable.ic_default_art),
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                            shape = RoundedCornerShape(drawCornerRadius / scale)
+                            clip = true
+                            shadowElevation = with(density) {
+                                (lerp(2.dp, if (simplifiedShadows) 8.dp else 18.dp, drawProgress) / scale).toPx()
+                            }
+                            spotShadowColor = if (!simplifiedShadows && isPlaying) {
+                                NeonCyan.copy(alpha = 0.18f * drawProgress)
                             } else {
-                                val artRequest = remember(artUri) {
-                                    ImageRequest.Builder(context)
-                                        .data(artUri)
-                                        .crossfade(false)
-                                        .placeholder(R.drawable.ic_default_art)
-                                        .error(R.drawable.ic_default_art)
-                                        .build()
-                                }
-                                AsyncImage(
-                                    model = artRequest,
-                                    contentDescription = "Обложка трека",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                Color.Black.copy(alpha = 0.16f)
                             }
+                            ambientShadowColor = if (!simplifiedShadows && isPlaying) {
+                                NeonPurple.copy(alpha = 0.10f * drawProgress)
+                            } else {
+                                Color.Transparent
+                            }
+                        }
+                        .background(colorScheme.progressTrackColor)
+                        .then(
+                            if (isExpanded) {
+                                Modifier.pointerInput(track.id, isExpanded) {
+                                    var totalDragX = 0f
+                                    var velocityTracker = VelocityTracker()
+                                    detectHorizontalDragGestures(
+                                        onDragStart = {
+                                            totalDragX = 0f
+                                            velocityTracker = VelocityTracker()
+                                        },
+                                        onDragEnd = {
+                                            val velocity = velocityTracker.calculateVelocity().x
+                                            val thresholdPx = size.width * 0.20f
+                                            if (totalDragX < -thresholdPx || (velocity < -600f && totalDragX < -20f)) {
+                                                onSwipeNextTrack()
+                                            } else if (totalDragX > thresholdPx || (velocity > 600f && totalDragX > 20f)) {
+                                                onSwipePreviousTrack()
+                                            }
+                                            trackSwipeDragOffset = 0f
+                                            isTrackSwiping = false
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            totalDragX += dragAmount
+                                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                            trackSwipeDragOffset = totalDragX
+                                            isTrackSwiping = true
+                                        }
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    Crossfade(
+                        targetState = track.albumArtUri,
+                        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                        label = "expandable_player_art_crossfade"
+                    ) { artUri ->
+                        if (artUri == null) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_default_art),
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val artRequest = remember(artUri) {
+                                ImageRequest.Builder(context)
+                                    .data(artUri)
+                                    .crossfade(false)
+                                    .placeholder(R.drawable.ic_default_art)
+                                    .error(R.drawable.ic_default_art)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = artRequest,
+                                contentDescription = "Обложка трека",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
                     }
                 }
 
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)
-                val miniAlpha = (1f - expandProgress * 2.5f).coerceIn(0f, 1f)
-                if (miniAlpha > 0f) {
-                    // Interactive scrubbable progress bar at top of mini player allowing seeking & rewinding
+                val miniAlpha = 1f
+                if (!isExpanded || animOffsetY.isRunning) {
+                    // Non-interactive playback progress at the bottom, below artwork, text and controls.
                     InteractiveMiniProgressBar(
                         position = position,
                         duration = duration,
                         isPlaying = isPlaying,
-                        onSeek = { viewModel.seekTo(it) },
+                        onSeek = {},
                         accentColor = colorScheme.accentColor,
                         trackColor = colorScheme.progressTrackColor,
+                        modifier = Modifier
+                            .offset(y = miniBarHeight - 20.dp)
+                            .padding(horizontal = 14.dp)
+                            .graphicsLayer { alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f) },
                         alpha = miniAlpha,
-                        onScrubbingStateChanged = { scrubbing, seekPos ->
-                            isMiniScrubbing = scrubbing
-                            miniScrubPos = seekPos
-                        },
+                        interactive = false,
                         testTag = "mini_player_progress"
                     )
 
@@ -722,8 +849,10 @@ fun ExpandablePlayerSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(miniBarHeight)
-                            .graphicsLayer { alpha = miniAlpha }
-                            .clickable(enabled = expandProgress < 0.35f && !isMiniScrubbing) {
+                            .graphicsLayer {
+                                alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f)
+                            }
+                            .clickable(enabled = expandProgress < 0.35f) {
                                 expandToFull()
                             }
                     ) {
@@ -738,7 +867,8 @@ fun ExpandablePlayerSheet(
                                 .width(textWidth)
                                 .graphicsLayer {
                                     if (expandProgress < 0.35f) {
-                                        translationX = trackSwipeOffset.value * 0.45f
+                                        val swipe = if (isTrackSwiping) trackSwipeDragOffset else trackSwipeOffset.value
+                                        translationX = swipe * 0.45f
                                     }
                                 }
                         ) {
@@ -751,30 +881,13 @@ fun ExpandablePlayerSheet(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
-                            val displayPos = if (isMiniScrubbing) miniScrubPos else position
-                            val formattedPos = remember((displayPos / 1000L)) { formatTime(displayPos) }
-                            val formattedDur = remember(duration) { formatTime(duration) }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = track.artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colorScheme.accentColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "• $formattedPos / $formattedDur",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isMiniScrubbing) colorScheme.accentColor else colorScheme.onSurfaceVariantColor,
-                                    fontWeight = if (isMiniScrubbing) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
-                                )
-                            }
+                            Text(
+                                text = track.artist,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colorScheme.accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
 
                         // Mini Player Control Buttons (Favorite, Previous/Rewind, Play/Pause, Next/Fast-Forward)
@@ -783,6 +896,18 @@ fun ExpandablePlayerSheet(
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             modifier = Modifier
                                 .align(Alignment.CenterEnd)
+                                // Keep the controls' vertical center on the album artwork's center line.
+                                .offset(y = miniArtY + miniArtSize / 2 - miniBarHeight / 2)
+                                // Keep the controls' visual travel in the graphics layer rather than
+                                // recalculating their layout position on every animation frame.
+                                .graphicsLayer {
+                                    val drawProgress = progressForDrawing()
+                                    val miniCenterOffset = miniArtY + miniArtSize / 2 - miniBarHeight / 2
+                                    val fullCenterOffset = fullArtY + fullArtSize / 2 - miniBarHeight / 2
+                                    translationY = with(density) {
+                                        (lerp(miniCenterOffset, fullCenterOffset, drawProgress) - miniCenterOffset).toPx()
+                                    }
+                                }
                                 .padding(end = 8.dp)
                         ) {
                             IconButton(
@@ -804,21 +929,17 @@ fun ExpandablePlayerSheet(
                                 )
                             }
 
-                            @OptIn(ExperimentalFoundationApi::class)
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onButtonPreviousTrack,
-                                        onLongClick = { viewModel.seekBackward10s() }
-                                    )
+                                    .clickable(onClick = onButtonPreviousTrack)
                                     .testTag("mini_player_previous"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Предыдущий трек (удержание: перемотка назад на 10 сек)",
+                                    contentDescription = "Предыдущий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -850,21 +971,17 @@ fun ExpandablePlayerSheet(
                                 }
                             }
 
-                            @OptIn(ExperimentalFoundationApi::class)
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onSwipeNextTrack,
-                                        onLongClick = { viewModel.seekForward10s() }
-                                    )
+                                    .clickable(onClick = onSwipeNextTrack)
                                     .testTag("mini_player_next"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Следующий трек (удержание: перемотка вперед на 10 сек)",
+                                    contentDescription = "Следующий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(22.dp)
                                 )
@@ -874,12 +991,14 @@ fun ExpandablePlayerSheet(
                 }
 
                 // 3. FULL PLAYER ELEMENTS (Visible when expanded, fades in smoothly)
-                val fullAlpha = ((expandProgress - 0.20f) / 0.60f).coerceIn(0f, 1f)
-                if (fullAlpha > 0f) {
+                val fullAlpha = 1f
+                if (isExpanded || animOffsetY.isRunning) {
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer { alpha = fullAlpha }
+                            .graphicsLayer {
+                                alpha = ((progressForDrawing() - 0.20f) / 0.60f).coerceIn(0f, 1f)
+                            }
                     ) {
                         // Top Bar with Drag Handle & Collapse Icon
                         Column(
@@ -1191,7 +1310,7 @@ fun ExpandablePlayerSheet(
                                         ) {
                                             Text(
                                                 text = currentT.title,
-                                                style = MaterialTheme.typography.titleLarge,
+                                                style = MaterialTheme.typography.headlineSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
@@ -1200,8 +1319,8 @@ fun ExpandablePlayerSheet(
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
                                                 text = currentT.artist,
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -1331,7 +1450,7 @@ fun ExpandablePlayerSheet(
                                         ),
                                         modifier = Modifier
                                             .size(66.dp)
-                                            .shadow(12.dp, CircleShape, spotColor = NeonCyan)
+                                            .shadow(7.dp, CircleShape, spotColor = NeonCyan.copy(alpha = 0.24f))
                                             .testTag("player_play_pause_button")
                                     ) {
                                         AnimatedContent(
@@ -1492,11 +1611,11 @@ private fun SheetProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            trackHeight = 3.dp,
-            thumbRadius = 5.5.dp,
-            glowRadius = 18.dp,
-            glowAlpha = 0.55f,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+            trackHeight = 4.dp,
+            thumbRadius = 5.dp,
+            glowRadius = 14.dp,
+            glowAlpha = 0.36f,
             testTag = "player_progress_slider"
         )
 
@@ -1539,10 +1658,10 @@ private fun PlayerArtworkCard(
         modifier = modifier
             .size(size)
             .shadow(
-                elevation = if (simplifiedShadows) 8.dp else 20.dp,
+                elevation = if (simplifiedShadows) 6.dp else 14.dp,
                 shape = RoundedCornerShape(cornerRadius),
-                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.25f),
-                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.3f) else Color.Transparent
+                spotColor = if (!simplifiedShadows && isPlaying) NeonCyan.copy(alpha = 0.18f) else Color.Black.copy(alpha = 0.18f),
+                ambientColor = if (!simplifiedShadows && isPlaying) NeonPurple.copy(alpha = 0.10f) else Color.Transparent
             )
             .clip(RoundedCornerShape(cornerRadius))
             .background(progressTrackColor)
@@ -1559,7 +1678,8 @@ private fun PlayerArtworkCard(
             val artRequest = remember(artUri) {
                 ImageRequest.Builder(context)
                     .data(artUri)
-                    .crossfade(false)
+                    // Fade decoded artwork in instead of replacing the placeholder in one frame.
+                    .crossfade(180)
                     .placeholder(R.drawable.ic_default_art)
                     .error(R.drawable.ic_default_art)
                     .build()
@@ -1654,25 +1774,25 @@ private fun ExpandedSlidingArtwork(
             transitionSpec = {
                 if (direction >= 0) {
                     (slideInHorizontally(
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
                         initialOffsetX = { fullWidth -> fullWidth }
-                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    ) + fadeIn(animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing)))
                     .togetherWith(
                         slideOutHorizontally(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            animationSpec = tween(durationMillis = 230, easing = FastOutSlowInEasing),
                             targetOffsetX = { fullWidth -> -fullWidth }
-                        ) + fadeOut(animationSpec = tween(180))
+                        ) + fadeOut(animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing))
                     )
                 } else {
                     (slideInHorizontally(
-                        animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
                         initialOffsetX = { fullWidth -> -fullWidth }
-                    ) + fadeIn(animationSpec = tween(220, delayMillis = 40)))
+                    ) + fadeIn(animationSpec = tween(durationMillis = 210, easing = FastOutSlowInEasing)))
                     .togetherWith(
                         slideOutHorizontally(
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow),
+                            animationSpec = tween(durationMillis = 230, easing = FastOutSlowInEasing),
                             targetOffsetX = { fullWidth -> fullWidth }
-                        ) + fadeOut(animationSpec = tween(180))
+                        ) + fadeOut(animationSpec = tween(durationMillis = 190, easing = FastOutSlowInEasing))
                     )
                 }
             },

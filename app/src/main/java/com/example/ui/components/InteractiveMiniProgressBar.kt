@@ -52,6 +52,7 @@ fun InteractiveMiniProgressBar(
     modifier: Modifier = Modifier,
     alpha: Float = 1f,
     onScrubbingStateChanged: ((isScrubbing: Boolean, seekPositionMs: Long) -> Unit)? = null,
+    interactive: Boolean = true,
     testTag: String = "mini_player_interactive_progress"
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -98,42 +99,46 @@ fun InteractiveMiniProgressBar(
                     range = 0f..(if (duration > 0) duration.toFloat() else 1f)
                 )
             }
-            .pointerInput(duration) {
-                detectTapGestures { offset ->
-                    if (duration > 0) {
-                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnSeek(targetMs)
+            .pointerInput(duration, interactive) {
+                if (interactive) {
+                    detectTapGestures { offset ->
+                        if (duration > 0) {
+                            val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnSeek(targetMs)
+                        }
                     }
                 }
             }
-            .pointerInput(duration) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        isScrubbing = true
-                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        scrubFraction = fraction
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnScrubbingStateChanged?.invoke(true, targetMs)
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        scrubFraction = fraction
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnScrubbingStateChanged?.invoke(true, targetMs)
-                    },
-                    onDragEnd = {
-                        isScrubbing = false
-                        val targetMs = (scrubFraction * duration).toLong()
-                        currentOnSeek(targetMs)
-                        currentOnScrubbingStateChanged?.invoke(false, targetMs)
-                    },
-                    onDragCancel = {
-                        isScrubbing = false
-                        currentOnScrubbingStateChanged?.invoke(false, position)
-                    }
-                )
+            .pointerInput(duration, interactive) {
+                if (interactive) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            isScrubbing = true
+                            val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            scrubFraction = fraction
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnScrubbingStateChanged?.invoke(true, targetMs)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            scrubFraction = fraction
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnScrubbingStateChanged?.invoke(true, targetMs)
+                        },
+                        onDragEnd = {
+                            isScrubbing = false
+                            val targetMs = (scrubFraction * duration).toLong()
+                            currentOnSeek(targetMs)
+                            currentOnScrubbingStateChanged?.invoke(false, targetMs)
+                        },
+                        onDragCancel = {
+                            isScrubbing = false
+                            currentOnScrubbingStateChanged?.invoke(false, position)
+                        }
+                    )
+                }
             }
             .testTag(testTag),
         contentAlignment = Alignment.CenterStart
