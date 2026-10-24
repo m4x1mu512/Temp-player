@@ -147,6 +147,7 @@ fun LibraryScreen(
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
+    val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
@@ -276,9 +277,10 @@ fun LibraryScreen(
         }
     }
 
-    // Single source of truth for external navigation event to queue & playing track
-    LaunchedEffect(Unit) {
-        viewModel.navigateToQueueEvent.collect {
+    // StateFlow survives navigation away from LibraryScreen, so a queue-open request
+    // triggered while Settings is on top is handled when LibraryScreen is composed again.
+    LaunchedEffect(openQueueEvent) {
+        if (openQueueEvent > 0) {
             navigateToQueueAndScrollToCurrentTrack()
         }
     }
