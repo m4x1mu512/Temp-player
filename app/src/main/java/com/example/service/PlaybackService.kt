@@ -158,7 +158,7 @@ class PlaybackService : MediaSessionService() {
 
             override fun seekToNext() {
                 Log.d(TAG, "next")
-                playbackManager.nextTrack(autoPlayIfPaused = true)
+                playbackManager.nextTrack(autoPlayIfPaused = false)
             }
 
             override fun seekToNextMediaItem() {
@@ -168,7 +168,7 @@ class PlaybackService : MediaSessionService() {
 
             override fun seekToPrevious() {
                 Log.d(TAG, "previous")
-                playbackManager.previousTrack(autoPlayIfPaused = true)
+                playbackManager.previousTrack(autoPlayIfPaused = false)
             }
 
             override fun seekToPreviousMediaItem() {
