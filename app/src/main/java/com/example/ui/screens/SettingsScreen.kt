@@ -203,7 +203,6 @@ fun SettingsScreen(
                                 )
                             )
                         }
-                        MiniPlayerBgMode.CUSTOM -> Unit
                     }
                 }
             }
@@ -546,6 +545,7 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                        MiniPlayerBgMode.CUSTOM -> Unit
                     }
                 }
             }
