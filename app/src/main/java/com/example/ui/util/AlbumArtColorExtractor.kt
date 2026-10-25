@@ -381,20 +381,33 @@ fun rememberPlayerColors(
         return Color(android.graphics.Color.HSVToColor(color.alpha.let { (it * 255).toInt() }, hsv))
     }
 
-    val miniTop = if (isLightAppTheme && isGradient) liftForLightTheme(animTop) else animTop
-    val miniMiddle = if (isLightAppTheme && isGradient) liftForLightTheme(animMiddle) else animMiddle
-    val miniBottom = if (isLightAppTheme && isGradient) liftForLightTheme(animBottom) else animBottom
+    // Cache HSV conversions until the animated color or theme actually changes.
+    // These values are read during color animation, so avoiding repeated allocations
+    // here helps older devices keep up with the same visual transition.
+    val miniTop = remember(animTop, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animTop) else animTop
+    }
+    val miniMiddle = remember(animMiddle, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animMiddle) else animMiddle
+    }
+    val miniBottom = remember(animBottom, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animBottom) else animBottom
+    }
 
-    // Horizontal gradient for MiniPlayer with depth alpha values
-    val miniPlayerHorizontalBrush = if (isGradient) {
-        Brush.horizontalGradient(
-            colors = listOf(
-                miniTop.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f),
-                miniMiddle.copy(alpha = if (isLightAppTheme) 0.62f else 0.20f),
-                miniBottom.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f)
+    // Keep the brush stable between frames when its actual colors have not changed.
+    val miniPlayerHorizontalBrush = remember(
+        isGradient, miniTop, miniMiddle, miniBottom, isLightAppTheme
+    ) {
+        if (isGradient) {
+            Brush.horizontalGradient(
+                colors = listOf(
+                    miniTop.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f),
+                    miniMiddle.copy(alpha = if (isLightAppTheme) 0.62f else 0.20f),
+                    miniBottom.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f)
+                )
             )
-        )
-    } else null
+        } else null
+    }
 
     return PlayerColorScheme(
         backgroundColor = animTop,
