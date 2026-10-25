@@ -259,6 +259,23 @@ fun PlayerScreen(
     // Pointer movement updates this scalar directly; graphicsLayer reads it without
     // recomposing the player hierarchy. Animatable is reserved for settle animation.
     val dragOffsetY = remember { mutableFloatStateOf(0f) }
+    val dragSettleAnimation = remember { Animatable(0f) }
+    var isDragSettling by remember { mutableStateOf(false) }
+    val returnDragToStart: () -> Unit = {
+        coroutineScope.launch {
+            dragSettleAnimation.snapTo(dragOffsetY.value)
+            isDragSettling = true
+            dragSettleAnimation.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+            dragOffsetY.value = 0f
+            isDragSettling = false
+        }
+    }
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
@@ -346,7 +363,7 @@ fun PlayerScreen(
                     }
                 )
                 .graphicsLayer {
-                    translationY = dragOffsetY.value.coerceAtLeast(0f)
+                    translationY = (if (isDragSettling) dragSettleAnimation.value else dragOffsetY.value).coerceAtLeast(0f)
                 }
                 .testTag("player_screen")
         ) {
@@ -366,32 +383,12 @@ fun PlayerScreen(
                                 if (dragOffsetY.value > dismissThresholdPx) {
                                     onNavigateBack()
                                 } else {
-                                    coroutineScope.launch {
-                                        Animatable(dragOffsetY.value).animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = spring(
-                                                dampingRatio = 0.85f,
-                                                stiffness = Spring.StiffnessMediumLow
-                                            )
-                                        ) { value ->
-                                            dragOffsetY.value = value
-                                        }
-                                    }
+                                    returnDragToStart()
                                 }
                                 dragDistanceY = 0f
                             },
                             onDragCancel = {
-                                coroutineScope.launch {
-                                    Animatable(dragOffsetY.value).animateTo(
-                                        targetValue = 0f,
-                                        animationSpec = spring(
-                                            dampingRatio = 0.85f,
-                                            stiffness = Spring.StiffnessMediumLow
-                                        )
-                                    ) { value ->
-                                        dragOffsetY.value = value
-                                    }
-                                }
+                                returnDragToStart()
                                 dragDistanceY = 0f
                             },
                             onDrag = { _, dragAmount ->
@@ -876,24 +873,19 @@ fun PlayerScreen(
                                         if (dragOffsetY.value > dismissThresholdPx) {
                                             onNavigateBack()
                                         } else {
-                                            coroutineScope.launch {
-                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                            }
+                                            returnDragToStart()
                                         }
                                         dragDistanceY = 0f
                                     },
                                     onDragCancel = {
-                                        coroutineScope.launch {
-                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                        }
+                                        returnDragToStart()
                                         dragDistanceY = 0f
                                     },
                                     onVerticalDrag = { _, dragAmount ->
                                         dragDistanceY += dragAmount
                                         if (dragAmount > 0f || dragOffsetY.value > 0f) {
-                                            coroutineScope.launch {
-                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount).coerceAtLeast(0f))
-                                            }
+                                            dragOffsetY.value =
+                                                (dragOffsetY.value + dragAmount).coerceAtLeast(0f)
                                         }
                                     }
                                 )
