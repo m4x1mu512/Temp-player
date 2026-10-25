@@ -53,6 +53,15 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    // Target for the :benchmark module: release-like (R8 on, so measurements match what ships)
+    // but signed with the debug key so it installs without the upload keystore.
+    create("benchmark") {
+      initWith(getByName("release"))
+      signingConfig = signingConfigs.getByName("debugConfig")
+      matchingFallbacks += listOf("release")
+      isDebuggable = false
+      isProfileable = true
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11

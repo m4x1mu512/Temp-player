@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "Temp"
 
 include(":app")
+include(":benchmark")
