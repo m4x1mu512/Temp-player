@@ -340,10 +340,10 @@ class MusicRepository(
             e.printStackTrace()
         }
 
-        // This is a folder-scoped scan. Upsert discovered tracks without deleting
-        // tracks indexed from other folders, since they may still be selected later.
         if (scannedTracks.isNotEmpty()) {
             trackDao.insertTracks(scannedTracks)
+            // Keep the library aligned with the folders selected for this scan.
+            trackDao.deleteTracksNotIn(scannedTracks.map { it.id })
         }
         scannedTracks.size
     }
