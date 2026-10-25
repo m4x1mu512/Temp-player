@@ -256,10 +256,9 @@ fun PlayerScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
-    val dragOffsetY = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        dragOffsetY.snapTo(0f)
-    }
+    // Pointer movement updates this scalar directly; graphicsLayer reads it without
+    // recomposing the player hierarchy. Animatable is reserved for settle animation.
+    val dragOffsetY = remember { mutableFloatStateOf(0f) }
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
     val context = LocalContext.current
@@ -368,23 +367,40 @@ fun PlayerScreen(
                                     onNavigateBack()
                                 } else {
                                     coroutineScope.launch {
-                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                        Animatable(dragOffsetY.value).animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = spring(
+                                                dampingRatio = 0.85f,
+                                                stiffness = Spring.StiffnessMediumLow
+                                            )
+                                        ) { value ->
+                                            dragOffsetY.value = value
+                                        }
                                     }
                                 }
                                 dragDistanceY = 0f
                             },
                             onDragCancel = {
                                 coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
+                                    Animatable(dragOffsetY.value).animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = spring(
+                                            dampingRatio = 0.85f,
+                                            stiffness = Spring.StiffnessMediumLow
+                                        )
+                                    ) { value ->
+                                        dragOffsetY.value = value
+                                    }
                                 }
                                 dragDistanceY = 0f
                             },
                             onDrag = { _, dragAmount ->
                                 dragDistanceY += dragAmount.y
-                                if (dragAmount.y > 0 || dragOffsetY.value > 0f) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
-                                    }
+                                if (dragAmount.y > 0f || dragOffsetY.value > 0f) {
+                                    // No coroutine or Animatable mutation per pointer event.
+                                    // The graphics layer consumes this value directly.
+                                    dragOffsetY.value =
+                                        (dragOffsetY.value + dragAmount.y).coerceAtLeast(0f)
                                 }
                             }
                         )
