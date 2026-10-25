@@ -25,6 +25,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Android 8-11 ship SQLite builds where SQLITE_MAX_VARIABLE_NUMBER is 999: any `IN (:ids)`
+ * bind with a larger list throws "too many SQL variables". Long libraries and long queues
+ * hit that limit, so every id list is chunked well below it.
+ */
+private const val SQL_VARIABLE_LIMIT = 900
+
 class MusicRepository(
     private val context: Context,
     private val database: AppDatabase
@@ -78,7 +85,7 @@ class MusicRepository(
 
     suspend fun getTracksByIds(ids: List<Long>): List<Track> = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext emptyList()
-        val entities = trackDao.getTracksByIds(ids)
+        val entities = ids.chunked(SQL_VARIABLE_LIMIT).flatMap { trackDao.getTracksByIds(it) }
         val favoriteIds = try {
             favoriteDao.getAllFavoriteIds().first().toSet()
         } catch (_: Exception) {
@@ -343,7 +350,18 @@ class MusicRepository(
         if (scannedTracks.isNotEmpty()) {
             trackDao.insertTracks(scannedTracks)
             // Keep the library aligned with the folders selected for this scan.
-            trackDao.deleteTracksNotIn(scannedTracks.map { it.id })
+            // `DELETE ... WHERE id NOT IN (:allIds)` used to pass one bind per track and threw
+            // "too many SQL variables" for libraries above 999 tracks on Android 8-11, aborting
+            // the scan. Compute the stale ids and delete them in chunks instead.
+            val validIds = scannedTracks.mapTo(HashSet(scannedTracks.size)) { it.id }
+            val staleIds = trackDao.getAllTracksDirect()
+                .asSequence()
+                .map { it.id }
+                .filterNot(validIds::contains)
+                .toList()
+            staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
+                trackDao.deleteTracksByIds(chunk)
+            }
         }
         scannedTracks.size
     }

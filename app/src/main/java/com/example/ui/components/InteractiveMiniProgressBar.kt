@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -80,13 +81,35 @@ fun InteractiveMiniProgressBar(
         }
     }
 
-    val displayFraction = if (isScrubbing) scrubFraction else animatedFraction.value
-
     val animatedTrackHeight: Dp by animateDpAsState(
         targetValue = if (isScrubbing) 5.dp else 3.5.dp,
         animationSpec = tween(120),
         label = "mini_track_height"
     )
+
+    // Hoisted: one shader per state instead of a new radial gradient every drawn frame.
+    val glowBrushIdle = remember(accentColor) {
+        Brush.radialGradient(
+            colors = listOf(
+                accentColor.copy(alpha = 0.40f),
+                accentColor.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(1f, 1f),
+            radius = 1f
+        )
+    }
+    val glowBrushScrubbing = remember(accentColor) {
+        Brush.radialGradient(
+            colors = listOf(
+                accentColor.copy(alpha = 0.65f),
+                accentColor.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(1f, 1f),
+            radius = 1f
+        )
+    }
 
     Box(
         modifier = modifier
@@ -95,7 +118,9 @@ fun InteractiveMiniProgressBar(
             .graphicsLayer { this.alpha = alpha }
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(
-                    current = (displayFraction * duration.toFloat()),
+                    // Reading the Animatable here recomposed this node on every animation
+                    // frame for as long as the mini player was on screen.
+                    current = position.toFloat(),
                     range = 0f..(if (duration > 0) duration.toFloat() else 1f)
                 )
             }
@@ -146,7 +171,8 @@ fun InteractiveMiniProgressBar(
         Canvas(modifier = Modifier.matchParentSize()) {
             val centerY = size.height / 2f
             val width = size.width
-            val currentFraction = displayFraction.coerceIn(0f, 1f)
+            val currentFraction =
+                (if (isScrubbing) scrubFraction else animatedFraction.value).coerceIn(0f, 1f)
             val thumbX = width * currentFraction
             val trackHeightPx = animatedTrackHeight.toPx()
 
@@ -172,19 +198,16 @@ fun InteractiveMiniProgressBar(
 
             // 3. Radial Glow behind Thumb
             val glowRadiusPx = if (isScrubbing) 16.dp.toPx() else 10.dp.toPx()
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        accentColor.copy(alpha = if (isScrubbing) 0.65f else 0.40f),
-                        accentColor.copy(alpha = 0.15f),
-                        Color.Transparent
-                    ),
-                    center = Offset(thumbX, centerY),
-                    radius = glowRadiusPx
-                ),
-                topLeft = Offset(thumbX - glowRadiusPx, centerY - glowRadiusPx),
-                size = Size(glowRadiusPx * 2f, glowRadiusPx * 2f)
-            )
+            withTransform({
+                translate(thumbX - glowRadiusPx, centerY - glowRadiusPx)
+                scale(glowRadiusPx, glowRadiusPx, pivot = Offset.Zero)
+            }) {
+                drawRect(
+                    brush = if (isScrubbing) glowBrushScrubbing else glowBrushIdle,
+                    topLeft = Offset.Zero,
+                    size = Size(2f, 2f)
+                )
+            }
 
             // 4. Thumb Knob
             val thumbRadiusPx = if (isScrubbing) 6.dp.toPx() else 3.5.dp.toPx()

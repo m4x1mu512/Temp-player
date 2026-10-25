@@ -809,9 +809,16 @@ fun ExpandablePlayerSheet(
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            val artRequest = remember(artUri) {
+                            // Decode straight to the size the artwork is drawn at. Without this
+                            // Coil decoded full-resolution covers (a 3000x3000 JPEG is ~36 MB
+                            // as ARGB_8888) and the crossfade kept two of them alive at once.
+                            val artTargetPx = with(LocalDensity.current) {
+                                fullArtSize.roundToPx()
+                            }.coerceAtLeast(256)
+                            val artRequest = remember(artUri, artTargetPx) {
                                 ImageRequest.Builder(context)
                                     .data(artUri)
+                                    .size(artTargetPx)
                                     .crossfade(false)
                                     .placeholder(R.drawable.ic_default_art)
                                     .error(R.drawable.ic_default_art)

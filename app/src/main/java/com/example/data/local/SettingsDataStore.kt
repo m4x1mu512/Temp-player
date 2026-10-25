@@ -515,7 +515,9 @@ class SettingsDataStore(private val context: Context) {
             if (queueIndex != null) {
                 editor.putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
             }
-            editor.commit()
+            // apply() writes in the background; commit() blocked the caller until the disk
+            // flush completed, and this runs on UI-adjacent paths.
+            editor.apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_LAST_TRACK_ID] = trackId

@@ -40,6 +40,9 @@ interface TrackDao {
     @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, year = :year, isCustomEdited = 1 WHERE id = :id")
     suspend fun updateTrackInfo(id: Long, title: String, artist: String, album: String, genre: String, year: String)
 
+    @Query("DELETE FROM tracks WHERE id IN (:ids)")
+    suspend fun deleteTracksByIds(ids: List<Long>)
+
     @Query("DELETE FROM tracks WHERE id NOT IN (:validIds)")
     suspend fun deleteTracksNotIn(validIds: List<Long>)
 

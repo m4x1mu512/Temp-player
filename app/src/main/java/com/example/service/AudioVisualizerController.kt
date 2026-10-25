@@ -158,6 +158,45 @@ class AudioVisualizerController(
         }
     }
 
+    private var wasVisible = true
+    private val rmsWindow = FloatArray(256)
+
+    /** Zeroes the published values once, when the visualizer leaves the screen. */
+    private fun resetVisualState() {
+        synchronized(lock) {
+            smoothedAmplitude = 0f
+            if (smoothedFftValues.isNotEmpty()) smoothedFftValues.fill(0f)
+            if (smoothedWaveformValues.isNotEmpty()) smoothedWaveformValues.fill(0f)
+            _amplitude.value = 0f
+            _rawFftData.value = FloatArray(currentBandCount)
+            _waveformData.value = FloatArray(currentBandCount)
+        }
+    }
+
+    /**
+     * Keeps ReplayGain fed while the visualizer is off-screen. It only needs the RMS of the
+     * real PCM, not the full FFT/smoothing/gradient pipeline that used to run at 30-50 Hz
+     * for nobody - on the permission screen, on the library tab, and for the whole duration
+     * of playback with the player collapsed.
+     */
+    private fun feedReplayGainRms() {
+        val now = System.currentTimeMillis()
+        if (now - lastRealPcmTimestamp >= 450 || ringAvailableSamples < 64) return
+        synchronized(ringLock) {
+            val available = min(256, ringAvailableSamples)
+            val startOffset = (ringWriteIndex - available + ringSize) % ringSize
+            val padCount = 256 - available
+            for (i in 0 until padCount) rmsWindow[i] = 0f
+            for (i in 0 until available) rmsWindow[padCount + i] = ringBuffer[(startOffset + i) % ringSize]
+        }
+        var sumSquares = 0.0
+        for (i in 0 until 256) {
+            val s = rmsWindow[i]
+            sumSquares += s * s
+        }
+        onRmsCalculated?.invoke(sqrt(sumSquares / 256).toFloat())
+    }
+
     /**
      * Stubs preserved for interface compatibility.
      * ZERO microphone / RECORD_AUDIO permissions are used.
@@ -325,6 +364,20 @@ class AudioVisualizerController(
                     val now = System.currentTimeMillis()
                 val bands = currentBandCount
                 val sens = sensitivity
+
+                val visible = _rawFftData.subscriptionCount.value > 0 ||
+                    _waveformData.subscriptionCount.value > 0 ||
+                    _amplitude.subscriptionCount.value > 0
+                if (!visible) {
+                    if (wasVisible) {
+                        wasVisible = false
+                        resetVisualState()
+                    }
+                    if (isPlaying) feedReplayGainRms()
+                    delay(if (isPlaying) 120L else 500L)
+                    continue
+                }
+                wasVisible = true
 
                 if (isPlaying) {
                     val pcmLatencyMs = now - lastRealPcmTimestamp

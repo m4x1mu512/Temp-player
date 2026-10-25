@@ -19,6 +19,7 @@ import com.example.data.model.ThemeMode
 import com.example.data.model.Track
 import com.example.data.model.VisualizerMode
 import com.example.service.PlaybackManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,6 +29,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -167,7 +170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             sortTrackList(tracks, sort)
         }
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList()
@@ -197,7 +200,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             sortTrackList(tracks, sort)
         }
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList()
@@ -210,6 +213,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     // Filtered and Sorted Tracks
+    // Filtering/sorting runs off the main thread: with 5-10k tracks the previous
+    // implementation did 4x String.lowercase() per track plus a sort on every keystroke
+    // and on every Room invalidation, blocking the frame.
     val displayedTracks: StateFlow<List<Track>> = combine(
         rawTracks,
         searchQuery,
@@ -218,16 +224,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val filtered = if (query.isBlank()) {
             tracks
         } else {
-            val q = query.trim().lowercase()
+            val q = query.trim()
             tracks.filter {
-                it.title.lowercase().contains(q) ||
-                        it.artist.lowercase().contains(q) ||
-                        it.album.lowercase().contains(q) ||
-                        it.folderName.lowercase().contains(q)
+                it.title.contains(q, ignoreCase = true) ||
+                        it.artist.contains(q, ignoreCase = true) ||
+                        it.album.contains(q, ignoreCase = true) ||
+                        it.folderName.contains(q, ignoreCase = true)
             }
         }
         sortTrackList(filtered, sort)
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList()
@@ -259,25 +265,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Groupings
-    val folderGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.folderName }
-    }.stateIn(
+    // One pass builds all three maps. Previously each grouping ran its own groupBy plus a
+    // redundant combine(searchQuery) — three full passes over the library on every emission,
+    // even when the visible tab never rendered two of them.
+    private data class LibraryGroups(
+        val folders: Map<String, List<Track>> = emptyMap(),
+        val artists: Map<String, List<Track>> = emptyMap(),
+        val albums: Map<String, List<Track>> = emptyMap()
+    )
+
+    private val libraryGroups: StateFlow<LibraryGroups> = displayedTracks
+        .map { tracks ->
+            val folders = LinkedHashMap<String, MutableList<Track>>()
+            val artists = LinkedHashMap<String, MutableList<Track>>()
+            val albums = LinkedHashMap<String, MutableList<Track>>()
+            for (track in tracks) {
+                folders.getOrPut(track.folderName) { ArrayList() }.add(track)
+                artists.getOrPut(track.artist) { ArrayList() }.add(track)
+                albums.getOrPut(track.album) { ArrayList() }.add(track)
+            }
+            LibraryGroups(folders, artists, albums)
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = LibraryGroups()
+        )
+
+    val folderGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.folders }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()
     )
 
-    val artistGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.artist }
-    }.stateIn(
+    val artistGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.artists }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()
     )
 
-    val albumGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.album }
-    }.stateIn(
+    val albumGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.albums }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()

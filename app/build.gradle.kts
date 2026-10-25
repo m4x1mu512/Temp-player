@@ -44,7 +44,11 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      // R8 on release: smaller dex means fewer page faults and faster class loading on the
+      // low-end Android 8-9 devices this app targets; it also removes dead Compose/Media3 code
+      // that would otherwise be verified and JIT-ed. Debug builds stay unminified.
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }

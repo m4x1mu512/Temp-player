@@ -229,13 +229,14 @@ class PlaybackManager private constructor(private val context: Context) {
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
     init {
+        // Called from the visualizer thread 30-50 times per second. Hopping to the main
+        // thread for every sample frame was pure scheduler churn; the controller is
+        // thread-safe and posts its own gain updates to the audio handler.
         visualizerController.onRmsCalculated = { rms ->
-            serviceScope.launch {
-                try {
-                    replayGainController.onAudioBufferRms(rms)
-                } catch (t: Throwable) {
-                    Log.w("PlaybackManager", "Error in onAudioBufferRms: ${t.message}")
-                }
+            try {
+                replayGainController.onAudioBufferRms(rms)
+            } catch (t: Throwable) {
+                Log.w("PlaybackManager", "Error in onAudioBufferRms: ${t.message}")
             }
         }
 
@@ -305,44 +306,10 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
-        // Synchronously restore initial queue and track from persistent cache so UI never flashes empty or unsorted
-        try {
-            val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
-                settingsDataStore.getInitialCustomAllTracksOrder()
-            }
-            if (savedQueueIds.isNotEmpty()) {
-                val directTracks = repository.getTracksByIdsDirect(savedQueueIds)
-                if (directTracks.isNotEmpty()) {
-                    _queue.value = directTracks
-                    val savedQueueIndex = settingsDataStore.getInitialLastQueueIndex()
-                    val lastTrackId = settingsDataStore.getInitialLastTrackId()
-                    val targetIndex = if (savedQueueIndex in directTracks.indices) {
-                        savedQueueIndex
-                    } else if (lastTrackId > 0) {
-                        directTracks.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
-                    } else {
-                        0
-                    }
-                    _queueIndex.value = targetIndex
-                    val trackToRestore = if (lastTrackId > 0) {
-                        directTracks.find { it.id == lastTrackId } ?: directTracks.getOrNull(targetIndex)
-                    } else {
-                        directTracks.getOrNull(targetIndex)
-                    }
-                    if (trackToRestore != null) {
-                        _currentTrack.value = trackToRestore
-                        _duration.value = trackToRestore.duration
-                        val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
-                        if (lastPos > 0 && lastPos < trackToRestore.duration) {
-                            _playbackPosition.value = lastPos
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("PlaybackManager", "Initial sync queue restore notice: ${e.message}")
-        }
-
+        // The queue used to be restored synchronously here, before the first frame: it read
+        // SharedPreferences on the main thread and then issued a blocking Room query, which
+        // (allowMainThreadQueries is off) only ever threw and was swallowed. restoreSavedQueueAndTrack()
+        // below already does the same work off the main thread.
         serviceScope.launch {
             restoreSavedQueueAndTrack()
         }
@@ -548,6 +515,9 @@ class PlaybackManager private constructor(private val context: Context) {
         playerB = null
         visualizerController.onPlaybackStateChanged(false)
         visualizerController.resetBuffers()
+        // Stop the frame loop too: without this it outlived the service and kept allocating
+        // buffers every 20-33 ms until the process died. attachPlayers() restarts it.
+        visualizerController.release()
         equalizerController.release()
         replayGainController.release()
         _isPlaying.value = false
@@ -1229,24 +1199,34 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var eqPersistJob: Job? = null
+
+    /**
+     * Sliders fire on every pixel of movement, and each write serialises the whole DataStore
+     * file. Persist once the user stops moving instead of ~60 times per second.
+     */
+    private fun scheduleEqualizerPersist() {
+        eqPersistJob?.cancel()
+        eqPersistJob = serviceScope.launch {
+            delay(400)
+            settingsDataStore.setEqualizerPreset(_equalizerPreset.value)
+            settingsDataStore.setEqualizerLevels(_equalizerBands.value.map { it.levelMilliBels.toInt() })
+            settingsDataStore.setEqPreamp(_eqPreamp.value)
+        }
+    }
+
     fun setEqualizerBandLevel(bandIndex: Short, levelMilliBels: Short) {
         equalizerController.setBandLevel(bandIndex, levelMilliBels)
         _equalizerPreset.value = EqualizerPreset.CUSTOM
         _equalizerBands.value = equalizerController.getBands()
-        serviceScope.launch {
-            settingsDataStore.setEqualizerPreset(EqualizerPreset.CUSTOM)
-            val levels = _equalizerBands.value.map { it.levelMilliBels.toInt() }
-            settingsDataStore.setEqualizerLevels(levels)
-        }
+        scheduleEqualizerPersist()
     }
 
     fun setEqPreamp(preampMilliBels: Int) {
         _eqPreamp.value = preampMilliBels
         equalizerController.setPreamp(preampMilliBels)
         _equalizerBands.value = equalizerController.getBands()
-        serviceScope.launch {
-            settingsDataStore.setEqPreamp(preampMilliBels)
-        }
+        scheduleEqualizerPersist()
     }
 
     fun setBassBoostEnabled(enabled: Boolean) {
@@ -1440,7 +1420,7 @@ class PlaybackManager private constructor(private val context: Context) {
                     }
                 }
                 tickCount++
-                if (tickCount % 20 == 0) {
+                if (tickCount % 60 == 0) {
                     saveCurrentState()
                 }
                 delay(250)
@@ -1562,20 +1542,32 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var lastSavedQueueIds: List<Long>? = null
+
     private fun saveCurrentState() {
         val track = _currentTrack.value
         val pos = _playbackPosition.value
         val q = _queue.value
         val idx = _queueIndex.value
-        if (track != null || q.isNotEmpty()) {
-            serviceScope.launch {
-                settingsDataStore.savePlaybackState(
-                    trackId = track?.id ?: -1L,
-                    position = pos,
-                    queueIds = if (q.isNotEmpty()) q.map { it.id } else null,
-                    queueIndex = if (idx >= 0) idx else null
-                )
-            }
+        if (track == null && q.isEmpty()) return
+
+        val ids = if (q.isNotEmpty()) q.map { it.id } else null
+        // Serialising the whole queue id list is only needed when the queue actually changed;
+        // it used to be rebuilt and written to disk every few seconds during playback.
+        val queueChanged = ids != lastSavedQueueIds
+        if (queueChanged) lastSavedQueueIds = ids
+
+        val trackId = track?.id ?: -1L
+        val queueIndex = if (idx >= 0) idx else null
+        // Never write on the main thread: this runs on every track change and periodically
+        // during playback, and the disk flush used to land inside the frame budget.
+        serviceScope.launch(Dispatchers.IO) {
+            settingsDataStore.savePlaybackState(
+                trackId = trackId,
+                position = pos,
+                queueIds = if (queueChanged) ids else null,
+                queueIndex = queueIndex
+            )
         }
     }
 
