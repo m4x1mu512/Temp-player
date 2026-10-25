@@ -13,12 +13,22 @@
 ## Замеры
 
 ```bash
-# холодный и тёплый запуск, 10 итераций
+# все тесты: холодный/тёплый запуск и прокрутка библиотеки
 ./gradlew :benchmark:connectedDebugAndroidTest
 ```
 
-Отчёт: `benchmark/build/reports/androidTests/connected/` — медиана, p50/p90/p95 по
-`timeToInitialDisplay` и `timeToFullDisplay`.
+Отчёт: `benchmark/build/reports/androidTests/connected/`.
+
+Что смотреть:
+
+| Тест | Метрика | Что показывает |
+|---|---|---|
+| `StartupBenchmarks.startupCold` | `timeToInitialDisplay`, `timeToFullDisplay` | запуск с нуля — главный показатель «быстроты» |
+| `StartupBenchmarks.startupWarm` | то же | возврат в приложение из фона |
+| `ScrollBenchmarks.scrollLibrary` | `frameDurationCpuMs` (p50/p90/p95), `frameOverrunMs` | плавность прокрутки: есть ли пропущенные кадры |
+
+`frameOverrunMs` — насколько кадр вышел за бюджет 16,7 мс. Если p90 близок к нулю или
+отрицательный, прокрутка в бюджете; положительные значения — это подёргивания.
 
 ## Baseline-профиль для Android 8–11
 
