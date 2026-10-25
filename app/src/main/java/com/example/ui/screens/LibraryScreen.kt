@@ -150,7 +150,6 @@ fun LibraryScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
-    val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val musicFolderSetupCompleted by viewModel.musicFolderSetupCompleted.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
@@ -337,7 +336,7 @@ fun LibraryScreen(
             if (pagerState.currentPage != 0) {
                 pagerState.scrollToPage(0)
             }
-            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val q = if (currentQueue.isNotEmpty()) currentQueue else allTracksOrdered
             val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
             if (targetIdx >= 0) {
                 queueListState.centerTrackIndexInstantly(targetIdx)
@@ -706,7 +705,7 @@ fun LibraryScreen(
         ) {
             // Tab Content with horizontal swipe between screens
             Box(modifier = Modifier.fillMaxSize()) {
-                if (rawTracks.isEmpty() && !isScanning) {
+                if (allTracksOrdered.isEmpty() && !isScanning) {
                     EmptyState(
                         title = "Медиатека пуста",
                         message = "На устройстве не найдено аудиофайлов или требуется обновить список",

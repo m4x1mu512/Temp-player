@@ -1438,7 +1438,23 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private val restoreMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Called from the view model (twice), the service and the activity start. Without a lock
+     * two callers could race: both would hit the database and both could issue a play command,
+     * duplicating the expensive part of a cold start.
+     */
     suspend fun restoreSavedQueueAndTrack(availableTracks: List<Track>? = null) {
+        restoreMutex.lock()
+        try {
+            restoreSavedQueueAndTrackLocked(availableTracks)
+        } finally {
+            restoreMutex.unlock()
+        }
+    }
+
+    private suspend fun restoreSavedQueueAndTrackLocked(availableTracks: List<Track>? = null) {
         try {
             if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
 
