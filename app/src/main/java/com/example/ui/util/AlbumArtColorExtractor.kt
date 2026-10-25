@@ -371,9 +371,9 @@ fun rememberPlayerColors(
     }
 
     // Vertical gradient for full expanded PlayerScreen occupying Modifier.fillMaxSize()
-    val playerScreenBrush = if (isGradient) {
-        Brush.verticalGradient(colors = gradientStopsList)
-    } else null
+    val playerScreenBrush = remember(isGradient, gradientStopsList) {
+        if (isGradient) Brush.verticalGradient(colors = gradientStopsList) else null
+    }
 
     // In a light app theme, keep the album-art palette but lift the mini-player
     // colors so the collapsed/expanded mini-player does not look unnecessarily dark.
