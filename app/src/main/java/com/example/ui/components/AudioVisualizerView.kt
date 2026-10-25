@@ -151,6 +151,9 @@ private fun RibbonVisualizer(
             listOf(Color.Transparent, colorMiddle.copy(alpha = 0.18f), colorStart.copy(alpha = 0.32f), Color.Transparent)
         )
     }
+    val ribbonFillBrush = remember(colorMiddle) {
+        Brush.verticalGradient(listOf(Color.Transparent, colorMiddle.copy(alpha = 0.12f), Color.Transparent))
+    }
     // Reuse draw geometry between audio frames instead of allocating nine Paths per frame.
     val path = remember { Path() }
     val fill = remember { Path() }
@@ -188,7 +191,7 @@ private fun RibbonVisualizer(
         fill.lineTo(w, h)
         fill.close()
         drawRect(brush = glowBrush, alpha = if (isPlaying) 0.8f else 0.25f)
-        drawPath(fill, Brush.verticalGradient(listOf(Color.Transparent, colorMiddle.copy(alpha = 0.12f), Color.Transparent)))
+        drawPath(fill, ribbonFillBrush)
         // Multiple fine ribbons create the luminous, layered silk-wave look without blur layers.
         for (ribbon in 0 until ribbonPaths.size) {
             val ribbonPath = ribbonPaths[ribbon]
@@ -235,6 +238,9 @@ private fun SpectrumVisualizer(
     val barBrush = remember(colorStart, colorMiddle, colorEnd) {
         Brush.verticalGradient(listOf(Color(0xFF8A32FF), colorEnd, colorStart, Color(0xFF28E8FF)))
     }
+    val centerGlowBrush = remember(colorMiddle) {
+        Brush.horizontalGradient(listOf(Color.Transparent, NeonMagenta.copy(alpha = 0.7f), colorMiddle.copy(alpha = 0.9f), Color.Transparent))
+    }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -244,7 +250,7 @@ private fun SpectrumVisualizer(
         val step = w / count
         val centerWidth = (step * 0.12f).coerceAtLeast(0.8f)
         // Continuous center glow keeps the entire frequency strip visually alive.
-        drawLine(Brush.horizontalGradient(listOf(Color.Transparent, NeonMagenta.copy(alpha = 0.7f), colorMiddle.copy(alpha = 0.9f), Color.Transparent)), Offset(0f, mid), Offset(w, mid), strokeWidth = (h * 0.07f).coerceAtLeast(1f))
+        drawLine(centerGlowBrush, Offset(0f, mid), Offset(w, mid), strokeWidth = (h * 0.07f).coerceAtLeast(1f))
         for (i in 0 until count) {
             val raw = if (isPlaying && i < data.size) data[i].coerceIn(0f, 1f) else 0.035f
             val floor = if (isPlaying) 0.16f else 0.035f
@@ -351,13 +357,13 @@ private fun EqualizerVisualizer(
         val barW = ((w - gap * (count - 1)) / count).coerceAtLeast(1f)
         val mid = h * 0.72f
         val maxHeight = h * 0.68f
+        val blockGap = (h * 0.012f).coerceAtLeast(0.7f)
+        val blockH = ((maxHeight - blockGap * 9f) / 10f).coerceAtLeast(1f)
         for (i in 0 until count) {
             val raw = if (isPlaying && i < data.size) data[i].coerceIn(0f, 1f) else 0.025f
             // A small floor prevents silent-looking gaps while keeping bass peaks reactive.
             val level = (0.12f + raw * 0.88f).coerceIn(0.12f, 1f)
             val blocks = (level * 10f).toInt().coerceIn(1, 10)
-            val blockGap = (h * 0.012f).coerceAtLeast(0.7f)
-            val blockH = ((maxHeight - blockGap * 9f) / 10f).coerceAtLeast(1f)
             val x = i * (barW + gap)
             for (b in 0 until 10) {
                 val y = mid - (b + 1) * (blockH + blockGap)
