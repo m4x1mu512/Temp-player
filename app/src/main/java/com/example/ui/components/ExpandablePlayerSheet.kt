@@ -1736,7 +1736,8 @@ private fun ExpandedSlidingArtwork(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dragOffsetX = remember { Animatable(0f) }
+    // Update the layer directly during pointer movement; avoid launching a coroutine per event.
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val artSizePx = with(density) { artSize.toPx() }
 
@@ -1761,39 +1762,37 @@ private fun ExpandedSlidingArtwork(
                             } else if (totalDragX > thresholdPx || (velocity > minFlingVelocity && totalDragX > 20f)) {
                                 onSwipePrevious()
                             }
-                            dragOffsetX.animateTo(
+                            Animatable(dragOffsetX).animateTo(
                                 targetValue = 0f,
                                 animationSpec = spring(
                                     dampingRatio = 0.85f,
                                     stiffness = Spring.StiffnessMediumLow
                                 )
-                            )
+                            ) { dragOffsetX = value }
                         }
                     },
                     onDragCancel = {
                         coroutineScope.launch {
-                            dragOffsetX.animateTo(
+                            Animatable(dragOffsetX).animateTo(
                                 targetValue = 0f,
                                 animationSpec = spring(
                                     dampingRatio = 0.85f,
                                     stiffness = Spring.StiffnessMediumLow
                                 )
-                            )
+                            ) { dragOffsetX = value }
                         }
                     },
                     onHorizontalDrag = { change, dragAmount ->
                         change.consume()
                         totalDragX += dragAmount
                         velocityTracker.addPosition(change.uptimeMillis, change.position)
-                        coroutineScope.launch {
-                            val resistance = (1f - (abs(totalDragX) / (artSizePx * 2.2f)).coerceIn(0f, 0.45f))
-                            dragOffsetX.snapTo(totalDragX * resistance)
-                        }
+                        val resistance = (1f - (abs(totalDragX) / (artSizePx * 2.2f)).coerceIn(0f, 0.45f))
+                        dragOffsetX = totalDragX * resistance
                     }
                 )
             }
             .graphicsLayer {
-                translationX = dragOffsetX.value
+                translationX = dragOffsetX
             },
         contentAlignment = Alignment.Center
     ) {
