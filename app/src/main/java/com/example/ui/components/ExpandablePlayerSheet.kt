@@ -184,7 +184,6 @@ fun ExpandablePlayerSheet(
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
     val isShuffle by viewModel.isShuffle.collectAsStateWithLifecycle()
     val positionFlow = viewModel.playbackPosition
-    val position by positionFlow.collectAsStateWithLifecycle()
 
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
@@ -828,20 +827,17 @@ fun ExpandablePlayerSheet(
                 val miniAlpha = 1f
                 if (!isExpanded || animOffsetY.isRunning) {
                     // Non-interactive playback progress at the bottom, below artwork, text and controls.
-                    InteractiveMiniProgressBar(
-                        position = position,
+                    MiniPlayerProgressFromFlow(
+                        positionFlow = positionFlow,
                         duration = duration,
                         isPlaying = isPlaying,
-                        onSeek = {},
                         accentColor = colorScheme.accentColor,
                         trackColor = colorScheme.progressTrackColor,
                         modifier = Modifier
                             .offset(y = miniBarHeight - 20.dp)
                             .padding(horizontal = 14.dp)
                             .graphicsLayer { alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f) },
-                        alpha = miniAlpha,
-                        interactive = false,
-                        testTag = "mini_player_progress"
+                        alpha = miniAlpha
                     )
 
                     // Mini player clickable backdrop
@@ -1548,6 +1544,33 @@ fun ExpandablePlayerSheet(
             onDismiss = { showCreatePlaylistDialog = false }
         )
     }
+}
+
+@Composable
+private fun MiniPlayerProgressFromFlow(
+    positionFlow: StateFlow<Long>,
+    duration: Long,
+    isPlaying: Boolean,
+    accentColor: Color,
+    trackColor: Color,
+    modifier: Modifier = Modifier,
+    alpha: Float = 1f
+) {
+    // Keep frequent playback-position updates scoped to the progress bar rather than
+    // recomposing the entire player sheet on every position tick.
+    val position by positionFlow.collectAsStateWithLifecycle()
+    InteractiveMiniProgressBar(
+        position = position,
+        duration = duration,
+        isPlaying = isPlaying,
+        onSeek = {},
+        accentColor = accentColor,
+        trackColor = trackColor,
+        modifier = modifier,
+        alpha = alpha,
+        interactive = false,
+        testTag = "mini_player_progress"
+    )
 }
 
 @Composable
