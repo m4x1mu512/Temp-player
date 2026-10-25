@@ -218,15 +218,29 @@ class RhythmEqualizerProcessor : RhythmAudioProcessor() {
     }
 
     override fun isBypassed(): Boolean {
-        if (isEnabled()) return false
+        if (!isEnabled()) {
+            // Bypassed only when slewing has fully converged to unity preamp and flat EQ
+            if (abs(currentPreampScale - 1.0f) >= 0.002f) return false
+            synchronized(lock) {
+                for (i in 0 until NUM_BANDS) {
+                    if (abs(currentBandGainsDb[i]) > 0.05f) {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
 
-        // Bypassed only when slewing has fully converged to unity preamp and flat EQ
-        val preampConverged = abs(currentPreampScale - 1.0f) < 0.002f
-        if (!preampConverged) return false
-
+        // Enabled, but the chain is a no-op: flat bands and unity preamp, with nothing
+        // slewing towards a different target. The equalizer is on by default with the FLAT
+        // preset, so this used to run five biquads per channel per sample - 88 200 samples
+        // per second - to multiply the signal by one.
         synchronized(lock) {
+            if (abs(currentPreampScale - 1.0f) > 0.002f || abs(targetPreampScale - 1.0f) > 0.002f) {
+                return false
+            }
             for (i in 0 until NUM_BANDS) {
-                if (abs(currentBandGainsDb[i]) > 0.05f) {
+                if (abs(currentBandGainsDb[i]) > 0.05f || abs(targetBandGainsDb[i]) > 0.05f) {
                     return false
                 }
             }
