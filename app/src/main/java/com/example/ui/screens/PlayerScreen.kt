@@ -921,10 +921,10 @@ fun PlayerScreen(
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .fillMaxWidth()
+                                // Extend beyond the padded player column so the visualizer reaches both screen edges.
+                                .requiredWidth(configuration.screenWidthDp.dp)
                                 .height(if (isCompact) 30.dp else if (isMedium) 36.dp else 42.dp)
                                 .padding(vertical = 1.dp)
-                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
                                 .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                 .testTag("player_visualizer_container_portrait")
