@@ -10,8 +10,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -36,6 +39,9 @@ import kotlin.math.sin
 private val NeonMagenta = Color(0xFFFF35E8)
 private val NeonBlue = Color(0xFF397BFF)
 
+/** Shared "no amplitude" state for the modes that do not draw the ribbon. */
+private val ZeroAmplitudeState = mutableStateOf(0f)
+
 @Composable
 fun AudioVisualizerView(
     fftDataFlow: StateFlow<FloatArray>,
@@ -48,17 +54,17 @@ fun AudioVisualizerView(
     neonColorMiddle: Color = NeonTurquoise,
     neonColorEnd: Color = NeonPurple
 ) {
-    // Subscribe only to the signals used by the selected visualizer. The audio controller
-    // publishes these flows frequently; collecting all three here made every mode recompose
-    // for data it never draws.
+    // Subscribe only to the signals used by the selected visualizer, and do not read the
+    // values here. The leaves read the State inside their draw lambdas, so a new audio frame
+    // only invalidates drawing instead of recomposing and re-laying out this subtree 30-50
+    // times per second.
     when (mode) {
         VisualizerMode.AMPLITUDE -> {
-            val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
-            val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
-            AudioVisualizerView(
-                fftData = waveformData,
-                waveformData = waveformData,
-                amplitude = amplitude,
+            val waveformState = waveformDataFlow.collectAsStateWithLifecycle()
+            val amplitudeState = amplitudeFlow.collectAsStateWithLifecycle()
+            AudioVisualizerCanvas(
+                dataState = waveformState,
+                amplitudeState = amplitudeState,
                 mode = mode,
                 isPlaying = isPlaying,
                 modifier = modifier,
@@ -68,10 +74,10 @@ fun AudioVisualizerView(
             )
         }
         VisualizerMode.WAVE -> {
-            val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
-            AudioVisualizerView(
-                fftData = waveformData,
-                waveformData = waveformData,
+            val waveformState = waveformDataFlow.collectAsStateWithLifecycle()
+            AudioVisualizerCanvas(
+                dataState = waveformState,
+                amplitudeState = ZeroAmplitudeState,
                 mode = mode,
                 isPlaying = isPlaying,
                 modifier = modifier,
@@ -81,9 +87,10 @@ fun AudioVisualizerView(
             )
         }
         VisualizerMode.SPECTRUM, VisualizerMode.CIRCLE -> {
-            val fftData by fftDataFlow.collectAsStateWithLifecycle()
-            AudioVisualizerView(
-                fftData = fftData,
+            val fftState = fftDataFlow.collectAsStateWithLifecycle()
+            AudioVisualizerCanvas(
+                dataState = fftState,
+                amplitudeState = ZeroAmplitudeState,
                 mode = mode,
                 isPlaying = isPlaying,
                 modifier = modifier,
@@ -107,25 +114,55 @@ fun AudioVisualizerView(
     neonColorMiddle: Color = NeonTurquoise,
     neonColorEnd: Color = NeonPurple
 ) {
+    val fftState = rememberUpdatedState(fftData)
+    val waveState = rememberUpdatedState(waveformData)
+    val amplitudeState = rememberUpdatedState(amplitude)
+    val dataState = when (mode) {
+        VisualizerMode.AMPLITUDE, VisualizerMode.WAVE -> waveState
+        VisualizerMode.SPECTRUM, VisualizerMode.CIRCLE -> fftState
+    }
+    AudioVisualizerCanvas(
+        dataState = dataState,
+        amplitudeState = amplitudeState,
+        mode = mode,
+        isPlaying = isPlaying,
+        modifier = modifier,
+        neonColorStart = neonColorStart,
+        neonColorMiddle = neonColorMiddle,
+        neonColorEnd = neonColorEnd
+    )
+}
+
+@Composable
+private fun AudioVisualizerCanvas(
+    dataState: State<FloatArray>,
+    amplitudeState: State<Float>,
+    mode: VisualizerMode,
+    isPlaying: Boolean,
+    modifier: Modifier,
+    neonColorStart: Color,
+    neonColorMiddle: Color,
+    neonColorEnd: Color
+) {
     Box(modifier = modifier.testTag("audio_visualizer_view")) {
         when (mode) {
             VisualizerMode.AMPLITUDE -> RibbonVisualizer(
-                data = waveformData, amplitude = amplitude, isPlaying = isPlaying,
+                dataState = dataState, amplitudeState = amplitudeState, isPlaying = isPlaying,
                 colorStart = neonColorStart, colorMiddle = neonColorMiddle,
                 colorEnd = neonColorEnd, modifier = Modifier.fillMaxSize()
             )
             VisualizerMode.SPECTRUM -> SpectrumVisualizer(
-                data = fftData, isPlaying = isPlaying, colorStart = neonColorStart,
+                dataState = dataState, isPlaying = isPlaying, colorStart = neonColorStart,
                 colorMiddle = neonColorMiddle, colorEnd = neonColorEnd,
                 modifier = Modifier.fillMaxSize()
             )
             VisualizerMode.WAVE -> WaveVisualizer(
-                data = waveformData, isPlaying = isPlaying, colorStart = neonColorStart,
+                dataState = dataState, isPlaying = isPlaying, colorStart = neonColorStart,
                 colorMiddle = neonColorMiddle, colorEnd = neonColorEnd,
                 modifier = Modifier.fillMaxSize()
             )
             VisualizerMode.CIRCLE -> EqualizerVisualizer(
-                data = fftData, isPlaying = isPlaying, colorStart = neonColorStart,
+                dataState = dataState, isPlaying = isPlaying, colorStart = neonColorStart,
                 colorMiddle = neonColorMiddle, colorEnd = neonColorEnd,
                 modifier = Modifier.fillMaxSize()
             )
@@ -135,8 +172,8 @@ fun AudioVisualizerView(
 
 @Composable
 private fun RibbonVisualizer(
-    data: FloatArray,
-    amplitude: Float,
+    dataState: State<FloatArray>,
+    amplitudeState: State<Float>,
     isPlaying: Boolean,
     colorStart: Color,
     colorMiddle: Color,
@@ -159,6 +196,9 @@ private fun RibbonVisualizer(
     val fill = remember { Path() }
     val ribbonPaths = remember { List(7) { Path() } }
     Canvas(modifier) {
+        // Read the published frame in the draw phase, not in composition.
+        val data = dataState.value
+        val amplitude = amplitudeState.value
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
@@ -228,7 +268,7 @@ private fun RibbonVisualizer(
 
 @Composable
 private fun SpectrumVisualizer(
-    data: FloatArray,
+    dataState: State<FloatArray>,
     isPlaying: Boolean,
     colorStart: Color,
     colorMiddle: Color,
@@ -246,6 +286,7 @@ private fun SpectrumVisualizer(
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
         val mid = h * 0.52f
+        val data = dataState.value
         val count = data.size.coerceIn(24, 64)
         val step = w / count
         val centerWidth = (step * 0.12f).coerceAtLeast(0.8f)
@@ -269,7 +310,7 @@ private fun SpectrumVisualizer(
 
 @Composable
 private fun WaveVisualizer(
-    data: FloatArray,
+    dataState: State<FloatArray>,
     isPlaying: Boolean,
     colorStart: Color,
     colorMiddle: Color,
@@ -286,6 +327,8 @@ private fun WaveVisualizer(
     val fill = remember { Path() }
     val secondary = remember { Path() }
     Canvas(modifier) {
+        // Read the published frame in the draw phase, not in composition.
+        val data = dataState.value
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
@@ -338,7 +381,7 @@ private fun WaveVisualizer(
 
 @Composable
 private fun EqualizerVisualizer(
-    data: FloatArray,
+    dataState: State<FloatArray>,
     isPlaying: Boolean,
     colorStart: Color,
     colorMiddle: Color,
@@ -352,6 +395,7 @@ private fun EqualizerVisualizer(
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
+        val data = dataState.value
         val count = data.size.coerceIn(20, 56)
         val gap = (w / count * 0.2f).coerceAtLeast(0.7f)
         val barW = ((w - gap * (count - 1)) / count).coerceAtLeast(1f)
