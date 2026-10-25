@@ -165,13 +165,11 @@ fun LibraryScreen(
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
-    val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
-    val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
-    val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
-    val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
+    // Equalizer and sleep-timer state is read inside the dialogs below: collecting it here at
+    // the root recomposed the whole screen (pager, every list) on each equalizer change and
+    // twice per second while a sleep timer was running.
+
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
@@ -1075,6 +1073,9 @@ fun LibraryScreen(
     }
 
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
+        val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
+        val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -1088,6 +1089,8 @@ fun LibraryScreen(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
+        val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemainingMillis,
@@ -1451,6 +1454,17 @@ private fun FolderCoverCollage(
 ) {
     val context = LocalContext.current
     val distinctUris = remember(artUris) { artUris.distinct() }
+    // Rebuilt on every recomposition before: each card change (current track, favourite,
+    // scan) produced four new ImageRequest objects and restarted their crossfades.
+    val tileRequests = remember(distinctUris) {
+        distinctUris.take(4).map { uri ->
+            ImageRequest.Builder(context)
+                .data(uri)
+                .size(120, 120)
+                .crossfade(100)
+                .build()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -1464,14 +1478,14 @@ private fun FolderCoverCollage(
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[0],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[1],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1480,14 +1494,14 @@ private fun FolderCoverCollage(
                     Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[2]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[2],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[3]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[3],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1499,14 +1513,14 @@ private fun FolderCoverCollage(
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[0],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[1],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
