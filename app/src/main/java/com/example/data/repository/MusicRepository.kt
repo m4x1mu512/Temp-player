@@ -74,13 +74,13 @@ class MusicRepository(
     }.flowOn(Dispatchers.IO)
 
     fun getTracksForPlaylist(playlistId: Long): Flow<List<Track>> {
-        return combine(
-            playlistDao.getTracksForPlaylist(playlistId),
-            favoriteDao.getAllFavoriteIds()
-        ) { entities, favoriteIds ->
-            val favoriteSet = favoriteIds.toSet()
-            entities.map { it.toTrack(isFavorite = favoriteSet.contains(it.id)) }
-        }.flowOn(Dispatchers.IO)
+        // Favourites are deliberately not part of this query. Playlist flows are cached per
+        // playlist and the screen shows hearts from favoriteIds, so combining with the
+        // favourites table made every heart tap re-run the playlist query for every cached
+        // playlist. isFavorite is left false and never read from these objects.
+        return playlistDao.getTracksForPlaylist(playlistId)
+            .map { entities -> entities.map { it.toTrack(isFavorite = false) } }
+            .flowOn(Dispatchers.IO)
     }
 
     suspend fun getTracksByIds(ids: List<Long>): List<Track> = withContext(Dispatchers.IO) {

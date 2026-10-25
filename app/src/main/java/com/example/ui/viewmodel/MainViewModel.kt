@@ -676,7 +676,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                // WhileSubscribed, not Eagerly: the cache keeps one flow per playlist forever,
+                // and eagerly started flows meant a Room observer per playlist that re-ran on
+                // every change in the database, whether or not the playlist was on screen.
+                started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
             )
         }
