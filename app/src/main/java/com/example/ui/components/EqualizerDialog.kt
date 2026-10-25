@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -929,6 +930,24 @@ private fun FrequencyResponseCurveView(
     val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
 
+    // This canvas redraws on every band-slider movement (~60 times a second while
+    // dragging). Paths, the point list, the gradient colour list and the stroke used to be
+    // allocated per frame; keep them for the lifetime of the composable instead.
+    val strokePath = remember { Path() }
+    val fillPath = remember { Path() }
+    val points = remember { ArrayList<Offset>() }
+    val activeColor = if (isEnabled) primaryColor else outlineColor
+    val gradientColors = remember(activeColor, isEnabled) {
+        listOf(
+            activeColor.copy(alpha = if (isEnabled) 0.35f else 0.15f),
+            activeColor.copy(alpha = 0.02f)
+        )
+    }
+    val curveStrokeWidth = with(LocalDensity.current) { 2.5.dp.toPx() }
+    val curveStroke = remember(curveStrokeWidth) {
+        Stroke(width = curveStrokeWidth, cap = StrokeCap.Round)
+    }
+
     Canvas(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
@@ -949,7 +968,7 @@ private fun FrequencyResponseCurveView(
         if (bands.isEmpty()) return@Canvas
 
         val stepX = width / (bands.size + 1).coerceAtLeast(2)
-        val points = mutableListOf<Offset>()
+        points.clear()
 
         // Leftmost point at 0 dB
         points.add(Offset(0f, centerY))
@@ -967,8 +986,8 @@ private fun FrequencyResponseCurveView(
         points.add(Offset(width, centerY))
 
         // Create smooth cubic Bezier path
-        val strokePath = Path()
-        val fillPath = Path()
+        strokePath.reset()
+        fillPath.reset()
 
         strokePath.moveTo(points[0].x, points[0].y)
         fillPath.moveTo(0f, height)
@@ -985,16 +1004,11 @@ private fun FrequencyResponseCurveView(
         fillPath.lineTo(width, height)
         fillPath.close()
 
-        val activeColor = if (isEnabled) primaryColor else outlineColor
-
         // Draw gradient fill under curve
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
-                colors = listOf(
-                    activeColor.copy(alpha = if (isEnabled) 0.35f else 0.15f),
-                    activeColor.copy(alpha = 0.02f)
-                ),
+                colors = gradientColors,
                 startY = 0f,
                 endY = height
             )
@@ -1004,7 +1018,7 @@ private fun FrequencyResponseCurveView(
         drawPath(
             path = strokePath,
             color = activeColor,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+            style = curveStroke
         )
 
         // Draw control dots
