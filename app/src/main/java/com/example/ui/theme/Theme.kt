@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
@@ -77,7 +78,11 @@ fun MyApplicationTheme(
   },
   content: @Composable () -> Unit,
 ) {
-  val colorScheme = if (darkTheme) createDarkColorScheme(accentColor) else createLightColorScheme(accentColor)
+  // Rebuilt two color schemes (7 Triple allocations each) on every recomposition of the
+  // theme wrapper, i.e. on every frame of any animation driven through it.
+  val colorScheme = remember(darkTheme, accentColor) {
+    if (darkTheme) createDarkColorScheme(accentColor) else createLightColorScheme(accentColor)
+  }
 
   val view = LocalView.current
   if (!view.isInEditMode) {
