@@ -102,6 +102,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = emptyList()
     )
 
+    val musicFolderSetupCompleted: StateFlow<Boolean> = settingsDataStore.musicFolderSetupCompletedFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
+    fun completeMusicFolderSetup() {
+        viewModelScope.launch {
+            settingsDataStore.completeMusicFolderSetup()
+        }
+    }
+
     fun addMusicFolder(uri: String) {
         viewModelScope.launch {
             val updated = (musicFolders.value + uri).distinct()
