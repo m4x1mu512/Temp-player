@@ -104,7 +104,6 @@ fun SettingsScreen(
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -113,16 +112,14 @@ fun SettingsScreen(
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
-
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
-    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    // Playback position and isPlaying were collected here but never read: every 250 ms the
+    // whole settings screen recomposed while music played. Equalizer bands and the sleep
+    // timer countdown are read inside their dialogs instead.
 
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
@@ -978,6 +975,7 @@ fun SettingsScreen(
 
     // Dialogs
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -991,6 +989,7 @@ fun SettingsScreen(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemaining,
