@@ -48,21 +48,51 @@ fun AudioVisualizerView(
     neonColorMiddle: Color = NeonTurquoise,
     neonColorEnd: Color = NeonPurple
 ) {
-    val fftData by fftDataFlow.collectAsStateWithLifecycle()
-    val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
-    val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
-
-    AudioVisualizerView(
-        fftData = fftData,
-        waveformData = waveformData,
-        amplitude = amplitude,
-        mode = mode,
-        isPlaying = isPlaying,
-        modifier = modifier,
-        neonColorStart = neonColorStart,
-        neonColorMiddle = neonColorMiddle,
-        neonColorEnd = neonColorEnd
-    )
+    // Subscribe only to the signals used by the selected visualizer. The audio controller
+    // publishes these flows frequently; collecting all three here made every mode recompose
+    // for data it never draws.
+    when (mode) {
+        VisualizerMode.AMPLITUDE -> {
+            val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
+            val amplitude by amplitudeFlow.collectAsStateWithLifecycle()
+            AudioVisualizerView(
+                fftData = waveformData,
+                waveformData = waveformData,
+                amplitude = amplitude,
+                mode = mode,
+                isPlaying = isPlaying,
+                modifier = modifier,
+                neonColorStart = neonColorStart,
+                neonColorMiddle = neonColorMiddle,
+                neonColorEnd = neonColorEnd
+            )
+        }
+        VisualizerMode.WAVE -> {
+            val waveformData by waveformDataFlow.collectAsStateWithLifecycle()
+            AudioVisualizerView(
+                fftData = waveformData,
+                waveformData = waveformData,
+                mode = mode,
+                isPlaying = isPlaying,
+                modifier = modifier,
+                neonColorStart = neonColorStart,
+                neonColorMiddle = neonColorMiddle,
+                neonColorEnd = neonColorEnd
+            )
+        }
+        VisualizerMode.SPECTRUM, VisualizerMode.CIRCLE -> {
+            val fftData by fftDataFlow.collectAsStateWithLifecycle()
+            AudioVisualizerView(
+                fftData = fftData,
+                mode = mode,
+                isPlaying = isPlaying,
+                modifier = modifier,
+                neonColorStart = neonColorStart,
+                neonColorMiddle = neonColorMiddle,
+                neonColorEnd = neonColorEnd
+            )
+        }
+    }
 }
 
 @Composable
