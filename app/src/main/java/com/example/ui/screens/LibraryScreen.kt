@@ -138,6 +138,7 @@ import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
 import com.example.ui.util.smoothScrollToTrackIndex
 import com.example.ui.util.centerTrackIndexInstantly
+import com.example.ui.util.firstDistinctArtUris
 import com.example.ui.viewmodel.MainViewModel
 
 @Composable
@@ -1185,7 +1186,7 @@ private fun GroupedListSection(
         val tracks = groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -1609,7 +1610,7 @@ private fun FoldersSection(
             val tracks = folderGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -1797,7 +1798,7 @@ private fun FoldersSection(
                     val folderTracks = folderGroups[folderName] ?: emptyList()
                     val count = folderTracks.size
                     val distinctArtUris = remember(folderTracks) {
-                        folderTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                        folderTracks.firstDistinctArtUris()
                     }
 
                     Card(
@@ -2264,7 +2265,7 @@ private fun PlaylistsSection(
         val listState = rememberLazyListState()
 
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -2473,10 +2474,10 @@ private fun PlaylistsSection(
         }
     } else {
         val allTracksCollageUris = remember(allTracks) {
-            allTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            allTracks.firstDistinctArtUris()
         }
         val favoritesCollageUris = remember(favorites) {
-            favorites.mapNotNull { it.albumArtUri }.distinct().take(4)
+            favorites.firstDistinctArtUris()
         }
 
         LazyColumn(
@@ -2657,7 +2658,7 @@ private fun PlaylistsSection(
                 val plTracksFlow = remember(pl.id) { getPlaylistTracks(pl.id) }
                 val plTracks by plTracksFlow.collectAsStateWithLifecycle()
                 val plCollageUris = remember(plTracks) {
-                    plTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                    plTracks.firstDistinctArtUris()
                 }
 
                 Card(
