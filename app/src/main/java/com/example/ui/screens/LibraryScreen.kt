@@ -206,6 +206,19 @@ fun LibraryScreen(
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
 
+    // Shared by every section. Created inline before, these lambdas were new objects on each
+    // composition, which made the section parameters unstable and defeated skipping: a
+    // recomposition of this screen re-ran all four section bodies for nothing.
+    val onToggleFavoriteCallback: (Long) -> Unit = remember(viewModel) {
+        { trackId -> viewModel.toggleFavorite(trackId) }
+    }
+    val onAddToPlaylistCallback: (Track) -> Unit = remember {
+        { track -> trackForPlaylistDialog = track }
+    }
+    val onEditTrackInfoCallback: (Track) -> Unit = remember {
+        { track -> trackForEditInfoDialog = track }
+    }
+
     // Dedicated filter drilldown states per library section
     var selectedFolderTitle by remember { mutableStateOf<String?>(null) }
     var selectedFolderTracks by remember { mutableStateOf<List<Track>?>(null) }
@@ -731,9 +744,9 @@ fun LibraryScreen(
                                                     queue = queueToDisplay
                                                 )
                                             },
-                                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                            onAddToPlaylist = { trackForPlaylistDialog = it },
-                                            onEditTrackInfo = { trackForEditInfoDialog = it },
+                                            onToggleFavorite = onToggleFavoriteCallback,
+                                            onAddToPlaylist = onAddToPlaylistCallback,
+                                            onEditTrackInfo = onEditTrackInfoCallback,
                                             onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) }
                                         )
 
@@ -770,9 +783,9 @@ fun LibraryScreen(
                                         selectedFolderTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
@@ -809,9 +822,9 @@ fun LibraryScreen(
                                     onRenamePlaylist = { playlistToRename = it },
                                     onDeletePlaylist = { viewModel.deletePlaylist(it.id) },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
@@ -842,9 +855,9 @@ fun LibraryScreen(
                                         selectedAlbumTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->
@@ -872,9 +885,9 @@ fun LibraryScreen(
                                         selectedArtistTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onShuffleTracks = { tracks ->

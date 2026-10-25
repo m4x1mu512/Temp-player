@@ -1098,7 +1098,9 @@ class PlaybackManager private constructor(private val context: Context) {
                         break
                     }
                     _sleepTimerRemainingMillis.value = remaining
-                    delay(500L)
+                    // The countdown is shown in whole seconds; ticking twice per second only
+                    // doubled wakeups and recompositions of whatever still reads the value.
+                    delay(1000L)
                 }
             }
         }
