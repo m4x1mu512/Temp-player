@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.view.Choreographer
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -50,6 +51,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.local.SettingsDataStore
 import com.example.data.model.ThemeMode
@@ -85,13 +87,54 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var serviceStartPosted = false
+    private var serviceStartPending = false
+
     override fun onStart() {
         super.onStart()
         viewModel.ensureVisualizerStarted()
+        if (!serviceStartPosted) {
+            serviceStartPosted = true
+            serviceStartPending = true
+            // Create the service after the first frame. Its onCreate builds ExoPlayer and the
+            // media session, and both used to sit on the launch path between onCreate and the
+            // first draw. MediaSessionService promotes itself to the foreground once playback
+            // begins, so starting a frame later is safe; the player's pending-play mechanism
+            // holds anything requested in the meantime.
+            Choreographer.getInstance().postFrameCallback {
+                window.decorView.post {
+                    if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@post
+                    serviceStartPending = false
+                    startPlaybackService()
+                    bindPlaybackService()
+                }
+            }
+        } else {
+            // Covers a start that was skipped because the activity left the foreground before
+            // the deferred callback ran.
+            if (serviceStartPending) {
+                serviceStartPending = false
+                startPlaybackService()
+            }
+            bindPlaybackService()
+        }
+    }
+
+    private fun startPlaybackService() {
         try {
-            val serviceIntent = Intent(this, PlaybackService::class.java)
-            startService(serviceIntent)
-            bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+            startService(Intent(this, PlaybackService::class.java))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun bindPlaybackService() {
+        try {
+            bindService(
+                Intent(this, PlaybackService::class.java),
+                serviceConnection,
+                Context.BIND_AUTO_CREATE
+            )
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -141,15 +184,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
         )
-
-        // Start PlaybackService via standard startService.
-        // MediaSessionService automatically transitions to foreground when media playback begins.
-        try {
-            val serviceIntent = Intent(this, PlaybackService::class.java)
-            startService(serviceIntent)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
 
         // Process incoming intent if app was launched via file manager
         handleIncomingIntent(intent)
