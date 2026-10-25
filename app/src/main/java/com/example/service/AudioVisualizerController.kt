@@ -161,6 +161,27 @@ class AudioVisualizerController(
     private var wasVisible = true
     private val rmsWindow = FloatArray(256)
 
+    // Scratch buffers for the frame loop: it runs 30-50 times a second, and allocating half a
+    // dozen FloatArrays per frame was steady young-GC work while music played. The arrays that
+    // are published to the UI flows stay freshly allocated - StateFlow compares by instance and
+    // would otherwise skip an update that reuses the previous array.
+    private var scratchBands = 0
+    private var scratchFft = FloatArray(0)
+    private var scratchWave = FloatArray(0)
+    private val fftReal = FloatArray(256)
+    private val fftImag = FloatArray(256)
+    private val fftMag = FloatArray(128)
+    private val hannWindow = FloatArray(256) { i ->
+        (0.5 * (1.0 - cos(2.0 * PI * i / 255.0))).toFloat()
+    }
+
+    private fun ensureScratch(bands: Int) {
+        if (scratchBands == bands) return
+        scratchBands = bands
+        scratchFft = FloatArray(bands)
+        scratchWave = FloatArray(bands)
+    }
+
     /** Zeroes the published values once, when the visualizer leaves the screen. */
     private fun resetVisualState() {
         synchronized(lock) {
@@ -414,10 +435,11 @@ class AudioVisualizerController(
 
                         val instantAmp = ((rms * 0.65f + peakSample * 0.35f) * agc * 1.5f).coerceIn(0.06f, 1.0f)
 
-                        val fftMagnitudes = FloatArray(bands)
+                        ensureScratch(bands)
+                        val fftMagnitudes = scratchFft
                         computeFft(pcmMono, fftMagnitudes, agc)
 
-                        val wave = FloatArray(bands)
+                        val wave = scratchWave
                         val waveStep = max(1, windowSize / bands)
                         for (i in 0 until bands) {
                             val sampleIdx = (i * waveStep).coerceIn(0, windowSize - 1)
@@ -458,8 +480,9 @@ class AudioVisualizerController(
                         val halfBeatPhase = ((elapsedSec + beatPeriod * 0.5) % beatPeriod) / beatPeriod
                         val snare = exp(-18.0 * halfBeatPhase).toFloat()
 
-                        val synthFft = FloatArray(bands)
-                        val synthWave = FloatArray(bands)
+                        ensureScratch(bands)
+                        val synthFft = scratchFft
+                        val synthWave = scratchWave
 
                         for (b in 0 until bands) {
                             val normB = b.toFloat() / bands
@@ -562,13 +585,12 @@ class AudioVisualizerController(
 
     private fun computeFft(samples: FloatArray, outMagnitudes: FloatArray, agc: Float) {
         val n = 256
-        val real = FloatArray(n)
-        val imag = FloatArray(n)
+        val real = fftReal
+        val imag = fftImag
 
-        // Hann window
+        // Hann window, precomputed once in hannWindow
         for (i in 0 until n) {
-            val window = 0.5f * (1f - cos(2.0 * PI * i / (n - 1)).toFloat())
-            real[i] = if (i < samples.size) samples[i] * window else 0f
+            real[i] = if (i < samples.size) samples[i] * hannWindow[i] else 0f
             imag[i] = 0f
         }
 
@@ -621,7 +643,7 @@ class AudioVisualizerController(
         }
 
         val halfN = n shr 1
-        val rawMag = FloatArray(halfN)
+        val rawMag = fftMag
         for (i in 0 until halfN) {
             rawMag[i] = hypot(real[i], imag[i]) / n
         }
