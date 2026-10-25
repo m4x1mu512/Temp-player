@@ -404,11 +404,16 @@ fun ExpandablePlayerSheet(
             }
         }
 
+        // Resolve gesture thresholds once per layout/density change rather than converting dp
+        // values when every gesture settles. The thresholds and resulting gesture behavior stay the same.
+        val flingThresholdPx = with(density) { 420.dp.toPx() }
+        val minimumTravelThresholdPx = with(density) { 36.dp.toPx() }
+
         val settleToTarget: (velocityY: Float, totalDragY: Float) -> Unit = { velocityY, totalDragY ->
             // Resolve the gesture from direction, meaningful travel, and current sheet position.
             // Tiny accidental movements settle to the nearest endpoint instead of toggling the player.
-            val flingThreshold = with(density) { 420.dp.toPx() }
-            val travelThreshold = (maxDragPx * 0.12f).coerceAtLeast(with(density) { 36.dp.toPx() })
+            val flingThreshold = flingThresholdPx
+            val travelThreshold = (maxDragPx * 0.12f).coerceAtLeast(minimumTravelThresholdPx)
             val targetExpanded = when {
                 velocityY < -flingThreshold -> true
                 velocityY > flingThreshold -> false
