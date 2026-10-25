@@ -583,7 +583,6 @@ fun ExpandablePlayerSheet(
                                                 dragOffsetY = animOffsetY.value
                                             } else if (abs(totalDragX) > 28f && abs(totalDragX) > abs(totalDragY) * 1.5f) {
                                                 isHorizontalTrackSwipe = true
-                                                trackSwipeDragOffset = totalDragX
                                                 isTrackSwiping = true
                                             }
                                         }
