@@ -922,7 +922,7 @@ fun PlayerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 // Extend beyond the padded player column so the visualizer reaches both screen edges.
-                                .requiredWidth(configuration.screenWidthDp.dp)
+                                .width(configuration.screenWidthDp.dp)
                                 .height(if (isCompact) 30.dp else if (isMedium) 36.dp else 42.dp)
                                 .padding(vertical = 1.dp)
                                 .clickable { viewModel.cycleVisualizerMode() }
