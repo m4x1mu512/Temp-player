@@ -77,7 +77,7 @@ class SettingsDataStore(private val context: Context) {
                 context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_CACHED_THEME_MODE, mode.name)
-                    .commit()
+                    .apply()
             } catch (_: Exception) {}
         }
 
@@ -99,7 +99,7 @@ class SettingsDataStore(private val context: Context) {
                 context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_CACHED_ACCENT_COLOR, accentColor.name)
-                    .commit()
+                    .apply()
             } catch (_: Exception) {}
         }
 
@@ -195,7 +195,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString("cached_favorites_order", ids.joinToString(","))
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -214,7 +214,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_CACHED_SORT_ORDER, order.name)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -229,7 +229,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString("cached_playlist_order_$playlistId", ids.joinToString(","))
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -267,7 +267,7 @@ class SettingsDataStore(private val context: Context) {
                 .edit()
                 .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, str)
                 .putString(KEY_CACHED_QUEUE_TRACK_IDS, str)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = str
@@ -541,7 +541,7 @@ class SettingsDataStore(private val context: Context) {
                 .putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
                 .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
                 .putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_QUEUE_TRACK_IDS] = qStr
