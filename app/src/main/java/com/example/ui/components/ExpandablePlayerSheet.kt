@@ -1409,11 +1409,19 @@ fun ExpandablePlayerSheet(
 
                                     IconButton(
                                         onClick = {
-                                            // Let Compose present the first collapse frame before queue navigation
-                                            // triggers the destination's potentially expensive composition.
-                                            collapseToMiniFast()
+                                            // Keep the current destination (including Settings) stable while
+                                            // the sheet collapses. Navigate only after the animation completes,
+                                            // avoiding two expensive screen transitions on the same frames.
+                                            isExpanded = false
+                                            isDragging = false
                                             coroutineScope.launch {
-                                                androidx.compose.runtime.withFrameNanos { }
+                                                animOffsetY.animateTo(
+                                                    targetValue = maxDragPx,
+                                                    animationSpec = tween(
+                                                        durationMillis = 240,
+                                                        easing = FastOutSlowInEasing
+                                                    )
+                                                )
                                                 onNavigateToQueue()
                                             }
                                         },
