@@ -137,6 +137,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
         private val KEY_CUSTOM_ALL_TRACKS_ORDER = stringPreferencesKey("custom_all_tracks_order")
         private val KEY_MUSIC_FOLDERS = stringPreferencesKey("music_folders")
+        private val KEY_MUSIC_FOLDER_SETUP_COMPLETED = booleanPreferencesKey("music_folder_setup_completed")
     }
 
     val musicFoldersFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
@@ -145,6 +146,16 @@ class SettingsDataStore(private val context: Context) {
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
             ?: emptyList()
+    }
+
+    val musicFolderSetupCompletedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MUSIC_FOLDER_SETUP_COMPLETED] ?: false
+    }
+
+    suspend fun completeMusicFolderSetup() {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MUSIC_FOLDER_SETUP_COMPLETED] = true
+        }
     }
 
     suspend fun saveMusicFolders(uris: List<String>) {
