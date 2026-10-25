@@ -96,31 +96,23 @@ fun ReorderableTrackList(
         } catch (_: Exception) {}
     }
 
-    // Keep currentList in sync with external tracks when not dragging without 1-frame blank flicker
+    // Synchronize without allocating temporary ID lists. Also refresh Track objects
+    // when their IDs/order stay the same but metadata (title, artist, art URI) changes.
+    // The effect runs only when the source list changes, never on drag animation frames.
     LaunchedEffect(tracks) {
         if (!reorderableLazyListState.isAnyItemDragging) {
-            val trackIds = tracks.map { it.id }
-            val currentIds = currentList.map { it.id }
-            if (currentIds != trackIds) {
-                if (currentList.size == tracks.size) {
-                    for (i in tracks.indices) {
-                        if (currentList[i].id != tracks[i].id || currentList[i] != tracks[i]) {
-                            currentList[i] = tracks[i]
-                        }
+            while (currentList.size > tracks.size) {
+                currentList.removeAt(currentList.lastIndex)
+            }
+
+            for (index in tracks.indices) {
+                val track = tracks[index]
+                if (index < currentList.size) {
+                    if (currentList[index] != track) {
+                        currentList[index] = track
                     }
                 } else {
-                    while (currentList.size > tracks.size) {
-                        currentList.removeAt(currentList.lastIndex)
-                    }
-                    for (i in tracks.indices) {
-                        if (i < currentList.size) {
-                            if (currentList[i].id != tracks[i].id || currentList[i] != tracks[i]) {
-                                currentList[i] = tracks[i]
-                            }
-                        } else {
-                            currentList.add(tracks[i])
-                        }
-                    }
+                    currentList.add(track)
                 }
             }
         }
