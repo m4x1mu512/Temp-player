@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import kotlin.math.absoluteValue
+import androidx.room.withTransaction
 import com.example.data.local.AppDatabase
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.PlaylistEntity
@@ -377,19 +378,24 @@ class MusicRepository(
         }
 
         if (scannedTracks.isNotEmpty()) {
-            trackDao.insertTracks(scannedTracks)
-            // Keep the library aligned with the folders selected for this scan.
-            // `DELETE ... WHERE id NOT IN (:allIds)` used to pass one bind per track and threw
-            // "too many SQL variables" for libraries above 999 tracks on Android 8-11, aborting
-            // the scan. Compute the stale ids and delete them in chunks instead.
-            val validIds = scannedTracks.mapTo(HashSet(scannedTracks.size)) { it.id }
-            val staleIds = trackDao.getAllTracksDirect()
-                .asSequence()
-                .map { it.id }
-                .filterNot(validIds::contains)
-                .toList()
-            staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
-                trackDao.deleteTracksByIds(chunk)
+            // One transaction for the whole update. Without it every delete chunk invalidated
+            // the tracks flow on its own, and each invalidation rebuilt the entire library
+            // (a Track object per row, a sort and a UI recomposition) mid-scan.
+            database.withTransaction {
+                trackDao.insertTracks(scannedTracks)
+                // Keep the library aligned with the folders selected for this scan.
+                // `DELETE ... WHERE id NOT IN (:allIds)` used to pass one bind per track and threw
+                // "too many SQL variables" for libraries above 999 tracks on Android 8-11, aborting
+                // the scan. Compute the stale ids and delete them in chunks instead.
+                val validIds = scannedTracks.mapTo(HashSet(scannedTracks.size)) { it.id }
+                val staleIds = trackDao.getAllTracksDirect()
+                    .asSequence()
+                    .map { it.id }
+                    .filterNot(validIds::contains)
+                    .toList()
+                staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
+                    trackDao.deleteTracksByIds(chunk)
+                }
             }
         }
         scannedTracks.size
