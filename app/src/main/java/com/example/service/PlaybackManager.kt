@@ -939,16 +939,13 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
+        // The queue is deliberately not rebuilt here. Hearts are rendered from favoriteIds,
+        // so Track.isFavorite is no longer read anywhere; remapping every Track in the queue
+        // (and re-emitting the queue flow, which recomposed the library screen) on each
+        // favourite tap was pure waste on large queues.
         val curr = _currentTrack.value
-        if (curr != null && curr.id == trackId) {
+        if (curr != null && curr.id == trackId && curr.isFavorite != isFavorite) {
             _currentTrack.value = curr.copy(isFavorite = isFavorite)
-        }
-        val q = _queue.value
-        if (q.isNotEmpty()) {
-            val updatedQueue = q.map { track ->
-                if (track.id == trackId) track.copy(isFavorite = isFavorite) else track
-            }
-            _queue.value = updatedQueue
         }
     }
 
