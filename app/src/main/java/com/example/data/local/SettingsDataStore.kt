@@ -136,6 +136,21 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_QUEUE_TRACK_IDS = stringPreferencesKey("queue_track_ids")
         private val KEY_LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
         private val KEY_CUSTOM_ALL_TRACKS_ORDER = stringPreferencesKey("custom_all_tracks_order")
+        private val KEY_MUSIC_FOLDERS = stringPreferencesKey("music_folders")
+    }
+
+    val musicFoldersFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MUSIC_FOLDERS]
+            ?.split("\\n")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+    }
+
+    suspend fun saveMusicFolders(uris: List<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MUSIC_FOLDERS] = uris.distinct().joinToString("\\n")
+        }
     }
 
     fun getInitialCustomAllTracksOrder(): List<Long> {
