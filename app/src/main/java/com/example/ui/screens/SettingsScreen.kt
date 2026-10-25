@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
@@ -58,6 +60,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +117,7 @@ fun SettingsScreen(
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
 
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
     val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
@@ -120,6 +127,19 @@ fun SettingsScreen(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) { }
+            viewModel.addMusicFolder(uri.toString())
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -818,6 +838,41 @@ fun SettingsScreen(
                     .padding(vertical = 4.dp)
             ) {
                 Column {
+                    SettingsActionItem(
+                        icon = Icons.Default.FolderOpen,
+                        title = "Папки с музыкой",
+                        subtitle = if (musicFolders.isEmpty()) "Папки не выбраны" else "Выбрано папок: ${musicFolders.size}",
+                        onClick = { folderPicker.launch(null) },
+                        testTag = "settings_music_folders"
+                    )
+
+                    if (musicFolders.isNotEmpty()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            musicFolders.forEach { folderUri ->
+                                val folderLabel = remember(folderUri) {
+                                    Uri.decode(folderUri.substringAfterLast("/tree/").substringBefore("/document/"))
+                                        .substringAfter(":")
+                                        .ifBlank { folderUri }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        text = folderLabel,
+                                        modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2
+                                    )
+                                    IconButton(onClick = { viewModel.removeMusicFolder(folderUri) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить папку")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     SettingsActionItem(
                         icon = Icons.Default.Refresh,
                         title = "Пересканировать медиатеку",
