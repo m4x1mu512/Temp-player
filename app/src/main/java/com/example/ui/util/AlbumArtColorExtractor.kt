@@ -249,10 +249,17 @@ fun rememberPlayerColors(
         )
     }
 
+    // Palette-to-gradient conversion uses HSV operations and temporary arrays.
+    // Recompute it only when the extracted album tones change, not on every
+    // recomposition caused by the animated color stops below.
+    val albumArtStops = remember(extractedTones, defaultDarkGradient) {
+        extractedTones?.let(::generateAlbumGradientStops) ?: defaultDarkGradient
+    }
+
     val (targetTop, targetMiddle, targetBottom, targetAccent, isGradient, isDark, onSurface, onSurfaceVariant, onAccent, trackColor) =
         when (bgMode) {
             MiniPlayerBgMode.ALBUM_ART -> {
-                val stops = extractedTones?.let { generateAlbumGradientStops(it) } ?: defaultDarkGradient
+                val stops = albumArtStops
                 TargetParams(
                     top = stops.top,
                     middle = stops.middle,
