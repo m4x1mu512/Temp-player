@@ -538,12 +538,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleFavorite(trackId: Long) {
+        // Track no longer carries isFavorite (the library flow would have to be rebuilt for
+        // every tap); the favourite set is the single source of truth here.
         val currentSet = _favoriteIds.value
-        val isCurrentlyFav = if (currentSet.isNotEmpty() || rawTracks.value.isEmpty()) {
-            currentSet.contains(trackId)
-        } else {
-            rawTracks.value.find { it.id == trackId }?.isFavorite == true
-        }
+        val isCurrentlyFav = currentSet.contains(trackId)
         val newSet = if (isCurrentlyFav) currentSet - trackId else currentSet + trackId
         _favoriteIds.value = newSet
 

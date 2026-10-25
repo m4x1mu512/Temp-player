@@ -41,15 +41,13 @@ class MusicRepository(
     private val favoriteDao = database.favoriteDao()
     private val playlistDao = database.playlistDao()
 
-    val allTracks: Flow<List<Track>> = combine(
-        trackDao.getAllTracks(),
-        favoriteDao.getAllFavoriteIds()
-    ) { trackEntities, favoriteIds ->
-        val favoriteSet = favoriteIds.toSet()
-        trackEntities.map { entity ->
-            entity.toTrack(isFavorite = favoriteSet.contains(entity.id))
-        }
-    }.flowOn(Dispatchers.IO)
+    // Deliberately does not combine with the favourites table. Baking isFavorite into every
+    // Track meant that one heart tap re-created a Track object for every row and re-emitted
+    // this flow, which made displayedTracks/allTracksOrdered re-sort and the library screen
+    // re-group the whole library. The UI reads favourite state from favoriteIds instead.
+    val allTracks: Flow<List<Track>> = trackDao.getAllTracks()
+        .map { entities -> entities.map { it.toTrack(isFavorite = false) } }
+        .flowOn(Dispatchers.IO)
 
     val favoriteIds: Flow<Set<Long>> = favoriteDao.getAllFavoriteIds()
         .map { it.toSet() }
@@ -59,12 +57,11 @@ class MusicRepository(
         favoriteDao.getAllFavoriteIdsDirect()
     }
 
-    // Derived from allTracks instead of re-querying the database: toggling a heart used to
-    // run a second full-library query plus an associateBy over every track. Order does not
-    // matter here - MainViewModel re-sorts favourites (custom order or the selected sort).
-    val favoriteTracks: Flow<List<Track>> = allTracks
-        .map { tracks -> tracks.filter { it.isFavorite } }
-        .flowOn(Dispatchers.IO)
+    // Favourites are mapped here rather than inside allTracks: this flow may re-emit on every
+    // heart tap, but it only filters an existing list instead of rebuilding every Track.
+    val favoriteTracks: Flow<List<Track>> = combine(allTracks, favoriteIds) { tracks, favIds ->
+        tracks.filter { favIds.contains(it.id) }
+    }.flowOn(Dispatchers.IO)
 
     val playlists: Flow<List<Playlist>> = playlistDao.getAllPlaylists().map { entities ->
         entities.map { entity ->
