@@ -375,8 +375,9 @@ fun rememberPlayerColors(
     fun liftForLightTheme(color: Color): Color {
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(color.toArgb(), hsv)
-        hsv[2] = (hsv[2] + (1f - hsv[2]) * 0.38f).coerceIn(0f, 1f)
-        hsv[1] = (hsv[1] * 0.88f).coerceIn(0f, 1f)
+        // Stronger lift: make album-derived colors visibly lighter in light mode.
+        hsv[2] = (hsv[2] + (1f - hsv[2]) * 0.68f).coerceIn(0f, 1f)
+        hsv[1] = (hsv[1] * 0.72f).coerceIn(0f, 1f)
         return Color(android.graphics.Color.HSVToColor(color.alpha.let { (it * 255).toInt() }, hsv))
     }
 
@@ -388,9 +389,9 @@ fun rememberPlayerColors(
     val miniPlayerHorizontalBrush = if (isGradient) {
         Brush.horizontalGradient(
             colors = listOf(
-                miniTop.copy(alpha = if (isLightAppTheme) 0.48f else 0.35f),
-                miniMiddle.copy(alpha = if (isLightAppTheme) 0.38f else 0.20f),
-                miniBottom.copy(alpha = if (isLightAppTheme) 0.48f else 0.35f)
+                miniTop.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f),
+                miniMiddle.copy(alpha = if (isLightAppTheme) 0.62f else 0.20f),
+                miniBottom.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f)
             )
         )
     } else null
