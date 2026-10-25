@@ -250,7 +250,7 @@ fun ExpandablePlayerSheet(
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
 
-    val audioSpecs = trackAudioSpecs ?: remember(track) {
+    val audioSpecs = trackAudioSpecs ?: remember(track.path, track.uriString, track.size, track.duration) {
         val ext = (if (track.path.isNotBlank()) track.path else track.uriString)
             .substringBefore('?')
             .substringAfterLast('.', "")
