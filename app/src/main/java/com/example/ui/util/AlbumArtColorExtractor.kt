@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
@@ -367,13 +368,29 @@ fun rememberPlayerColors(
         Brush.verticalGradient(colors = gradientStopsList)
     } else null
 
+    // In a light app theme, keep the album-art palette but lift the mini-player
+    // colors so the collapsed/expanded mini-player does not look unnecessarily dark.
+    // The full-screen player keeps its original album-art gradient.
+    val isLightAppTheme = systemSurface.luminance() > 0.5f
+    fun liftForLightTheme(color: Color): Color {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+        hsv[2] = (hsv[2] + (1f - hsv[2]) * 0.38f).coerceIn(0f, 1f)
+        hsv[1] = (hsv[1] * 0.88f).coerceIn(0f, 1f)
+        return Color(android.graphics.Color.HSVToColor(color.alpha.let { (it * 255).toInt() }, hsv))
+    }
+
+    val miniTop = if (isLightAppTheme && isGradient) liftForLightTheme(animTop) else animTop
+    val miniMiddle = if (isLightAppTheme && isGradient) liftForLightTheme(animMiddle) else animMiddle
+    val miniBottom = if (isLightAppTheme && isGradient) liftForLightTheme(animBottom) else animBottom
+
     // Horizontal gradient for MiniPlayer with depth alpha values
     val miniPlayerHorizontalBrush = if (isGradient) {
         Brush.horizontalGradient(
             colors = listOf(
-                animTop.copy(alpha = 0.35f),
-                animMiddle.copy(alpha = 0.20f),
-                animBottom.copy(alpha = 0.35f)
+                miniTop.copy(alpha = if (isLightAppTheme) 0.48f else 0.35f),
+                miniMiddle.copy(alpha = if (isLightAppTheme) 0.38f else 0.20f),
+                miniBottom.copy(alpha = if (isLightAppTheme) 0.48f else 0.35f)
             )
         )
     } else null
