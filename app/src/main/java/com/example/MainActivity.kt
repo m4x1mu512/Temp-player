@@ -367,7 +367,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     }
                 },
                 popEnterTransition = {
-                    slideIntoContainer(
+                    if (openingQueueFromPlayer) {
+                        EnterTransition.None
+                    } else slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
                         animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
                         initialOffset = { -(it * 0.16f).toInt() }
@@ -419,7 +421,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                 },
                 popExitTransition = {
-                    slideOutOfContainer(
+                    if (openingQueueFromPlayer) {
+                        ExitTransition.None
+                    } else slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
                         animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
                         targetOffset = { (it * 0.18f).toInt() }
