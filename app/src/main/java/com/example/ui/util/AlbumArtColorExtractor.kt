@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.example.data.model.MiniPlayerBgMode
@@ -129,7 +129,7 @@ suspend fun loadAlbumCoverTones(
 ): ExtractedAlbumCoverTones = withContext(Dispatchers.IO) {
     if (uri != null) {
         try {
-            val loader = ImageLoader(context)
+            val loader = context.imageLoader
             val request = ImageRequest.Builder(context)
                 .data(uri)
                 .size(128, 128)
