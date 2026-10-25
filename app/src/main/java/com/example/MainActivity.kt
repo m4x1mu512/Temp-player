@@ -211,17 +211,11 @@ class MainActivity : ComponentActivity() {
                     intent?.action == Intent.ACTION_VIEW || intent?.action == Intent.ACTION_SEND
                 }
 
-                LaunchedEffect(hasAudioPermission) {
-                    if (hasAudioPermission) {
-                        viewModel.scanMusic()
-                    }
-                }
-
                 if (!hasAudioPermission && !hasExternalIntent) {
                     PermissionScreen(
                         onPermissionGranted = {
                             hasAudioPermission = true
-                            viewModel.scanMusic()
+                            viewModel.onAudioPermissionGranted()
                         },
                         modifier = Modifier.fillMaxSize()
                     )
