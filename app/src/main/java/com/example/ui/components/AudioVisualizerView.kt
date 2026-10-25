@@ -151,6 +151,10 @@ private fun RibbonVisualizer(
             listOf(Color.Transparent, colorMiddle.copy(alpha = 0.18f), colorStart.copy(alpha = 0.32f), Color.Transparent)
         )
     }
+    // Reuse draw geometry between audio frames instead of allocating nine Paths per frame.
+    val path = remember { Path() }
+    val fill = remember { Path() }
+    val ribbonPaths = remember { List(7) { Path() } }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -158,8 +162,8 @@ private fun RibbonVisualizer(
         val mid = h * 0.5f
         val count = data.size.coerceIn(16, 64)
         val step = w / (count - 1).coerceAtLeast(1)
-        val path = Path()
-        val fill = Path()
+        path.reset()
+        fill.reset()
         path.moveTo(0f, mid)
         fill.moveTo(0f, h)
         fill.lineTo(0f, mid)
@@ -186,8 +190,9 @@ private fun RibbonVisualizer(
         drawRect(brush = glowBrush, alpha = if (isPlaying) 0.8f else 0.25f)
         drawPath(fill, Brush.verticalGradient(listOf(Color.Transparent, colorMiddle.copy(alpha = 0.12f), Color.Transparent)))
         // Multiple fine ribbons create the luminous, layered silk-wave look without blur layers.
-        for (ribbon in 0 until 7) {
-            val ribbonPath = Path()
+        for (ribbon in 0 until ribbonPaths.size) {
+            val ribbonPath = ribbonPaths[ribbon]
+            ribbonPath.reset()
             val phase = ribbon * 0.48f
             for (i in 0 until count) {
                 val x = i * step
@@ -273,6 +278,7 @@ private fun WaveVisualizer(
     }
     val path = remember { Path() }
     val fill = remember { Path() }
+    val secondary = remember { Path() }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -303,7 +309,7 @@ private fun WaveVisualizer(
         drawPath(fill, fillBrush)
         // Subtle offset trace produces depth with inexpensive vector strokes.
         if (isPlaying) {
-            val secondary = Path()
+            secondary.reset()
             for (i in 0 until count) {
                 val raw = if (i < data.size) data[i].coerceIn(0f, 1f) else 0.025f
                 val env = 0.25f + 0.75f * sin(PI * i / (count - 1)).toFloat()
