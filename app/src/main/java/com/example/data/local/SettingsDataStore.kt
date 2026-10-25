@@ -142,7 +142,7 @@ class SettingsDataStore(private val context: Context) {
 
     val musicFoldersFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
         preferences[KEY_MUSIC_FOLDERS]
-            ?.split("\\n")
+            ?.split("\n")
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
             ?: emptyList()
@@ -160,7 +160,7 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun saveMusicFolders(uris: List<String>) {
         context.dataStore.edit { preferences ->
-            preferences[KEY_MUSIC_FOLDERS] = uris.distinct().joinToString("\\n")
+            preferences[KEY_MUSIC_FOLDERS] = uris.distinct().joinToString("\n")
         }
     }
 
