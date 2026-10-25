@@ -217,6 +217,9 @@ fun LibraryScreen(
     val onEditTrackInfoCallback: (Track) -> Unit = remember {
         { track -> trackForEditInfoDialog = track }
     }
+    val onShuffleTracksCallback: (List<Track>) -> Unit = remember(viewModel) {
+        { tracks -> if (tracks.isNotEmpty()) viewModel.playWithShuffle(tracks) }
+    }
 
     // Dedicated filter drilldown states per library section
     var selectedFolderTitle by remember { mutableStateOf<String?>(null) }
@@ -787,11 +790,7 @@ fun LibraryScreen(
                                     onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -835,11 +834,7 @@ fun LibraryScreen(
                                     onMoveAllTracksTrack = { from, to -> viewModel.moveAllTracksTrack(from, to) },
                                     onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
                                     onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -864,11 +859,7 @@ fun LibraryScreen(
                                     onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -894,11 +885,7 @@ fun LibraryScreen(
                                     onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
