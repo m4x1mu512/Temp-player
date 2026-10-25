@@ -911,6 +911,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Live feedback while the user drags the slider: reconfigures the running visualizer
+     * without touching DataStore. The value is persisted once, when the drag ends.
+     */
+    fun previewVisualizerSensitivity(sensitivity: Float) {
+        playbackManager.visualizerController.updateConfig(visualizerBands.value, sensitivity)
+    }
+
     fun setMiniPlayerBgMode(mode: MiniPlayerBgMode) {
         viewModelScope.launch {
             settingsDataStore.setMiniPlayerBgMode(mode)
