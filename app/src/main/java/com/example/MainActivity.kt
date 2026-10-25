@@ -284,6 +284,16 @@ fun AppNavigation(viewModel: MainViewModel) {
     val appBackdrop = rememberLayerBackdrop()
     val backdropSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     val navController = rememberNavController()
+    var openingQueueFromPlayer by remember { mutableStateOf(false) }
+
+    LaunchedEffect(openingQueueFromPlayer) {
+        if (openingQueueFromPlayer) {
+            // Keep the queue transition lightweight only for this action.
+            androidx.compose.runtime.withFrameNanos { }
+            kotlinx.coroutines.delay(320)
+            openingQueueFromPlayer = false
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.navigateToQueueEvent.collect {
@@ -325,7 +335,9 @@ fun AppNavigation(viewModel: MainViewModel) {
             composable(
                 route = "library",
                 enterTransition = {
-                    if (initialState.destination.route == "settings") {
+                    if (openingQueueFromPlayer) {
+                        EnterTransition.None
+                    } else if (initialState.destination.route == "settings") {
                         slideIntoContainer(
                             AnimatedContentTransitionScope.SlideDirection.End,
                             animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
@@ -339,7 +351,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     }
                 },
                 exitTransition = {
-                    if (targetState.destination.route == "settings") {
+                    if (openingQueueFromPlayer) {
+                        ExitTransition.None
+                    } else if (targetState.destination.route == "settings") {
                         slideOutOfContainer(
                             AnimatedContentTransitionScope.SlideDirection.Start,
                             animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
@@ -383,7 +397,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                     ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
                 },
                 exitTransition = {
-                    slideOutOfContainer(
+                    if (openingQueueFromPlayer) {
+                        ExitTransition.None
+                    } else slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
                         animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
                         targetOffset = { -(it * 0.14f).toInt() }
@@ -425,6 +441,7 @@ fun AppNavigation(viewModel: MainViewModel) {
             viewModel = viewModel,
             backdrop = if (backdropSupported) appBackdrop else null,
             onNavigateToQueue = {
+                openingQueueFromPlayer = true
                 if (navController.currentDestination?.route != "library") {
                     navController.popBackStack("library", inclusive = false)
                 }
