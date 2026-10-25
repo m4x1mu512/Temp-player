@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
@@ -71,6 +75,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -89,6 +94,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -145,6 +151,8 @@ fun LibraryScreen(
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
+    val musicFolderSetupCompleted by viewModel.musicFolderSetupCompleted.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
@@ -173,6 +181,21 @@ fun LibraryScreen(
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val scanMessage by viewModel.scanMessage.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+    val firstRunFolderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) { }
+            viewModel.addMusicFolder(uri.toString())
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -207,6 +230,41 @@ fun LibraryScreen(
         selectedAlbumTracks = null
         selectedArtistTitle = null
         selectedArtistTracks = null
+    }
+
+    if (!musicFolderSetupCompleted) {
+        AlertDialog(
+            onDismissRequest = { viewModel.completeMusicFolderSetup() },
+            title = { Text("Где искать музыку?") },
+            text = {
+                Column {
+                    Text("Выбери папки на устройстве, в которых приложение будет искать музыкальные файлы. Сканирование запускается только вручную.")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (musicFolders.isNotEmpty()) {
+                        Text(
+                            text = "Выбрано папок: ${musicFolders.size}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.completeMusicFolderSetup() }) {
+                    Text("Готово")
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { firstRunFolderPicker.launch(null) }) {
+                        Text("Добавить папку")
+                    }
+                    TextButton(onClick = { viewModel.completeMusicFolderSetup() }) {
+                        Text("Позже")
+                    }
+                }
+            }
+        )
     }
 
     val coroutineScope = rememberCoroutineScope()
