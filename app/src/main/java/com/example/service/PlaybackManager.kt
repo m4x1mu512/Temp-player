@@ -225,6 +225,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var positionProgressJob: Job? = null
+    private var secondaryPlayerJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
@@ -326,6 +327,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 visualizerController.onPlaybackStateChanged(isPlaying)
                 if (isPlaying) {
                     startPositionTracking()
+                    scheduleSecondaryPlayer()
                 } else if (!crossfadeController.isCrossfading) {
                     stopPositionTracking()
                     saveCurrentState()
@@ -507,10 +509,20 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun detachPlayer() {
         stopPositionTracking()
+        secondaryPlayerJob?.cancel()
+        secondaryPlayerJob = null
         cancelSleepTimer()
         crossfadeController.release()
         playerA?.removeListener(playerAListener)
         playerB?.removeListener(playerBListener)
+        // Release both here: the second player may have been created lazily by this manager,
+        // so PlaybackService's own player2 field can still be null when the service dies.
+        try {
+            playerA?.release()
+        } catch (_: Exception) {}
+        try {
+            playerB?.release()
+        } catch (_: Exception) {}
         playerA = null
         playerB = null
         visualizerController.onPlaybackStateChanged(false)
@@ -565,12 +577,38 @@ class PlaybackManager private constructor(private val context: Context) {
         if (existing != null) return existing
         val isForPlayerB = (activePlayerIndex == 0)
         val newPlayer = createSecondaryPlayer(isPlayerB = isForPlayerB)
+        // attachPlayers() normally wires the listener; a lazily created player must get it
+        // here, otherwise its state changes and end-of-track would never be handled.
         if (isForPlayerB) {
             playerB = newPlayer
+            newPlayer.addListener(playerBListener)
         } else {
             playerA = newPlayer
+            newPlayer.addListener(playerAListener)
         }
         return newPlayer
+    }
+
+    /**
+     * The second player exists only for crossfading, yet it used to be constructed inside
+     * PlaybackService.onCreate - two complete ExoPlayer instances (renderers, audio sinks,
+     * five processors each) before the first frame. Build it a few seconds into playback,
+     * when the UI is idle. A crossfade that starts sooner still creates it on demand.
+     */
+    private fun scheduleSecondaryPlayer() {
+        if (playerB != null || playerA == null) return
+        if (!_isCrossfadeEnabled.value) return
+        if (secondaryPlayerJob?.isActive == true) return
+        secondaryPlayerJob = serviceScope.launch {
+            delay(3_000L)
+            if (playerB == null && playerA != null && _isCrossfadeEnabled.value) {
+                try {
+                    getOrCreateSecondaryPlayer()
+                } catch (t: Throwable) {
+                    Log.w("PlaybackManager", "Could not prepare secondary player: ${t.message}")
+                }
+            }
+        }
     }
 
     private fun handleTrackEnded() {
