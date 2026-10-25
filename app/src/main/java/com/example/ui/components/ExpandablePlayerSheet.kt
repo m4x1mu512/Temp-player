@@ -189,14 +189,12 @@ fun ExpandablePlayerSheet(
     val visualizerMode by viewModel.visualizerMode.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
-    val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
-    val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
+    // Equalizer, sleep-timer and playlist state is collected inside the dialogs that use it.
+    // Collected here, every equalizer tweak and every sleep-timer tick (twice a second)
+    // recomposed the whole sheet - the always-visible mini player included.
 
-    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val isCurrentTrackFavorite = remember(favoriteIds, track.id) {
         favoriteIds.contains(track.id)
@@ -1509,6 +1507,9 @@ fun ExpandablePlayerSheet(
 
     // Modal Dialogs
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
+        val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
+        val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -1522,6 +1523,7 @@ fun ExpandablePlayerSheet(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemaining,
@@ -1532,6 +1534,7 @@ fun ExpandablePlayerSheet(
     }
 
     if (showAddToPlaylistDialog) {
+        val playlists by viewModel.playlists.collectAsStateWithLifecycle()
         AddToPlaylistDialog(
             track = track,
             playlists = playlists,
