@@ -157,7 +157,6 @@ fun LibraryScreen(
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
-    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val folderGroups by viewModel.folderGroups.collectAsStateWithLifecycle()
     val artistGroups by viewModel.artistGroups.collectAsStateWithLifecycle()
@@ -798,6 +797,11 @@ fun LibraryScreen(
 
                             2 -> {
                                 // 3. "Плейлисты"
+                                // Collected here rather than at the root: the favourites list is
+                                // only rendered by this tab, so keeping it hot at the root made
+                                // every heart tap re-filter and re-sort it while the user was
+                                // on another tab (the pager only composes the visible page).
+                                val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
                                 PlaylistsSection(
                                     allTracks = allTracksOrdered,
                                     favorites = favoriteTracks,

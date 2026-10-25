@@ -172,7 +172,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        // Rendered only by the playlists tab. Eagerly starting it meant every heart tap
+        // re-filtered and re-sorted the favourites list no matter which tab was open.
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )
 
