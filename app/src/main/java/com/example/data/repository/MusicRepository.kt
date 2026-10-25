@@ -120,6 +120,22 @@ class MusicRepository(
         return entities.map { it.toTrack(isFavorite = favoriteIds.contains(it.id)) }
     }
 
+    /**
+     * Embedded covers are written to cacheDir, which Android is free to clear. When the
+     * cached file is gone the row must be treated as artwork-less so the next scan
+     * re-extracts it instead of keeping a dead file:// URI.
+     */
+    private fun isUsableArtUri(uriString: String?): Boolean {
+        if (uriString.isNullOrEmpty()) return false
+        if (!uriString.startsWith("file:")) return true
+        return try {
+            val path = Uri.parse(uriString).path ?: return false
+            File(path).exists()
+        } catch (_: Exception) {
+            true
+        }
+    }
+
     suspend fun scanLocalMusic(folderUris: List<String>): Int = withContext(Dispatchers.IO) {
         if (folderUris.isEmpty()) return@withContext 0
 
@@ -254,8 +270,17 @@ class MusicRepository(
 
                     var genre = ""
 
-                    // If duration is 0 or metadata needed, attempt metadata retriever extraction
-                    if (duration <= 0 || albumArtUri == null || genre.isEmpty()) {
+                    val existingRow = existingTracksMap[id]
+                    // Reading tags with MediaMetadataRetriever costs 10-50 ms per file, and
+                    // the condition below used to be true for every single track on every
+                    // scan (genre is always empty here), so rescanning a few thousand files
+                    // took minutes even when nothing had changed. Pay for it only for new
+                    // rows, and for existing ones that still lack a duration or a usable cover.
+                    val needsMetadata = existingRow == null ||
+                        duration <= 0L ||
+                        (albumArtUri == null && !isUsableArtUri(existingRow.albumArtUriString))
+
+                    if (needsMetadata) {
                         try {
                             MediaMetadataRetriever().use { mmr ->
                                 mmr.setDataSource(context, contentUri)
@@ -307,7 +332,7 @@ class MusicRepository(
                         duration = (size * 8000L / 192_000L).coerceAtLeast(10_000L)
                     }
 
-                    val existing = existingTracksMap[id]
+                    val existing = existingRow
                     if (existing != null && existing.isCustomEdited) {
                         // Preserve user-edited track details
                         scannedTracks.add(
@@ -330,7 +355,9 @@ class MusicRepository(
                                 album = album,
                                 duration = duration,
                                 uriString = contentUri.toString(),
-                                albumArtUriString = albumArtUri,
+                                // Keep artwork discovered on an earlier scan when this scan
+                                // skipped the tag reader (it would otherwise be nulled out).
+                                albumArtUriString = albumArtUri ?: existing?.albumArtUriString,
                                 size = size,
                                 dateAdded = dateAdded,
                                 folderName = folderName,

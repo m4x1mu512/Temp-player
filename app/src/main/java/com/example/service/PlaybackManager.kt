@@ -345,7 +345,7 @@ class PlaybackManager private constructor(private val context: Context) {
                             _duration.value = realDuration
                             // Synchronize real duration with database & current track
                             _currentTrack.value?.let { track ->
-                                if (track.duration != realDuration) {
+                                if (shouldSyncDuration(track.duration, realDuration)) {
                                     _currentTrack.value = track.copy(duration = realDuration)
                                     serviceScope.launch {
                                         repository.updateTrackDuration(track.id, realDuration)
@@ -384,7 +384,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 if (realDuration > 0 && _duration.value != realDuration) {
                     _duration.value = realDuration
                     _currentTrack.value?.let { track ->
-                        if (track.duration != realDuration) {
+                        if (shouldSyncDuration(track.duration, realDuration)) {
                             _currentTrack.value = track.copy(duration = realDuration)
                             serviceScope.launch {
                                 repository.updateTrackDuration(track.id, realDuration)
@@ -1543,6 +1543,18 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var lastSavedQueueIds: List<Long>? = null
+
+    /**
+     * MediaStore/ID3 durations routinely differ from ExoPlayer's by tens of milliseconds.
+     * Rewriting the row for such a difference invalidated the tracks table on every track
+     * start, which made the whole library re-filter and recompose while the user was
+     * scrolling. Only persist a genuinely different duration.
+     */
+    private fun shouldSyncDuration(storedMs: Long, actualMs: Long): Boolean {
+        if (actualMs <= 0L) return false
+        if (storedMs <= 0L) return true
+        return kotlin.math.abs(storedMs - actualMs) > 1500L
+    }
 
     private fun saveCurrentState() {
         val track = _currentTrack.value
