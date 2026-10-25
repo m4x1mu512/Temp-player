@@ -1409,21 +1409,10 @@ fun ExpandablePlayerSheet(
 
                                     IconButton(
                                         onClick = {
-                                            // Keep the current destination (including Settings) stable while
-                                            // the sheet collapses. Navigate only after the animation completes,
-                                            // avoiding two expensive screen transitions on the same frames.
-                                            isExpanded = false
-                                            isDragging = false
-                                            coroutineScope.launch {
-                                                animOffsetY.animateTo(
-                                                    targetValue = maxDragPx,
-                                                    animationSpec = tween(
-                                                        durationMillis = 240,
-                                                        easing = FastOutSlowInEasing
-                                                    )
-                                                )
-                                                onNavigateToQueue()
-                                            }
+                                            // Collapse the player and reveal the queue in parallel.
+                                            // Queue navigation uses a lightweight screen transition.
+                                            collapseToMiniFast()
+                                            onNavigateToQueue()
                                         },
                                         modifier = Modifier.testTag("player_bottom_queue_button")
                                     ) {
