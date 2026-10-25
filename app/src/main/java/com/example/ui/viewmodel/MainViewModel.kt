@@ -429,6 +429,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanMusic() {
         viewModelScope.launch {
+            if (musicFolders.value.isEmpty()) {
+                _scanMessage.value = "Сначала выберите папки с музыкой в настройках"
+                return@launch
+            }
             _isScanning.value = true
             try {
                 val count = repository.scanLocalMusic(musicFolders.value)
