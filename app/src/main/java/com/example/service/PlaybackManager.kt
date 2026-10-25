@@ -1572,7 +1572,10 @@ class PlaybackManager private constructor(private val context: Context) {
                 }
             } else if (lastTrackId > 0) {
                 // If no saved queue IDs, fallback to finding last track in allTracks
+                // The DAO no longer sorts in SQL, so restore the alphabetical queue order
+                // that this fallback used to get for free.
                 val allTracks = repository.allTracks.first()
+                    .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 val track = allTracks.find { it.id == lastTrackId }
                 if (track != null && _currentTrack.value == null) {
                     _queue.value = allTracks
