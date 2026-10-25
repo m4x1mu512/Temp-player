@@ -96,6 +96,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedTab.value = tabIndex
     }
 
+    val musicFolders: StateFlow<List<String>> = settingsDataStore.musicFoldersFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList()
+    )
+
+    fun addMusicFolder(uri: String) {
+        viewModelScope.launch {
+            val updated = (musicFolders.value + uri).distinct()
+            settingsDataStore.saveMusicFolders(updated)
+        }
+    }
+
+    fun removeMusicFolder(uri: String) {
+        viewModelScope.launch {
+            settingsDataStore.saveMusicFolders(musicFolders.value.filterNot { it == uri })
+        }
+    }
+
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
@@ -400,7 +419,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isScanning.value = true
             try {
-                val count = repository.scanLocalMusic()
+                val count = repository.scanLocalMusic(musicFolders.value)
                 _scanMessage.value = if (count > 0) "Найдено треков: $count" else "Аудиофайлы не найдены"
                 if (currentQueue.value.isEmpty()) {
                     playbackManager.restoreSavedQueueAndTrack()
