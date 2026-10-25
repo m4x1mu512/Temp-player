@@ -59,7 +59,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -922,7 +922,7 @@ fun PlayerScreen(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 // Extend beyond the padded player column so the visualizer reaches both screen edges.
-                                .width(configuration.screenWidthDp.dp)
+                                .requiredWidth(configuration.screenWidthDp.dp)
                                 .height(if (isCompact) 30.dp else if (isMedium) 36.dp else 42.dp)
                                 .padding(vertical = 1.dp)
                                 .clickable { viewModel.cycleVisualizerMode() }
