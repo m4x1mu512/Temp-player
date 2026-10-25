@@ -58,10 +58,12 @@ class MusicRepository(
         favoriteDao.getAllFavoriteIdsDirect()
     }
 
-    val favoriteTracks: Flow<List<Track>> = combine(allTracks, favoriteDao.getAllFavoriteIds()) { tracks, favIds ->
-        val trackMap = tracks.associateBy { it.id }
-        favIds.mapNotNull { trackMap[it] }
-    }.flowOn(Dispatchers.IO)
+    // Derived from allTracks instead of re-querying the database: toggling a heart used to
+    // run a second full-library query plus an associateBy over every track. Order does not
+    // matter here - MainViewModel re-sorts favourites (custom order or the selected sort).
+    val favoriteTracks: Flow<List<Track>> = allTracks
+        .map { tracks -> tracks.filter { it.isFavorite } }
+        .flowOn(Dispatchers.IO)
 
     val playlists: Flow<List<Playlist>> = playlistDao.getAllPlaylists().map { entities ->
         entities.map { entity ->
