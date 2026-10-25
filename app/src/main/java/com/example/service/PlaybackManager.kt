@@ -1322,12 +1322,27 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var audioParamPersistJob: Job? = null
+
+    /**
+     * The speed, pitch and loudness sliders fire on every pixel of movement, and each write
+     * serialises the whole DataStore file. The audible effect is applied immediately; only
+     * the persistence waits until the user stops moving.
+     */
+    private fun scheduleAudioParamPersist() {
+        audioParamPersistJob?.cancel()
+        audioParamPersistJob = serviceScope.launch {
+            delay(400)
+            settingsDataStore.setPlaybackSpeed(_playbackSpeed.value)
+            settingsDataStore.setPlaybackPitch(_playbackPitch.value)
+            settingsDataStore.setLoudnessGain(_loudnessGain.value)
+        }
+    }
+
     fun setLoudnessGain(gainMilliBels: Int) {
         _loudnessGain.value = gainMilliBels
         equalizerController.setLoudnessGain(gainMilliBels)
-        serviceScope.launch {
-            settingsDataStore.setLoudnessGain(gainMilliBels)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun setPlaybackSpeed(speed: Float) {
@@ -1336,9 +1351,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val params = PlaybackParameters(clamped, _playbackPitch.value)
         playerA?.playbackParameters = params
         playerB?.playbackParameters = params
-        serviceScope.launch {
-            settingsDataStore.setPlaybackSpeed(clamped)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun setPlaybackPitch(pitch: Float) {
@@ -1347,9 +1360,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val params = PlaybackParameters(_playbackSpeed.value, clamped)
         playerA?.playbackParameters = params
         playerB?.playbackParameters = params
-        serviceScope.launch {
-            settingsDataStore.setPlaybackPitch(clamped)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun resetAudioEffects() {
