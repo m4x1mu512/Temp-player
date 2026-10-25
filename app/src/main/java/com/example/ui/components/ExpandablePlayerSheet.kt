@@ -1409,8 +1409,13 @@ fun ExpandablePlayerSheet(
 
                                     IconButton(
                                         onClick = {
+                                            // Let Compose present the first collapse frame before queue navigation
+                                            // triggers the destination's potentially expensive composition.
                                             collapseToMiniFast()
-                                            onNavigateToQueue()
+                                            coroutineScope.launch {
+                                                androidx.compose.runtime.withFrameNanos { }
+                                                onNavigateToQueue()
+                                            }
                                         },
                                         modifier = Modifier.testTag("player_bottom_queue_button")
                                     ) {
