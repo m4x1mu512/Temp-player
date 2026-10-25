@@ -108,6 +108,10 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.reorderable)
   implementation(libs.androidx.palette.ktx)
+  // Installs the baseline profiles shipped inside the AndroidX artifacts (Compose UI,
+  // lifecycle, ...) on Android 8-11, where ART does not pick them up from the APK itself.
+  // Pure startup / first-scroll win: no visual or behavioural change.
+  implementation(libs.androidx.profileinstaller)
 
   // Media3 ExoPlayer & Session
   implementation(libs.androidx.media3.exoplayer)

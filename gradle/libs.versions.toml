@@ -45,6 +45,7 @@ googleid = "1.1.1"
 media3 = "1.5.1"
 reorderable = "2.4.3"
 palette = "1.0.0"
+profileinstaller = "1.4.1"
 
 
 [libraries]
@@ -109,6 +110,7 @@ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.re
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
 
 [plugins]
