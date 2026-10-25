@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import kotlin.math.absoluteValue
 import com.example.data.local.AppDatabase
@@ -112,7 +113,29 @@ class MusicRepository(
         return entities.map { it.toTrack(isFavorite = favoriteIds.contains(it.id)) }
     }
 
-    suspend fun scanLocalMusic(): Int = withContext(Dispatchers.IO) {
+    suspend fun scanLocalMusic(folderUris: List<String>): Int = withContext(Dispatchers.IO) {
+        if (folderUris.isEmpty()) return@withContext 0
+
+        val selectedFolderPaths = folderUris.mapNotNull { rawUri ->
+            try {
+                val treeUri = Uri.parse(rawUri)
+                val documentId = DocumentsContract.getTreeDocumentId(treeUri)
+                val separator = documentId.indexOf(':')
+                if (separator < 0) return@mapNotNull null
+                val volume = documentId.substring(0, separator)
+                val relativePath = documentId.substring(separator + 1).trim('/')
+                val root = if (volume.equals("primary", ignoreCase = true)) {
+                    "/storage/emulated/0"
+                } else {
+                    "/storage/$volume"
+                }
+                if (relativePath.isBlank()) root else "$root/$relativePath"
+            } catch (_: Exception) {
+                null
+            }
+        }
+        if (selectedFolderPaths.isEmpty()) return@withContext 0
+
         val scannedTracks = mutableListOf<TrackEntity>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
@@ -168,6 +191,11 @@ class MusicRepository(
                     val rawTitle = if (titleCol != -1) cursor.getString(titleCol) else null
                     val displayName = if (displayNameCol != -1) cursor.getString(displayNameCol) else null
                     val path = if (dataCol != -1) cursor.getString(dataCol) ?: "" else ""
+                    if (path.isBlank() || selectedFolderPaths.none { folder ->
+                            path == folder || path.startsWith(folder.trimEnd('/') + "/")
+                        }) {
+                        continue
+                    }
 
                     // Fallback to file display name if title is missing
                     val title = when {
@@ -312,9 +340,10 @@ class MusicRepository(
             e.printStackTrace()
         }
 
+        // This is a folder-scoped scan. Upsert discovered tracks without deleting
+        // tracks indexed from other folders, since they may still be selected later.
         if (scannedTracks.isNotEmpty()) {
             trackDao.insertTracks(scannedTracks)
-            trackDao.deleteTracksNotIn(scannedTracks.map { it.id })
         }
         scannedTracks.size
     }
