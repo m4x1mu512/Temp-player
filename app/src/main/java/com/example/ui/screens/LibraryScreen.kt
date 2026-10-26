@@ -400,9 +400,9 @@ fun LibraryScreen(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.74f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
                             )
                         ),
                         shape = glassShape
@@ -410,14 +410,14 @@ fun LibraryScreen(
                     .border(
                         BorderStroke(
                             width = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.11f)
                         ),
                         shape = glassShape
                     )
                     .statusBarsPadding()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .padding(horizontal = 5.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 // 1. Список воспроизведения (Queue)
                 IconButton(
@@ -428,8 +428,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 0) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -457,8 +457,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 1) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -486,8 +486,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 2) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -515,8 +515,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 3) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -544,8 +544,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 4) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -573,8 +573,8 @@ fun LibraryScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(15.dp))
                             .background(
                                 if (pagerState.currentPage == 5) {
                                     MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
@@ -891,7 +891,29 @@ fun LibraryScreen(
 
                             5 -> {
                                 // 6. "Поиск"
-                                Column(modifier = Modifier.fillMaxSize()) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = 10.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Поиск музыки",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Найди трек, альбом или любимого исполнителя",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { viewModel.onSearchQueryChanged(it) },
@@ -926,31 +948,39 @@ fun LibraryScreen(
                                             }
                                         },
                                         singleLine = true,
-                                        shape = RoundedCornerShape(20.dp),
+                                        shape = RoundedCornerShape(22.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f),
-                                            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.68f),
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
                                             cursorColor = MaterialTheme.colorScheme.primary
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            .padding(horizontal = 16.dp, vertical = 10.dp)
                                             .testTag("search_input")
                                     )
 
                                     if (searchQuery.isNotBlank() && displayedTracks.isNotEmpty()) {
-                                        Text(
-                                            text = "Найдено треков: ${displayedTracks.size}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(
-                                                start = 22.dp,
-                                                end = 22.dp,
-                                                bottom = 4.dp
+                                        Row(
+                                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(MaterialTheme.colorScheme.primary)
                                             )
-                                        )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Найдено треков: ${displayedTracks.size}",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
 
                                     if (displayedTracks.isEmpty()) {
