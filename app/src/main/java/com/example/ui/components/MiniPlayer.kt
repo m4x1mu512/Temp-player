@@ -178,7 +178,7 @@ fun MiniPlayer(
         )
 
         Card(
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color.Transparent
             ),
@@ -200,7 +200,7 @@ fun MiniPlayer(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                     key = KEY_PLAYER_CONTAINER,
-                    clipShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                    clipShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 )
                 .testTag("mini_player")
         ) {
@@ -212,9 +212,9 @@ fun MiniPlayer(
                 // Keep the album-derived tint subtle so the library remains visible around the player.
                 val horizontalGradient = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
                     colors = listOf(
-                        colorScheme.backgroundColor.copy(alpha = 0.76f),
-                        colorScheme.accentColor.copy(alpha = 0.14f),
-                        colorScheme.backgroundColor.copy(alpha = 0.76f)
+                        colorScheme.backgroundColor.copy(alpha = 0.64f),
+                        colorScheme.accentColor.copy(alpha = 0.12f),
+                        colorScheme.backgroundColor.copy(alpha = 0.64f)
                     )
                 )
 
@@ -223,9 +223,9 @@ fun MiniPlayer(
                         .matchParentSize()
                         .background(
                             if (colorScheme.isDark) {
-                                Color(0xFF11150D).copy(alpha = 0.20f)
+                                Color(0xFF11150D).copy(alpha = 0.14f)
                             } else {
-                                Color(0xFFF7F8F3).copy(alpha = 0.26f)
+                                Color(0xFFF7F8F3).copy(alpha = 0.18f)
                             }
                         )
                         .background(horizontalGradient)
