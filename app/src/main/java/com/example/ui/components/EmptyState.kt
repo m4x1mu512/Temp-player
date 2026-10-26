@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicOff
 import androidx.compose.material.icons.filled.Refresh
@@ -47,13 +47,13 @@ fun EmptyState(
     ) {
         Box(
             modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
+                .size(88.dp)
+                .clip(RoundedCornerShape(26.dp))
                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                    shape = CircleShape
+                    shape = RoundedCornerShape(26.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -61,11 +61,11 @@ fun EmptyState(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(38.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         Text(
             text = title,
@@ -75,7 +75,7 @@ fun EmptyState(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = message,
