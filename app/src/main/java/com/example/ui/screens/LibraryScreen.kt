@@ -1386,11 +1386,8 @@ private fun GroupedListSection(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
-                            BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
-                            ),
-                            RoundedCornerShape(18.dp)
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)),
+                            RoundedCornerShape(22.dp)
                         )
                         .clickable { onSelectGroup(groupKey, groupTracks) }
                 ) {
@@ -2506,17 +2503,17 @@ private fun PlaylistsSection(
             // 1) All tracks card ("Все треки")
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)),
-                            RoundedCornerShape(18.dp)
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)),
+                            RoundedCornerShape(22.dp)
                         )
                         .clickable { onSelectCategory("Все треки") }
                         .testTag("all_tracks_card")
@@ -2568,17 +2565,17 @@ private fun PlaylistsSection(
             // 2) Favorites card ("Избранное")
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = FavoriteRed.copy(alpha = 0.075f)
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
-                            BorderStroke(1.dp, FavoriteRed.copy(alpha = 0.16f)),
-                            RoundedCornerShape(18.dp)
+                            BorderStroke(1.dp, FavoriteRed.copy(alpha = 0.18f)),
+                            RoundedCornerShape(22.dp)
                         )
                         .clickable { onSelectCategory("Избранное") }
                         .testTag("favorites_card")
@@ -2643,14 +2640,14 @@ private fun PlaylistsSection(
             // 4) Button: "Создать плейлист"
             item {
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.055f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
                             BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
-                            RoundedCornerShape(18.dp)
+                            RoundedCornerShape(22.dp)
                         )
                         .clickable { onCreatePlaylist() }
                         .testTag("create_playlist_card")
