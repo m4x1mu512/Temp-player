@@ -94,7 +94,7 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = RoundedCornerShape(if (isDragging) 20.dp else 18.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 16.dp)
     val itemBorderColor = when {
         isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f)
         isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
@@ -106,7 +106,7 @@ fun TrackListItem(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
@@ -121,8 +121,8 @@ fun TrackListItem(
         // Thumbnail with playing overlay
         Box(
             modifier = Modifier
-                .size(58.dp)
-                .clip(RoundedCornerShape(15.dp))
+                .size(56.dp)
+                .clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(
                     width = 1.dp,
@@ -144,7 +144,7 @@ fun TrackListItem(
                 model = thumbnailRequest,
                 contentDescription = "Обложка ${track.title}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(58.dp)
+                modifier = Modifier.size(56.dp)
             )
 
             if (isCurrent) {

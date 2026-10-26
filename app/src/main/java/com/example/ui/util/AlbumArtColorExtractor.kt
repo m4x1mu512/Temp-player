@@ -63,18 +63,18 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     val width = bitmap.width
     val height = bitmap.height
     if (width == 0 || height == 0) {
-        val fallback = Color(0xFF1B1C24)
-        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFF5B8DEF))
+        val fallback = Color(0xFF151A11)
+        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFFC5F45B))
     }
 
     val palette = Palette.from(bitmap)
         .maximumColorCount(24)
         .generate()
 
-    val fallbackVibrant = android.graphics.Color.parseColor("#4A6FA5")
-    val fallbackDarkVibrant = android.graphics.Color.parseColor("#1B1E2B")
-    val fallbackMuted = android.graphics.Color.parseColor("#262938")
-    val fallbackDominant = android.graphics.Color.parseColor("#171822")
+    val fallbackVibrant = android.graphics.Color.parseColor("#6B7D3A")
+    val fallbackDarkVibrant = android.graphics.Color.parseColor("#20271A")
+    val fallbackMuted = android.graphics.Color.parseColor("#293020")
+    val fallbackDominant = android.graphics.Color.parseColor("#11150D")
 
     // 1. Vibrant Color
     val vibrantRgb = palette.getVibrantColor(
@@ -242,9 +242,9 @@ fun rememberPlayerColors(
     // Default neutral dark gradient stops when album art is loading or unavailable
     val defaultDarkGradient = remember {
         AlbumGradientStops(
-            top = Color(0xFF262834),
-            middle = Color(0xFF1B1C24),
-            bottom = Color(0xFF111217),
+            top = Color(0xFF252D1B),
+            middle = Color(0xFF191F13),
+            bottom = Color(0xFF0C0F0A),
             accent = systemPrimary
         )
     }
@@ -267,9 +267,9 @@ fun rememberPlayerColors(
                     accent = stops.accent,
                     isGradient = true,
                     isDark = true,
-                    onSurface = Color(0xFFF7F7FA),
-                    onSurfaceVariant = Color(0xFFB4B4C0),
-                    onAccent = Color(0xFF0D0E12),
+                    onSurface = Color(0xFFF3F7EC),
+                    onSurfaceVariant = Color(0xFFB8C2A9),
+                    onAccent = Color(0xFF1A230C),
                     trackColor = Color(0x38FFFFFF)
                 )
             }

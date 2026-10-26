@@ -400,9 +400,9 @@ fun LibraryScreen(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.74f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
                             )
                         ),
                         shape = glassShape
