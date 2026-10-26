@@ -42,6 +42,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -388,305 +390,203 @@ fun LibraryScreen(
         modifier = modifier.testTag("library_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // 7 top bar icons: 6 tabs + 1 more menu
-            val glassShape = RoundedCornerShape(
-                bottomStart = 22.dp,
-                bottomEnd = 22.dp
-            )
-            Row(
+            val glassShape = RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(glassShape)
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.86f)
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
                             )
                         ),
                         shape = glassShape
                     )
                     .border(
-                        BorderStroke(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.11f)
-                        ),
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
                         shape = glassShape
                     )
                     .statusBarsPadding()
-                    .padding(horizontal = 5.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    .padding(top = 9.dp, bottom = 12.dp)
             ) {
-                // 1. Список воспроизведения (Queue)
-                IconButton(
-                    onClick = { navigateToTab(0) },
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_queue_button")
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 12.dp, bottom = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 0) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QueueMusic,
-                            contentDescription = "Список воспроизведения",
-                            tint = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "ВАША МУЗЫКА",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.8.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = when (pagerState.currentPage) {
+                                0 -> "Сейчас в очереди"
+                                1 -> "Папки"
+                                2 -> "Плейлисты"
+                                3 -> "Альбомы"
+                                4 -> "Исполнители"
+                                else -> "Поиск"
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                }
-
-                // 2. Папки (Folders)
-                IconButton(
-                    onClick = { navigateToTab(1) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_folders_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 1) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = "Папки",
-                            tint = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 3. Плейлисты (Playlists)
-                IconButton(
-                    onClick = { navigateToTab(2) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_playlists_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 2) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = "Плейлисты",
-                            tint = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 4. Альбомы (Albums)
-                IconButton(
-                    onClick = { navigateToTab(3) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_albums_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 3) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Album,
-                            contentDescription = "Альбомы",
-                            tint = if (pagerState.currentPage == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 5. Исполнители (Artists)
-                IconButton(
-                    onClick = { navigateToTab(4) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_artists_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 4) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Исполнители",
-                            tint = if (pagerState.currentPage == 4) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 6. Поиск (Search)
-                IconButton(
-                    onClick = { navigateToTab(5) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("nav_search_button")
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(RoundedCornerShape(15.dp))
-                            .background(
-                                if (pagerState.currentPage == 5) {
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                                } else {
-                                    Color.Transparent
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Поиск",
-                            tint = if (pagerState.currentPage == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-
-                // 7. Три точки (Menu)
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    IconButton(
-                        onClick = { moreMenuExpanded = true },
-                        modifier = Modifier.testTag("nav_more_button")
-                    ) {
-                        if (isScanning) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Меню",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                    Box {
+                        IconButton(
+                            onClick = { moreMenuExpanded = true },
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(15.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+                                .testTag("nav_more_button")
+                        ) {
+                            if (isScanning) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "Меню",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
-                    }
-
-                    DropdownMenu(
-                        expanded = moreMenuExpanded,
-                        onDismissRequest = { moreMenuExpanded = false },
-                        shape = RoundedCornerShape(24.dp),
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 0.dp,
-                        shadowElevation = 8.dp
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Эквалайзер") },
-                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                showEqualizerDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Таймер сна") },
-                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                showSleepTimerDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Сканировать") },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                viewModel.scanMusic()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Сортировка") },
-                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                sortMenuExpanded = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Настройки") },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-                            onClick = {
-                                moreMenuExpanded = false
-                                onNavigateToSettings()
-                            }
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = sortMenuExpanded,
-                        onDismissRequest = { sortMenuExpanded = false }
-                    ) {
-                        SortOrder.values().forEach { order ->
+                        DropdownMenu(
+                            expanded = moreMenuExpanded,
+                            onDismissRequest = { moreMenuExpanded = false },
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 0.dp,
+                            shadowElevation = 8.dp
+                        ) {
                             DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = order.displayName,
-                                        fontWeight = if (order == sortOrder) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (order == sortOrder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                    )
-                                },
+                                text = { Text("Эквалайзер") },
+                                leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
-                                    viewModel.onSortOrderChanged(order)
-                                    sortMenuExpanded = false
+                                    moreMenuExpanded = false
+                                    showEqualizerDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Таймер сна") },
+                                leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    showSleepTimerDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Сканировать") },
+                                leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    viewModel.scanMusic()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Сортировка") },
+                                leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    sortMenuExpanded = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Настройки") },
+                                leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    onNavigateToSettings()
                                 }
                             )
                         }
+                        DropdownMenu(
+                            expanded = sortMenuExpanded,
+                            onDismissRequest = { sortMenuExpanded = false },
+                            shape = RoundedCornerShape(20.dp),
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ) {
+                            SortOrder.values().forEach { order ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = order.displayName,
+                                            fontWeight = if (order == sortOrder) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (order == sortOrder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    onClick = {
+                                        viewModel.onSortOrderChanged(order)
+                                        sortMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
                     }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    @Composable
+                    fun NavigationChip(
+                        title: String,
+                        icon: androidx.compose.ui.graphics.vector.ImageVector,
+                        page: Int,
+                        testTag: String
+                    ) {
+                        val selected = pagerState.currentPage == page
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
+                                )
+                                .clickable { navigateToTab(page) }
+                                .testTag(testTag)
+                                .padding(horizontal = 13.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    NavigationChip("Очередь", Icons.Default.QueueMusic, 0, "nav_queue_button")
+                    NavigationChip("Папки", Icons.Default.Folder, 1, "nav_folders_button")
+                    NavigationChip("Плейлисты", Icons.Default.MusicNote, 2, "nav_playlists_button")
+                    NavigationChip("Альбомы", Icons.Default.Album, 3, "nav_albums_button")
+                    NavigationChip("Исполнители", Icons.Default.Person, 4, "nav_artists_button")
+                    NavigationChip("Поиск", Icons.Default.Search, 5, "nav_search_button")
                 }
             }
         },
