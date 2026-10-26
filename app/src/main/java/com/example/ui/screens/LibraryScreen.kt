@@ -1400,8 +1400,8 @@ private fun GroupedListSection(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(54.dp)
-                                .clip(RoundedCornerShape(13.dp))
+                                .size(68.dp)
+                                .clip(RoundedCornerShape(18.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1434,9 +1434,9 @@ private fun GroupedListSection(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = groupKey,
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
