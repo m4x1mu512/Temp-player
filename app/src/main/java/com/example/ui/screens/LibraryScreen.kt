@@ -1377,11 +1377,11 @@ private fun GroupedListSection(
                     groupTracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
                 }
                 Card(
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
