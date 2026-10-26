@@ -1217,31 +1217,31 @@ private fun GroupedListSection(
 
             // Hero Artist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
             Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .border(
                         BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)),
-                        RoundedCornerShape(20.dp)
+                        RoundedCornerShape(26.dp)
                     )
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(14.dp)
+                    modifier = Modifier.padding(16.dp)
                 ) {
                     if (distinctArtUris.isNotEmpty()) {
                         FolderCoverCollage(
                             artUris = distinctArtUris,
-                            size = 92.dp,
-                            shape = RoundedCornerShape(14.dp)
+                            size = 104.dp,
+                            shape = RoundedCornerShape(20.dp)
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(92.dp)
-                                .clip(RoundedCornerShape(14.dp))
+                                .size(104.dp)
+                                .clip(RoundedCornerShape(20.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1259,7 +1259,7 @@ private fun GroupedListSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = selectedTitle,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -2321,27 +2321,27 @@ private fun PlaylistsSection(
 
             // Hero Playlist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
             Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(14.dp)
+                    modifier = Modifier.padding(16.dp)
                 ) {
                     if (distinctArtUris.isNotEmpty()) {
                         FolderCoverCollage(
                             artUris = distinctArtUris,
-                            size = 92.dp,
-                            shape = RoundedCornerShape(14.dp)
+                            size = 104.dp,
+                            shape = RoundedCornerShape(20.dp)
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(92.dp)
-                                .clip(RoundedCornerShape(14.dp))
+                                .size(104.dp)
+                                .clip(RoundedCornerShape(20.dp))
                                 .background(
                                     if (selectedCategoryTitle == "Избранное") FavoriteRed.copy(alpha = 0.15f)
                                     else MaterialTheme.colorScheme.surfaceVariant
@@ -2366,7 +2366,7 @@ private fun PlaylistsSection(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = title,
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
