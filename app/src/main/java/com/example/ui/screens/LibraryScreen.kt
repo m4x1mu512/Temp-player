@@ -610,12 +610,79 @@ fun LibraryScreen(
             // Tab Content with horizontal swipe between screens
             Box(modifier = Modifier.fillMaxSize()) {
                 if (allTracksOrdered.isEmpty() && !isScanning) {
-                    EmptyState(
-                        title = "Медиатека пуста",
-                        message = "На устройстве не найдено аудиофайлов или требуется обновить список",
-                        actionButtonText = "Сканировать аудио",
-                        onActionClick = { viewModel.scanMusic() }
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 22.dp, vertical = 20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(30.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+                                    RoundedCornerShape(30.dp)
+                                )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                                MaterialTheme.colorScheme.surface.copy(alpha = 0.04f)
+                                            )
+                                        )
+                                    )
+                                    .padding(horizontal = 24.dp, vertical = 30.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(82.dp)
+                                        .clip(RoundedCornerShape(27.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MusicNote,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(42.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(22.dp))
+                                Text(
+                                    text = "Твоя библиотека начинается здесь",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(9.dp))
+                                Text(
+                                    text = "Просканируй выбранные папки, чтобы найти музыку на устройстве.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(22.dp))
+                                Button(
+                                    onClick = { viewModel.scanMusic() },
+                                    shape = RoundedCornerShape(17.dp),
+                                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 13.dp)
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(9.dp))
+                                    Text("Сканировать музыку", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    }
                 } else {
                     HorizontalPager(
                         state = pagerState,
@@ -937,13 +1004,68 @@ fun LibraryScreen(
                                     }
 
                                     if (displayedTracks.isEmpty()) {
-                                        EmptyState(
-                                            title = if (searchQuery.isBlank()) "Введите поисковый запрос" else "Ничего не найдено",
-                                            message = if (searchQuery.isBlank()) "Найдите треки, альбомы или исполнителей" else "По запросу «$searchQuery» треков не обнаружено. Попробуйте изменить запрос",
-                                            icon = if (searchQuery.isBlank()) Icons.Default.Search else Icons.Default.MusicNote,
-                                            actionButtonText = null,
-                                            onActionClick = null
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(horizontal = 22.dp, vertical = 12.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(28.dp))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
+                                                    .border(
+                                                        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+                                                        RoundedCornerShape(28.dp)
+                                                    )
+                                                    .padding(horizontal = 22.dp, vertical = 26.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(70.dp)
+                                                        .clip(RoundedCornerShape(23.dp))
+                                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (searchQuery.isBlank()) Icons.Default.Search else Icons.Default.MusicNote,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(34.dp),
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(18.dp))
+                                                Text(
+                                                    text = if (searchQuery.isBlank()) "Что будем слушать?" else "Ничего не найдено",
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = if (searchQuery.isBlank()) {
+                                                        "Начни вводить название трека, альбома или исполнителя."
+                                                    } else {
+                                                        "По запросу «$searchQuery» совпадений нет. Попробуй другое название."
+                                                    },
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                if (searchQuery.isNotBlank()) {
+                                                    Spacer(modifier = Modifier.height(18.dp))
+                                                    OutlinedButton(
+                                                        onClick = { viewModel.onSearchQueryChanged("") },
+                                                        shape = RoundedCornerShape(15.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.Clear, contentDescription = null)
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text("Очистить поиск")
+                                                    }
+                                                }
+                                            }
+                                        }
                                     } else {
                                         val searchListState = rememberLazyListState()
                                         Box(modifier = Modifier.fillMaxSize()) {
