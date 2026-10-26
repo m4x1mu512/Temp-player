@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -998,36 +999,37 @@ fun LibraryScreen(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .padding(horizontal = 22.dp, vertical = 12.dp),
+                                                .padding(horizontal = 16.dp, vertical = 8.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Column(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .clip(RoundedCornerShape(28.dp))
+                                                    .verticalScroll(rememberScrollState())
+                                                    .clip(RoundedCornerShape(26.dp))
                                                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f))
                                                     .border(
                                                         BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
-                                                        RoundedCornerShape(28.dp)
+                                                        RoundedCornerShape(26.dp)
                                                     )
-                                                    .padding(horizontal = 22.dp, vertical = 26.dp),
+                                                    .padding(horizontal = 18.dp, vertical = 20.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(70.dp)
-                                                        .clip(RoundedCornerShape(23.dp))
+                                                        .size(60.dp)
+                                                        .clip(RoundedCornerShape(20.dp))
                                                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
                                                     contentAlignment = Alignment.Center
                                                 ) {
                                                     Icon(
                                                         imageVector = if (searchQuery.isBlank()) Icons.Default.Search else Icons.Default.MusicNote,
                                                         contentDescription = null,
-                                                        modifier = Modifier.size(34.dp),
+                                                        modifier = Modifier.size(30.dp),
                                                         tint = MaterialTheme.colorScheme.primary
                                                     )
                                                 }
-                                                Spacer(modifier = Modifier.height(18.dp))
+                                                Spacer(modifier = Modifier.height(14.dp))
                                                 Text(
                                                     text = if (searchQuery.isBlank()) "Что будем слушать?" else "Ничего не найдено",
                                                     style = MaterialTheme.typography.titleLarge,
@@ -1045,7 +1047,7 @@ fun LibraryScreen(
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                                 if (searchQuery.isNotBlank()) {
-                                                    Spacer(modifier = Modifier.height(18.dp))
+                                                    Spacer(modifier = Modifier.height(14.dp))
                                                     OutlinedButton(
                                                         onClick = { viewModel.onSearchQueryChanged("") },
                                                         shape = RoundedCornerShape(15.dp)
