@@ -344,7 +344,10 @@ fun PlayerScreen(
         }
     }
 
-    MaterialTheme(colorScheme = playerMaterialColorScheme) {
+    MaterialTheme(
+        colorScheme = playerMaterialColorScheme,
+        typography = com.example.ui.theme.Typography
+    ) {
         Box(
             modifier = modifier
                 .fillMaxSize()
