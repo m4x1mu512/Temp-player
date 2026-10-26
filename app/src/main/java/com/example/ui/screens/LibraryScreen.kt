@@ -2093,19 +2093,19 @@ private fun AlbumsSection(
                     }
 
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surface
                         ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .border(
                                 BorderStroke(
                                     1.dp,
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
                                 ),
-                                RoundedCornerShape(16.dp)
+                                RoundedCornerShape(18.dp)
                             )
                             .clickable { onSelectGroup(albumTitle, tracks) }
                             .testTag("album_card_$albumTitle")
@@ -2115,7 +2115,7 @@ private fun AlbumsSection(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center
                             ) {
