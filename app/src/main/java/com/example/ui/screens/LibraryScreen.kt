@@ -553,31 +553,23 @@ fun LibraryScreen(
                         testTag: String
                     ) {
                         val selected = pagerState.currentPage == page
-                        Row(
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(
                                     if (selected) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f)
                                 )
                                 .clickable { navigateToTab(page) }
-                                .testTag(testTag)
-                                .padding(horizontal = 13.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                                .testTag(testTag),
+                            contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                                contentDescription = title,
+                                modifier = Modifier.size(21.dp),
                                 tint = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
                             )
                         }
                     }
