@@ -605,20 +605,21 @@ fun LibraryScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 22.dp, vertical = 20.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Card(
-                            shape = RoundedCornerShape(30.dp),
+                            shape = RoundedCornerShape(26.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
                                 .border(
                                     BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)),
-                                    RoundedCornerShape(30.dp)
+                                    RoundedCornerShape(26.dp)
                                 )
                         ) {
                             Column(
@@ -632,41 +633,41 @@ fun LibraryScreen(
                                             )
                                         )
                                     )
-                                    .padding(horizontal = 24.dp, vertical = 30.dp),
+                                    .padding(horizontal = 18.dp, vertical = 20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(82.dp)
-                                        .clip(RoundedCornerShape(27.dp))
+                                        .size(64.dp)
+                                        .clip(RoundedCornerShape(22.dp))
                                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.MusicNote,
                                         contentDescription = null,
-                                        modifier = Modifier.size(42.dp),
+                                        modifier = Modifier.size(34.dp),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(22.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
                                 Text(
                                     text = "Твоя библиотека начинается здесь",
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.height(9.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Просканируй выбранные папки, чтобы найти музыку на устройстве.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Spacer(modifier = Modifier.height(22.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
                                 Button(
                                     onClick = { viewModel.scanMusic() },
                                     shape = RoundedCornerShape(17.dp),
-                                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 13.dp)
+                                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 11.dp)
                                 ) {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                     Spacer(modifier = Modifier.width(9.dp))
