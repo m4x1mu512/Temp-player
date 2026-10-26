@@ -1405,14 +1405,18 @@ fun ExpandablePlayerSheet(
                                         )
                                     }
 
-                                    IconButton(
+                                    FilledTonalIconButton(
                                         onClick = { viewModel.toggleRepeat() },
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                            contentColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
                                         modifier = Modifier.testTag("player_repeat_button")
                                     ) {
                                         when (repeatMode) {
-                                            RepeatMode.OFF -> Icon(Icons.Default.Repeat, contentDescription = "Повтор выключен", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            RepeatMode.ALL -> Icon(Icons.Default.Repeat, contentDescription = "Повтор всех", tint = MaterialTheme.colorScheme.primary)
-                                            RepeatMode.ONE -> Icon(Icons.Default.RepeatOne, contentDescription = "Повтор одного", tint = MaterialTheme.colorScheme.primary)
+                                            RepeatMode.OFF -> Icon(Icons.Default.Repeat, contentDescription = "Повтор выключен")
+                                            RepeatMode.ALL -> Icon(Icons.Default.Repeat, contentDescription = "Повтор всех")
+                                            RepeatMode.ONE -> Icon(Icons.Default.RepeatOne, contentDescription = "Повтор одного")
                                         }
                                     }
 
