@@ -138,6 +138,7 @@ import com.example.ui.components.SleepTimerDialog
 import com.example.ui.components.TrackListItem
 import com.example.ui.util.smoothScrollToTrackIndex
 import com.example.ui.util.centerTrackIndexInstantly
+import com.example.ui.util.firstDistinctArtUris
 import com.example.ui.viewmodel.MainViewModel
 
 @Composable
@@ -150,14 +151,12 @@ fun LibraryScreen(
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val displayedTracks by viewModel.displayedTracks.collectAsStateWithLifecycle()
-    val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val musicFolderSetupCompleted by viewModel.musicFolderSetupCompleted.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
     val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
     val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
-    val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val folderGroups by viewModel.folderGroups.collectAsStateWithLifecycle()
     val artistGroups by viewModel.artistGroups.collectAsStateWithLifecycle()
@@ -165,13 +164,11 @@ fun LibraryScreen(
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
-    val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
-    val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
-    val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
-    val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
+    // Equalizer and sleep-timer state is read inside the dialogs below: collecting it here at
+    // the root recomposed the whole screen (pager, every list) on each equalizer change and
+    // twice per second while a sleep timer was running.
+
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
@@ -207,6 +204,22 @@ fun LibraryScreen(
     var moreMenuExpanded by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+
+    // Shared by every section. Created inline before, these lambdas were new objects on each
+    // composition, which made the section parameters unstable and defeated skipping: a
+    // recomposition of this screen re-ran all four section bodies for nothing.
+    val onToggleFavoriteCallback: (Long) -> Unit = remember(viewModel) {
+        { trackId -> viewModel.toggleFavorite(trackId) }
+    }
+    val onAddToPlaylistCallback: (Track) -> Unit = remember {
+        { track -> trackForPlaylistDialog = track }
+    }
+    val onEditTrackInfoCallback: (Track) -> Unit = remember {
+        { track -> trackForEditInfoDialog = track }
+    }
+    val onShuffleTracksCallback: (List<Track>) -> Unit = remember(viewModel) {
+        { tracks -> if (tracks.isNotEmpty()) viewModel.playWithShuffle(tracks) }
+    }
 
     // Dedicated filter drilldown states per library section
     var selectedFolderTitle by remember { mutableStateOf<String?>(null) }
@@ -326,7 +339,7 @@ fun LibraryScreen(
             if (pagerState.currentPage != 0) {
                 pagerState.scrollToPage(0)
             }
-            val q = if (currentQueue.isNotEmpty()) currentQueue else rawTracks
+            val q = if (currentQueue.isNotEmpty()) currentQueue else allTracksOrdered
             val targetIdx = q.indexOfFirst { it.id == currentTrack?.id }
             if (targetIdx >= 0) {
                 queueListState.centerTrackIndexInstantly(targetIdx)
@@ -695,7 +708,7 @@ fun LibraryScreen(
         ) {
             // Tab Content with horizontal swipe between screens
             Box(modifier = Modifier.fillMaxSize()) {
-                if (rawTracks.isEmpty() && !isScanning) {
+                if (allTracksOrdered.isEmpty() && !isScanning) {
                     EmptyState(
                         title = "Медиатека пуста",
                         message = "На устройстве не найдено аудиофайлов или требуется обновить список",
@@ -733,9 +746,9 @@ fun LibraryScreen(
                                                     queue = queueToDisplay
                                                 )
                                             },
-                                            onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                            onAddToPlaylist = { trackForPlaylistDialog = it },
-                                            onEditTrackInfo = { trackForEditInfoDialog = it },
+                                            onToggleFavorite = onToggleFavoriteCallback,
+                                            onAddToPlaylist = onAddToPlaylistCallback,
+                                            onEditTrackInfo = onEditTrackInfoCallback,
                                             onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) }
                                         )
 
@@ -772,21 +785,22 @@ fun LibraryScreen(
                                         selectedFolderTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
                             2 -> {
                                 // 3. "Плейлисты"
+                                // Collected here rather than at the root: the favourites list is
+                                // only rendered by this tab, so keeping it hot at the root made
+                                // every heart tap re-filter and re-sort it while the user was
+                                // on another tab (the pager only composes the visible page).
+                                val favoriteTracks by viewModel.favoriteTracks.collectAsStateWithLifecycle()
                                 PlaylistsSection(
                                     allTracks = allTracksOrdered,
                                     favorites = favoriteTracks,
@@ -811,20 +825,16 @@ fun LibraryScreen(
                                     onRenamePlaylist = { playlistToRename = it },
                                     onDeletePlaylist = { viewModel.deletePlaylist(it.id) },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
                                     onMoveAllTracksTrack = { from, to -> viewModel.moveAllTracksTrack(from, to) },
                                     onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
                                     onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -844,16 +854,12 @@ fun LibraryScreen(
                                         selectedAlbumTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -874,16 +880,12 @@ fun LibraryScreen(
                                         selectedArtistTracks = null
                                     },
                                     onPlayTrack = { track, q -> viewModel.playTrack(track, q) },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onAddToPlaylist = { trackForPlaylistDialog = it },
-                                    onEditTrackInfo = { trackForEditInfoDialog = it },
+                                    onToggleFavorite = onToggleFavoriteCallback,
+                                    onAddToPlaylist = onAddToPlaylistCallback,
+                                    onEditTrackInfo = onEditTrackInfoCallback,
                                     favoriteIds = favoriteIds,
                                     onNavigateToQueue = navigateToQueueAndScrollToCurrentTrack,
-                                    onShuffleTracks = { tracks ->
-                                        if (tracks.isNotEmpty()) {
-                                            viewModel.playWithShuffle(tracks)
-                                        }
-                                    }
+                                    onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
 
@@ -1075,6 +1077,9 @@ fun LibraryScreen(
     }
 
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
+        val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
+        val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -1088,6 +1093,8 @@ fun LibraryScreen(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemainingMillis by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
+        val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemainingMillis,
@@ -1170,7 +1177,7 @@ private fun GroupedListSection(
         val tracks = groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -1451,6 +1458,17 @@ private fun FolderCoverCollage(
 ) {
     val context = LocalContext.current
     val distinctUris = remember(artUris) { artUris.distinct() }
+    // Rebuilt on every recomposition before: each card change (current track, favourite,
+    // scan) produced four new ImageRequest objects and restarted their crossfades.
+    val tileRequests = remember(distinctUris) {
+        distinctUris.take(4).map { uri ->
+            ImageRequest.Builder(context)
+                .data(uri)
+                .size(120, 120)
+                .crossfade(100)
+                .build()
+        }
+    }
 
     Box(
         modifier = modifier
@@ -1464,14 +1482,14 @@ private fun FolderCoverCollage(
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[0],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[1],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1480,14 +1498,14 @@ private fun FolderCoverCollage(
                     Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[2]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[2],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[3]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[3],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1499,14 +1517,14 @@ private fun FolderCoverCollage(
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[0]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[0],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
                         Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                         AsyncImage(
-                            model = ImageRequest.Builder(context).data(distinctUris[1]).size(120, 120).crossfade(100).build(),
+                            model = tileRequests[1],
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1583,7 +1601,7 @@ private fun FoldersSection(
             val tracks = folderGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -1771,7 +1789,7 @@ private fun FoldersSection(
                     val folderTracks = folderGroups[folderName] ?: emptyList()
                     val count = folderTracks.size
                     val distinctArtUris = remember(folderTracks) {
-                        folderTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                        folderTracks.firstDistinctArtUris()
                     }
 
                     Card(
@@ -2238,7 +2256,7 @@ private fun PlaylistsSection(
         val listState = rememberLazyListState()
 
         val distinctArtUris = remember(tracks) {
-            tracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            tracks.firstDistinctArtUris()
         }
         val totalDurationMs = remember(tracks) { tracks.sumOf { it.duration } }
         val formattedTotalDuration = remember(totalDurationMs) {
@@ -2447,10 +2465,10 @@ private fun PlaylistsSection(
         }
     } else {
         val allTracksCollageUris = remember(allTracks) {
-            allTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+            allTracks.firstDistinctArtUris()
         }
         val favoritesCollageUris = remember(favorites) {
-            favorites.mapNotNull { it.albumArtUri }.distinct().take(4)
+            favorites.firstDistinctArtUris()
         }
 
         LazyColumn(
@@ -2631,7 +2649,7 @@ private fun PlaylistsSection(
                 val plTracksFlow = remember(pl.id) { getPlaylistTracks(pl.id) }
                 val plTracks by plTracksFlow.collectAsStateWithLifecycle()
                 val plCollageUris = remember(plTracks) {
-                    plTracks.mapNotNull { it.albumArtUri }.distinct().take(4)
+                    plTracks.firstDistinctArtUris()
                 }
 
                 Card(

@@ -225,17 +225,19 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var positionProgressJob: Job? = null
+    private var secondaryPlayerJob: Job? = null
     private var sleepTimerJob: Job? = null
     private var currentAudioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
     init {
+        // Called from the visualizer thread 30-50 times per second. Hopping to the main
+        // thread for every sample frame was pure scheduler churn; the controller is
+        // thread-safe and posts its own gain updates to the audio handler.
         visualizerController.onRmsCalculated = { rms ->
-            serviceScope.launch {
-                try {
-                    replayGainController.onAudioBufferRms(rms)
-                } catch (t: Throwable) {
-                    Log.w("PlaybackManager", "Error in onAudioBufferRms: ${t.message}")
-                }
+            try {
+                replayGainController.onAudioBufferRms(rms)
+            } catch (t: Throwable) {
+                Log.w("PlaybackManager", "Error in onAudioBufferRms: ${t.message}")
             }
         }
 
@@ -305,44 +307,10 @@ class PlaybackManager private constructor(private val context: Context) {
             }
         }
 
-        // Synchronously restore initial queue and track from persistent cache so UI never flashes empty or unsorted
-        try {
-            val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
-                settingsDataStore.getInitialCustomAllTracksOrder()
-            }
-            if (savedQueueIds.isNotEmpty()) {
-                val directTracks = repository.getTracksByIdsDirect(savedQueueIds)
-                if (directTracks.isNotEmpty()) {
-                    _queue.value = directTracks
-                    val savedQueueIndex = settingsDataStore.getInitialLastQueueIndex()
-                    val lastTrackId = settingsDataStore.getInitialLastTrackId()
-                    val targetIndex = if (savedQueueIndex in directTracks.indices) {
-                        savedQueueIndex
-                    } else if (lastTrackId > 0) {
-                        directTracks.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
-                    } else {
-                        0
-                    }
-                    _queueIndex.value = targetIndex
-                    val trackToRestore = if (lastTrackId > 0) {
-                        directTracks.find { it.id == lastTrackId } ?: directTracks.getOrNull(targetIndex)
-                    } else {
-                        directTracks.getOrNull(targetIndex)
-                    }
-                    if (trackToRestore != null) {
-                        _currentTrack.value = trackToRestore
-                        _duration.value = trackToRestore.duration
-                        val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
-                        if (lastPos > 0 && lastPos < trackToRestore.duration) {
-                            _playbackPosition.value = lastPos
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.w("PlaybackManager", "Initial sync queue restore notice: ${e.message}")
-        }
-
+        // The queue used to be restored synchronously here, before the first frame: it read
+        // SharedPreferences on the main thread and then issued a blocking Room query, which
+        // (allowMainThreadQueries is off) only ever threw and was swallowed. restoreSavedQueueAndTrack()
+        // below already does the same work off the main thread.
         serviceScope.launch {
             restoreSavedQueueAndTrack()
         }
@@ -359,6 +327,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 visualizerController.onPlaybackStateChanged(isPlaying)
                 if (isPlaying) {
                     startPositionTracking()
+                    scheduleSecondaryPlayer()
                 } else if (!crossfadeController.isCrossfading) {
                     stopPositionTracking()
                     saveCurrentState()
@@ -378,7 +347,7 @@ class PlaybackManager private constructor(private val context: Context) {
                             _duration.value = realDuration
                             // Synchronize real duration with database & current track
                             _currentTrack.value?.let { track ->
-                                if (track.duration != realDuration) {
+                                if (shouldSyncDuration(track.duration, realDuration)) {
                                     _currentTrack.value = track.copy(duration = realDuration)
                                     serviceScope.launch {
                                         repository.updateTrackDuration(track.id, realDuration)
@@ -417,7 +386,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 if (realDuration > 0 && _duration.value != realDuration) {
                     _duration.value = realDuration
                     _currentTrack.value?.let { track ->
-                        if (track.duration != realDuration) {
+                        if (shouldSyncDuration(track.duration, realDuration)) {
                             _currentTrack.value = track.copy(duration = realDuration)
                             serviceScope.launch {
                                 repository.updateTrackDuration(track.id, realDuration)
@@ -540,14 +509,27 @@ class PlaybackManager private constructor(private val context: Context) {
 
     fun detachPlayer() {
         stopPositionTracking()
+        secondaryPlayerJob?.cancel()
+        secondaryPlayerJob = null
         cancelSleepTimer()
         crossfadeController.release()
         playerA?.removeListener(playerAListener)
         playerB?.removeListener(playerBListener)
+        // Release both here: the second player may have been created lazily by this manager,
+        // so PlaybackService's own player2 field can still be null when the service dies.
+        try {
+            playerA?.release()
+        } catch (_: Exception) {}
+        try {
+            playerB?.release()
+        } catch (_: Exception) {}
         playerA = null
         playerB = null
         visualizerController.onPlaybackStateChanged(false)
         visualizerController.resetBuffers()
+        // Stop the frame loop too: without this it outlived the service and kept allocating
+        // buffers every 20-33 ms until the process died. attachPlayers() restarts it.
+        visualizerController.release()
         equalizerController.release()
         replayGainController.release()
         _isPlaying.value = false
@@ -595,12 +577,38 @@ class PlaybackManager private constructor(private val context: Context) {
         if (existing != null) return existing
         val isForPlayerB = (activePlayerIndex == 0)
         val newPlayer = createSecondaryPlayer(isPlayerB = isForPlayerB)
+        // attachPlayers() normally wires the listener; a lazily created player must get it
+        // here, otherwise its state changes and end-of-track would never be handled.
         if (isForPlayerB) {
             playerB = newPlayer
+            newPlayer.addListener(playerBListener)
         } else {
             playerA = newPlayer
+            newPlayer.addListener(playerAListener)
         }
         return newPlayer
+    }
+
+    /**
+     * The second player exists only for crossfading, yet it used to be constructed inside
+     * PlaybackService.onCreate - two complete ExoPlayer instances (renderers, audio sinks,
+     * five processors each) before the first frame. Build it a few seconds into playback,
+     * when the UI is idle. A crossfade that starts sooner still creates it on demand.
+     */
+    private fun scheduleSecondaryPlayer() {
+        if (playerB != null || playerA == null) return
+        if (!_isCrossfadeEnabled.value) return
+        if (secondaryPlayerJob?.isActive == true) return
+        secondaryPlayerJob = serviceScope.launch {
+            delay(3_000L)
+            if (playerB == null && playerA != null && _isCrossfadeEnabled.value) {
+                try {
+                    getOrCreateSecondaryPlayer()
+                } catch (t: Throwable) {
+                    Log.w("PlaybackManager", "Could not prepare secondary player: ${t.message}")
+                }
+            }
+        }
     }
 
     private fun handleTrackEnded() {
@@ -931,16 +939,13 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun updateTrackFavorite(trackId: Long, isFavorite: Boolean) {
+        // The queue is deliberately not rebuilt here. Hearts are rendered from favoriteIds,
+        // so Track.isFavorite is no longer read anywhere; remapping every Track in the queue
+        // (and re-emitting the queue flow, which recomposed the library screen) on each
+        // favourite tap was pure waste on large queues.
         val curr = _currentTrack.value
-        if (curr != null && curr.id == trackId) {
+        if (curr != null && curr.id == trackId && curr.isFavorite != isFavorite) {
             _currentTrack.value = curr.copy(isFavorite = isFavorite)
-        }
-        val q = _queue.value
-        if (q.isNotEmpty()) {
-            val updatedQueue = q.map { track ->
-                if (track.id == trackId) track.copy(isFavorite = isFavorite) else track
-            }
-            _queue.value = updatedQueue
         }
     }
 
@@ -1128,7 +1133,9 @@ class PlaybackManager private constructor(private val context: Context) {
                         break
                     }
                     _sleepTimerRemainingMillis.value = remaining
-                    delay(500L)
+                    // The countdown is shown in whole seconds; ticking twice per second only
+                    // doubled wakeups and recompositions of whatever still reads the value.
+                    delay(1000L)
                 }
             }
         }
@@ -1229,24 +1236,34 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var eqPersistJob: Job? = null
+
+    /**
+     * Sliders fire on every pixel of movement, and each write serialises the whole DataStore
+     * file. Persist once the user stops moving instead of ~60 times per second.
+     */
+    private fun scheduleEqualizerPersist() {
+        eqPersistJob?.cancel()
+        eqPersistJob = serviceScope.launch {
+            delay(400)
+            settingsDataStore.setEqualizerPreset(_equalizerPreset.value)
+            settingsDataStore.setEqualizerLevels(_equalizerBands.value.map { it.levelMilliBels.toInt() })
+            settingsDataStore.setEqPreamp(_eqPreamp.value)
+        }
+    }
+
     fun setEqualizerBandLevel(bandIndex: Short, levelMilliBels: Short) {
         equalizerController.setBandLevel(bandIndex, levelMilliBels)
         _equalizerPreset.value = EqualizerPreset.CUSTOM
         _equalizerBands.value = equalizerController.getBands()
-        serviceScope.launch {
-            settingsDataStore.setEqualizerPreset(EqualizerPreset.CUSTOM)
-            val levels = _equalizerBands.value.map { it.levelMilliBels.toInt() }
-            settingsDataStore.setEqualizerLevels(levels)
-        }
+        scheduleEqualizerPersist()
     }
 
     fun setEqPreamp(preampMilliBels: Int) {
         _eqPreamp.value = preampMilliBels
         equalizerController.setPreamp(preampMilliBels)
         _equalizerBands.value = equalizerController.getBands()
-        serviceScope.launch {
-            settingsDataStore.setEqPreamp(preampMilliBels)
-        }
+        scheduleEqualizerPersist()
     }
 
     fun setBassBoostEnabled(enabled: Boolean) {
@@ -1305,12 +1322,27 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var audioParamPersistJob: Job? = null
+
+    /**
+     * The speed, pitch and loudness sliders fire on every pixel of movement, and each write
+     * serialises the whole DataStore file. The audible effect is applied immediately; only
+     * the persistence waits until the user stops moving.
+     */
+    private fun scheduleAudioParamPersist() {
+        audioParamPersistJob?.cancel()
+        audioParamPersistJob = serviceScope.launch {
+            delay(400)
+            settingsDataStore.setPlaybackSpeed(_playbackSpeed.value)
+            settingsDataStore.setPlaybackPitch(_playbackPitch.value)
+            settingsDataStore.setLoudnessGain(_loudnessGain.value)
+        }
+    }
+
     fun setLoudnessGain(gainMilliBels: Int) {
         _loudnessGain.value = gainMilliBels
         equalizerController.setLoudnessGain(gainMilliBels)
-        serviceScope.launch {
-            settingsDataStore.setLoudnessGain(gainMilliBels)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun setPlaybackSpeed(speed: Float) {
@@ -1319,9 +1351,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val params = PlaybackParameters(clamped, _playbackPitch.value)
         playerA?.playbackParameters = params
         playerB?.playbackParameters = params
-        serviceScope.launch {
-            settingsDataStore.setPlaybackSpeed(clamped)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun setPlaybackPitch(pitch: Float) {
@@ -1330,9 +1360,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val params = PlaybackParameters(_playbackSpeed.value, clamped)
         playerA?.playbackParameters = params
         playerB?.playbackParameters = params
-        serviceScope.launch {
-            settingsDataStore.setPlaybackPitch(clamped)
-        }
+        scheduleAudioParamPersist()
     }
 
     fun resetAudioEffects() {
@@ -1440,7 +1468,7 @@ class PlaybackManager private constructor(private val context: Context) {
                     }
                 }
                 tickCount++
-                if (tickCount % 20 == 0) {
+                if (tickCount % 60 == 0) {
                     saveCurrentState()
                 }
                 delay(250)
@@ -1456,7 +1484,23 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private val restoreMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Called from the view model (twice), the service and the activity start. Without a lock
+     * two callers could race: both would hit the database and both could issue a play command,
+     * duplicating the expensive part of a cold start.
+     */
     suspend fun restoreSavedQueueAndTrack(availableTracks: List<Track>? = null) {
+        restoreMutex.lock()
+        try {
+            restoreSavedQueueAndTrackLocked(availableTracks)
+        } finally {
+            restoreMutex.unlock()
+        }
+    }
+
+    private suspend fun restoreSavedQueueAndTrackLocked(availableTracks: List<Track>? = null) {
         try {
             if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
 
@@ -1536,7 +1580,10 @@ class PlaybackManager private constructor(private val context: Context) {
                 }
             } else if (lastTrackId > 0) {
                 // If no saved queue IDs, fallback to finding last track in allTracks
+                // The DAO no longer sorts in SQL, so restore the alphabetical queue order
+                // that this fallback used to get for free.
                 val allTracks = repository.allTracks.first()
+                    .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 val track = allTracks.find { it.id == lastTrackId }
                 if (track != null && _currentTrack.value == null) {
                     _queue.value = allTracks
@@ -1562,20 +1609,44 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    private var lastSavedQueueIds: List<Long>? = null
+
+    /**
+     * MediaStore/ID3 durations routinely differ from ExoPlayer's by tens of milliseconds.
+     * Rewriting the row for such a difference invalidated the tracks table on every track
+     * start, which made the whole library re-filter and recompose while the user was
+     * scrolling. Only persist a genuinely different duration.
+     */
+    private fun shouldSyncDuration(storedMs: Long, actualMs: Long): Boolean {
+        if (actualMs <= 0L) return false
+        if (storedMs <= 0L) return true
+        return kotlin.math.abs(storedMs - actualMs) > 1500L
+    }
+
     private fun saveCurrentState() {
         val track = _currentTrack.value
         val pos = _playbackPosition.value
         val q = _queue.value
         val idx = _queueIndex.value
-        if (track != null || q.isNotEmpty()) {
-            serviceScope.launch {
-                settingsDataStore.savePlaybackState(
-                    trackId = track?.id ?: -1L,
-                    position = pos,
-                    queueIds = if (q.isNotEmpty()) q.map { it.id } else null,
-                    queueIndex = if (idx >= 0) idx else null
-                )
-            }
+        if (track == null && q.isEmpty()) return
+
+        val ids = if (q.isNotEmpty()) q.map { it.id } else null
+        // Serialising the whole queue id list is only needed when the queue actually changed;
+        // it used to be rebuilt and written to disk every few seconds during playback.
+        val queueChanged = ids != lastSavedQueueIds
+        if (queueChanged) lastSavedQueueIds = ids
+
+        val trackId = track?.id ?: -1L
+        val queueIndex = if (idx >= 0) idx else null
+        // Never write on the main thread: this runs on every track change and periodically
+        // during playback, and the disk flush used to land inside the frame budget.
+        serviceScope.launch(Dispatchers.IO) {
+            settingsDataStore.savePlaybackState(
+                trackId = trackId,
+                position = pos,
+                queueIds = if (queueChanged) ids else null,
+                queueIndex = queueIndex
+            )
         }
     }
 

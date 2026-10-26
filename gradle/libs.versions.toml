@@ -45,6 +45,9 @@ googleid = "1.1.1"
 media3 = "1.5.1"
 reorderable = "2.4.3"
 palette = "1.0.0"
+profileinstaller = "1.4.1"
+benchmarkMacro = "1.4.1"
+uiautomator = "2.3.0"
 
 
 [libraries]
@@ -109,6 +112,9 @@ androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.re
 androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
+androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmarkMacro" }
+androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 
 
 [plugins]

@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep readable stack traces: CrashLogger ships them to the user for bug reports.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# Room entities and DAOs: keep them intact so schema validation and generated adapters
+# can never disagree with the obfuscated names.
+-keep class com.example.data.local.** { *; }
+-keepclassmembers class com.example.data.local.** { *; }
+

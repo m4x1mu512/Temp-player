@@ -66,6 +66,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -103,7 +104,6 @@ fun SettingsScreen(
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -112,16 +112,14 @@ fun SettingsScreen(
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
-
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
-    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    // Playback position and isPlaying were collected here but never read: every 250 ms the
+    // whole settings screen recomposed while music played. Equalizer bands and the sleep
+    // timer countdown are read inside their dialogs instead.
 
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
@@ -657,6 +655,13 @@ fun SettingsScreen(
 
                     if (visualizerEnabled) {
                         Spacer(modifier = Modifier.height(14.dp))
+                        // Drag locally and persist once. Previously every pixel of movement
+                        // wrote DataStore, and the thumb only moved after the write came back
+                        // through the flow - the slider felt sticky and the file was rewritten
+                        // dozens of times per second.
+                        var localSensitivity by remember(visualizerSensitivity) {
+                            mutableFloatStateOf(visualizerSensitivity)
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -668,15 +673,22 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "${(visualizerSensitivity * 100).roundToInt()}%",
+                                text = "${(localSensitivity * 100).roundToInt()}%",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Slider(
-                            value = visualizerSensitivity,
-                            onValueChange = { viewModel.setVisualizerSensitivity(((it * 10).roundToInt()) / 10f) },
+                            value = localSensitivity,
+                            onValueChange = { raw ->
+                                val snapped = (raw * 10).roundToInt() / 10f
+                                localSensitivity = snapped
+                                viewModel.previewVisualizerSensitivity(snapped)
+                            },
+                            onValueChangeFinished = {
+                                viewModel.setVisualizerSensitivity(localSensitivity)
+                            },
                             valueRange = 0.2f..3.0f,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -765,6 +777,10 @@ fun SettingsScreen(
 
                     if (crossfadeEnabled) {
                         Spacer(modifier = Modifier.height(12.dp))
+                        // Same as the sensitivity slider: drag locally, persist on release.
+                        var localCrossfade by remember(crossfadeDuration) {
+                            mutableFloatStateOf(crossfadeDuration.toFloat())
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -776,15 +792,18 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "$crossfadeDuration с",
+                                text = "${localCrossfade.roundToInt()} с",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Slider(
-                            value = crossfadeDuration.toFloat(),
-                            onValueChange = { viewModel.setCrossfadeDurationSeconds(it.roundToInt()) },
+                            value = localCrossfade,
+                            onValueChange = { localCrossfade = it.roundToInt().toFloat() },
+                            onValueChangeFinished = {
+                                viewModel.setCrossfadeDurationSeconds(localCrossfade.roundToInt())
+                            },
                             valueRange = 1f..10f,
                             steps = 8,
                             modifier = Modifier
@@ -956,6 +975,7 @@ fun SettingsScreen(
 
     // Dialogs
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -969,6 +989,7 @@ fun SettingsScreen(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemaining,

@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import kotlin.math.absoluteValue
+import androidx.room.withTransaction
 import com.example.data.local.AppDatabase
 import com.example.data.local.FavoriteEntity
 import com.example.data.local.PlaylistEntity
@@ -25,6 +26,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.io.File
 
+/**
+ * Android 8-11 ship SQLite builds where SQLITE_MAX_VARIABLE_NUMBER is 999: any `IN (:ids)`
+ * bind with a larger list throws "too many SQL variables". Long libraries and long queues
+ * hit that limit, so every id list is chunked well below it.
+ */
+private const val SQL_VARIABLE_LIMIT = 900
+
 class MusicRepository(
     private val context: Context,
     private val database: AppDatabase
@@ -33,15 +41,13 @@ class MusicRepository(
     private val favoriteDao = database.favoriteDao()
     private val playlistDao = database.playlistDao()
 
-    val allTracks: Flow<List<Track>> = combine(
-        trackDao.getAllTracks(),
-        favoriteDao.getAllFavoriteIds()
-    ) { trackEntities, favoriteIds ->
-        val favoriteSet = favoriteIds.toSet()
-        trackEntities.map { entity ->
-            entity.toTrack(isFavorite = favoriteSet.contains(entity.id))
-        }
-    }.flowOn(Dispatchers.IO)
+    // Deliberately does not combine with the favourites table. Baking isFavorite into every
+    // Track meant that one heart tap re-created a Track object for every row and re-emitted
+    // this flow, which made displayedTracks/allTracksOrdered re-sort and the library screen
+    // re-group the whole library. The UI reads favourite state from favoriteIds instead.
+    val allTracks: Flow<List<Track>> = trackDao.getAllTracks()
+        .map { entities -> entities.map { it.toTrack(isFavorite = false) } }
+        .flowOn(Dispatchers.IO)
 
     val favoriteIds: Flow<Set<Long>> = favoriteDao.getAllFavoriteIds()
         .map { it.toSet() }
@@ -51,9 +57,10 @@ class MusicRepository(
         favoriteDao.getAllFavoriteIdsDirect()
     }
 
-    val favoriteTracks: Flow<List<Track>> = combine(allTracks, favoriteDao.getAllFavoriteIds()) { tracks, favIds ->
-        val trackMap = tracks.associateBy { it.id }
-        favIds.mapNotNull { trackMap[it] }
+    // Favourites are mapped here rather than inside allTracks: this flow may re-emit on every
+    // heart tap, but it only filters an existing list instead of rebuilding every Track.
+    val favoriteTracks: Flow<List<Track>> = combine(allTracks, favoriteIds) { tracks, favIds ->
+        tracks.filter { favIds.contains(it.id) }
     }.flowOn(Dispatchers.IO)
 
     val playlists: Flow<List<Playlist>> = playlistDao.getAllPlaylists().map { entities ->
@@ -67,18 +74,18 @@ class MusicRepository(
     }.flowOn(Dispatchers.IO)
 
     fun getTracksForPlaylist(playlistId: Long): Flow<List<Track>> {
-        return combine(
-            playlistDao.getTracksForPlaylist(playlistId),
-            favoriteDao.getAllFavoriteIds()
-        ) { entities, favoriteIds ->
-            val favoriteSet = favoriteIds.toSet()
-            entities.map { it.toTrack(isFavorite = favoriteSet.contains(it.id)) }
-        }.flowOn(Dispatchers.IO)
+        // Favourites are deliberately not part of this query. Playlist flows are cached per
+        // playlist and the screen shows hearts from favoriteIds, so combining with the
+        // favourites table made every heart tap re-run the playlist query for every cached
+        // playlist. isFavorite is left false and never read from these objects.
+        return playlistDao.getTracksForPlaylist(playlistId)
+            .map { entities -> entities.map { it.toTrack(isFavorite = false) } }
+            .flowOn(Dispatchers.IO)
     }
 
     suspend fun getTracksByIds(ids: List<Long>): List<Track> = withContext(Dispatchers.IO) {
         if (ids.isEmpty()) return@withContext emptyList()
-        val entities = trackDao.getTracksByIds(ids)
+        val entities = ids.chunked(SQL_VARIABLE_LIMIT).flatMap { trackDao.getTracksByIds(it) }
         val favoriteIds = try {
             favoriteDao.getAllFavoriteIds().first().toSet()
         } catch (_: Exception) {
@@ -111,6 +118,22 @@ class MusicRepository(
             emptySet()
         }
         return entities.map { it.toTrack(isFavorite = favoriteIds.contains(it.id)) }
+    }
+
+    /**
+     * Embedded covers are written to cacheDir, which Android is free to clear. When the
+     * cached file is gone the row must be treated as artwork-less so the next scan
+     * re-extracts it instead of keeping a dead file:// URI.
+     */
+    private fun isUsableArtUri(uriString: String?): Boolean {
+        if (uriString.isNullOrEmpty()) return false
+        if (!uriString.startsWith("file:")) return true
+        return try {
+            val path = Uri.parse(uriString).path ?: return false
+            File(path).exists()
+        } catch (_: Exception) {
+            true
+        }
     }
 
     suspend fun scanLocalMusic(folderUris: List<String>): Int = withContext(Dispatchers.IO) {
@@ -247,8 +270,17 @@ class MusicRepository(
 
                     var genre = ""
 
-                    // If duration is 0 or metadata needed, attempt metadata retriever extraction
-                    if (duration <= 0 || albumArtUri == null || genre.isEmpty()) {
+                    val existingRow = existingTracksMap[id]
+                    // Reading tags with MediaMetadataRetriever costs 10-50 ms per file, and
+                    // the condition below used to be true for every single track on every
+                    // scan (genre is always empty here), so rescanning a few thousand files
+                    // took minutes even when nothing had changed. Pay for it only for new
+                    // rows, and for existing ones that still lack a duration or a usable cover.
+                    val needsMetadata = existingRow == null ||
+                        duration <= 0L ||
+                        (albumArtUri == null && !isUsableArtUri(existingRow.albumArtUriString))
+
+                    if (needsMetadata) {
                         try {
                             MediaMetadataRetriever().use { mmr ->
                                 mmr.setDataSource(context, contentUri)
@@ -300,7 +332,7 @@ class MusicRepository(
                         duration = (size * 8000L / 192_000L).coerceAtLeast(10_000L)
                     }
 
-                    val existing = existingTracksMap[id]
+                    val existing = existingRow
                     if (existing != null && existing.isCustomEdited) {
                         // Preserve user-edited track details
                         scannedTracks.add(
@@ -323,7 +355,9 @@ class MusicRepository(
                                 album = album,
                                 duration = duration,
                                 uriString = contentUri.toString(),
-                                albumArtUriString = albumArtUri,
+                                // Keep artwork discovered on an earlier scan when this scan
+                                // skipped the tag reader (it would otherwise be nulled out).
+                                albumArtUriString = albumArtUri ?: existing?.albumArtUriString,
                                 size = size,
                                 dateAdded = dateAdded,
                                 folderName = folderName,
@@ -341,9 +375,25 @@ class MusicRepository(
         }
 
         if (scannedTracks.isNotEmpty()) {
-            trackDao.insertTracks(scannedTracks)
-            // Keep the library aligned with the folders selected for this scan.
-            trackDao.deleteTracksNotIn(scannedTracks.map { it.id })
+            // One transaction for the whole update. Without it every delete chunk invalidated
+            // the tracks flow on its own, and each invalidation rebuilt the entire library
+            // (a Track object per row, a sort and a UI recomposition) mid-scan.
+            database.withTransaction {
+                trackDao.insertTracks(scannedTracks)
+                // Keep the library aligned with the folders selected for this scan.
+                // `DELETE ... WHERE id NOT IN (:allIds)` used to pass one bind per track and threw
+                // "too many SQL variables" for libraries above 999 tracks on Android 8-11, aborting
+                // the scan. Compute the stale ids and delete them in chunks instead.
+                val validIds = scannedTracks.mapTo(HashSet(scannedTracks.size)) { it.id }
+                val staleIds = trackDao.getAllTracksDirect()
+                    .asSequence()
+                    .map { it.id }
+                    .filterNot(validIds::contains)
+                    .toList()
+                staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
+                    trackDao.deleteTracksByIds(chunk)
+                }
+            }
         }
         scannedTracks.size
     }
