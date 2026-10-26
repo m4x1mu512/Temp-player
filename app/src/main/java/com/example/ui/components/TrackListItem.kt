@@ -83,9 +83,9 @@ fun TrackListItem(
 
     val targetBgColor = when {
         isDragging -> MaterialTheme.colorScheme.surfaceVariant
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
-        else -> Color.Transparent
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.085f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.22f)
     }
 
     val itemBgColor by animateColorAsState(
@@ -94,19 +94,19 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 16.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 14.dp)
     val itemBorderColor = when {
-        isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.65f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
-        isHighlighted -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.30f)
-        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.035f)
+        isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.70f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
+        isHighlighted -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.28f)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
@@ -115,19 +115,19 @@ fun TrackListItem(
                 color = itemBorderColor,
                 shape = itemShape
             )
-            .padding(start = 10.dp, end = 4.dp, top = 9.dp, bottom = 9.dp)
+            .padding(start = 9.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(14.dp))
+                .size(54.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(15.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -144,7 +144,7 @@ fun TrackListItem(
                 model = thumbnailRequest,
                 contentDescription = "Обложка ${track.title}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier.size(54.dp)
             )
 
             if (isCurrent) {
