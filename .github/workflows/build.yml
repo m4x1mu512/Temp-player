@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "ChatGPT" ]
+    branches: [ "chatGPT" ]
   pull_request:
-    branches: [ "ChatGPT" ]
+    branches: [ "chatGPT" ]
   workflow_dispatch:
 
 jobs:
