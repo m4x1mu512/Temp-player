@@ -1218,10 +1218,14 @@ private fun GroupedListSection(
             // Hero Artist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)),
+                        RoundedCornerShape(20.dp)
+                    )
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -1373,31 +1377,31 @@ private fun GroupedListSection(
                     groupTracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
                 }
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
                             BorderStroke(
                                 1.dp,
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)
                             ),
-                            RoundedCornerShape(16.dp)
+                            RoundedCornerShape(18.dp)
                         )
                         .clickable { onSelectGroup(groupKey, groupTracks) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(52.dp)
-                                .clip(RoundedCornerShape(12.dp))
+                                .size(54.dp)
+                                .clip(RoundedCornerShape(13.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -2482,9 +2486,14 @@ private fun PlaylistsSection(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
                     ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 16.dp, vertical = 5.dp)
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { onSelectCategory("Все треки") }
                         .testTag("all_tracks_card")
                 ) {
@@ -2537,11 +2546,16 @@ private fun PlaylistsSection(
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+                        containerColor = FavoriteRed.copy(alpha = 0.075f)
                     ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 16.dp, vertical = 5.dp)
+                        .border(
+                            BorderStroke(1.dp, FavoriteRed.copy(alpha = 0.16f)),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { onSelectCategory("Избранное") }
                         .testTag("favorites_card")
                 ) {
@@ -2606,10 +2620,14 @@ private fun PlaylistsSection(
             item {
                 Card(
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.055f)),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 16.dp, vertical = 5.dp)
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { onCreatePlaylist() }
                         .testTag("create_playlist_card")
                 ) {
@@ -2653,16 +2671,21 @@ private fun PlaylistsSection(
                 }
 
                 Card(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = 16.dp, vertical = 5.dp)
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)),
+                            RoundedCornerShape(18.dp)
+                        )
                         .clickable { onSelectPlaylist(pl) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
                         if (plCollageUris.isNotEmpty()) {
                             FolderCoverCollage(
