@@ -2671,33 +2671,35 @@ private fun PlaylistsSection(
                 }
 
                 Card(
-                    shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 5.dp)
                         .border(
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f)),
-                            RoundedCornerShape(18.dp)
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)),
+                            RoundedCornerShape(22.dp)
                         )
                         .clickable { onSelectPlaylist(pl) }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp)
                     ) {
                         if (plCollageUris.isNotEmpty()) {
                             FolderCoverCollage(
                                 artUris = plCollageUris,
-                                size = 44.dp,
-                                shape = RoundedCornerShape(10.dp)
+                                size = 60.dp,
+                                shape = RoundedCornerShape(16.dp)
                             )
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2709,14 +2711,14 @@ private fun PlaylistsSection(
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(15.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = pl.name,
-                                style = MaterialTheme.typography.bodyLarge,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
