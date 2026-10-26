@@ -2520,19 +2520,19 @@ private fun PlaylistsSection(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp)
                     ) {
                         if (allTracksCollageUris.isNotEmpty()) {
                             FolderCoverCollage(
                                 artUris = allTracksCollageUris,
-                                size = 44.dp,
-                                shape = RoundedCornerShape(12.dp)
+                                size = 60.dp,
+                                shape = RoundedCornerShape(16.dp)
                             )
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2544,7 +2544,7 @@ private fun PlaylistsSection(
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(15.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -2582,19 +2582,19 @@ private fun PlaylistsSection(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp)
                     ) {
                         if (favoritesCollageUris.isNotEmpty()) {
                             FolderCoverCollage(
                                 artUris = favoritesCollageUris,
-                                size = 44.dp,
-                                shape = RoundedCornerShape(12.dp)
+                                size = 60.dp,
+                                shape = RoundedCornerShape(16.dp)
                             )
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .size(60.dp)
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(FavoriteRed),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -2606,7 +2606,7 @@ private fun PlaylistsSection(
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(15.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
