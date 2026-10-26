@@ -795,32 +795,78 @@ fun LibraryScreen(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .padding(top = 10.dp)
+                                        .padding(top = 12.dp)
                                 ) {
-                                    Column(
+                                    Card(
+                                        shape = RoundedCornerShape(28.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                                        ),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 20.dp, vertical = 6.dp)
+                                            .padding(horizontal = 16.dp)
+                                            .border(
+                                                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
+                                                RoundedCornerShape(28.dp)
+                                            )
                                     ) {
-                                        Text(
-                                            text = "Поиск музыки",
-                                            style = MaterialTheme.typography.headlineSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = "Найди трек, альбом или любимого исполнителя",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    Brush.linearGradient(
+                                                        colors = listOf(
+                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
+                                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.10f)
+                                                        )
+                                                    )
+                                                )
+                                                .padding(start = 20.dp, top = 20.dp, end = 18.dp, bottom = 19.dp)
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(15.dp)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(58.dp)
+                                                        .clip(RoundedCornerShape(19.dp))
+                                                        .background(MaterialTheme.colorScheme.primary),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Search,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(29.dp),
+                                                        tint = MaterialTheme.colorScheme.onPrimary
+                                                    )
+                                                }
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "Найди свою музыку",
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Spacer(modifier = Modifier.height(5.dp))
+                                                    Text(
+                                                        text = "Треки, альбомы и исполнители — в одном поиске",
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
+
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { viewModel.onSearchQueryChanged(it) },
                                         placeholder = {
                                             Text(
-                                                "Поиск по названию, артисту или альбому",
+                                                "Название, исполнитель или альбом",
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -849,34 +895,40 @@ fun LibraryScreen(
                                             }
                                         },
                                         singleLine = true,
-                                        shape = RoundedCornerShape(22.dp),
+                                        shape = RoundedCornerShape(20.dp),
                                         colors = OutlinedTextFieldDefaults.colors(
-                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.68f),
-                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
-                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
-                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
+                                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.60f),
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
                                             cursorColor = MaterialTheme.colorScheme.primary
                                         ),
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                                            .padding(horizontal = 16.dp, vertical = 14.dp)
                                             .testTag("search_input")
                                     )
 
-                                    if (searchQuery.isNotBlank() && displayedTracks.isNotEmpty()) {
+                                    if (searchQuery.isNotBlank()) {
                                         Row(
-                                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 22.dp, end = 20.dp, bottom = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Box(
                                                 modifier = Modifier
-                                                    .size(7.dp)
+                                                    .size(8.dp)
                                                     .clip(CircleShape)
                                                     .background(MaterialTheme.colorScheme.primary)
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(9.dp))
                                             Text(
-                                                text = "Найдено треков: ${displayedTracks.size}",
+                                                text = if (displayedTracks.isEmpty()) {
+                                                    "Совпадений пока нет"
+                                                } else {
+                                                    "Найдено треков: ${displayedTracks.size}"
+                                                },
                                                 style = MaterialTheme.typography.labelLarge,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
