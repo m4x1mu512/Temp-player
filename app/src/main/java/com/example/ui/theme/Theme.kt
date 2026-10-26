@@ -19,7 +19,7 @@ import androidx.compose.material3.ColorScheme
 
 private fun createDarkColorScheme(accentColor: AccentColor): ColorScheme {
   val (background, surface, surfaceVariant) = when (accentColor) {
-    AccentColor.TURQUOISE -> Triple(Color(0xFF041311), Color(0xFF0B211E), Color(0xFF12332E))
+    AccentColor.TURQUOISE -> Triple(Color(0xFF0C0F0A), Color(0xFF151A11), Color(0xFF20271A))
     AccentColor.PURPLE -> Triple(Color(0xFF080414), Color(0xFF150923), Color(0xFF28113D))
     AccentColor.CYBER_YELLOW -> Triple(Color(0xFF151104), Color(0xFF241D08), Color(0xFF3B2E0C))
     AccentColor.NEON_PINK -> Triple(Color(0xFF160611), Color(0xFF260A1D), Color(0xFF40102F))
@@ -44,7 +44,7 @@ private fun createDarkColorScheme(accentColor: AccentColor): ColorScheme {
 
 private fun createLightColorScheme(accentColor: AccentColor): ColorScheme {
   val (background, surface, surfaceVariant) = when (accentColor) {
-    AccentColor.TURQUOISE -> Triple(Color(0xFFF0FBF8), Color(0xFFFAFFFD), Color(0xFFDDF4EE))
+    AccentColor.TURQUOISE -> Triple(Color(0xFFF7F8F3), Color(0xFFFFFEFA), Color(0xFFE9EDE4))
     AccentColor.PURPLE -> Triple(Color(0xFFF7F2FF), Color(0xFFFFFBFF), Color(0xFFEDE1FF))
     AccentColor.CYBER_YELLOW -> Triple(Color(0xFFFFFAE8), Color(0xFFFFFDF5), Color(0xFFF8EDC7))
     AccentColor.NEON_PINK -> Triple(Color(0xFFFFF0F7), Color(0xFFFFFAFC), Color(0xFFF8DCEB))

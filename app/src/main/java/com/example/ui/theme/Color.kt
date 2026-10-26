@@ -3,30 +3,30 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Light Theme Palette
-val TempLightBackground = Color(0xFFF7F2FF)
-val TempLightSurface = Color(0xFFFFFBFF)
-val TempLightSurfaceVariant = Color(0xFFEDE1FF)
-val TempLightPrimary = Color(0xFF8B35D6) // Vivid violet
-val TempLightSecondary = Color(0xFF7137C8) // Deep violet
-val TempLightTertiary = Color(0xFFD13AAE) // Neon pink
+val TempLightBackground = Color(0xFFF7F8F3)
+val TempLightSurface = Color(0xFFFFFEFA)
+val TempLightSurfaceVariant = Color(0xFFE9EDE4)
+val TempLightPrimary = Color(0xFF6D8F22) // Geezo-inspired lime
+val TempLightSecondary = Color(0xFF527A24) // Muted leaf green
+val TempLightTertiary = Color(0xFF7A8B4D) // Soft olive
 val TempLightOnPrimary = Color(0xFFFFFFFF)
 val TempLightOnSecondary = Color(0xFFFFFFFF)
-val TempLightOnBackground = Color(0xFF21152F)
-val TempLightOnSurface = Color(0xFF241530)
-val TempLightOnSurfaceVariant = Color(0xFF796587)
+val TempLightOnBackground = Color(0xFF171B13)
+val TempLightOnSurface = Color(0xFF1B2116)
+val TempLightOnSurfaceVariant = Color(0xFF5D6654)
 
 // Dark Theme Palette
-val TempDarkBackground = Color(0xFF080414)
-val TempDarkSurface = Color(0xFF150923)
-val TempDarkSurfaceVariant = Color(0xFF28113D)
-val TempDarkPrimary = Color(0xFFB94DFF) // Neon violet
-val TempDarkSecondary = Color(0xFF873CFF) // Electric purple
-val TempDarkTertiary = Color(0xFFFF63D8) // Neon pink
-val TempDarkOnPrimary = Color(0xFF200032)
+val TempDarkBackground = Color(0xFF0C0F0A)
+val TempDarkSurface = Color(0xFF151A11)
+val TempDarkSurfaceVariant = Color(0xFF20271A)
+val TempDarkPrimary = Color(0xFFC5F45B) // Geezo-inspired lime
+val TempDarkSecondary = Color(0xFFA3CF43) // Leaf green
+val TempDarkTertiary = Color(0xFFE3F6B0) // Pale lime
+val TempDarkOnPrimary = Color(0xFF1A230C)
 val TempDarkOnSecondary = Color(0xFF17002C)
-val TempDarkOnBackground = Color(0xFFF8EEFF)
-val TempDarkOnSurface = Color(0xFFF8EEFF)
-val TempDarkOnSurfaceVariant = Color(0xFFC0A9D8)
+val TempDarkOnBackground = Color(0xFFF3F7EC)
+val TempDarkOnSurface = Color(0xFFF3F7EC)
+val TempDarkOnSurfaceVariant = Color(0xFFB8C2A9)
 
 // Visualizer & Wave Neon Gradients
 val NeonCyan = Color(0xFF6FE7FF)

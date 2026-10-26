@@ -442,7 +442,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.QueueMusic,
                             contentDescription = "Список воспроизведения",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -471,7 +471,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = "Папки",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -500,7 +500,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = "Плейлисты",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -529,7 +529,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Album,
                             contentDescription = "Альбомы",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -558,7 +558,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = "Исполнители",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 4) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -587,7 +587,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Поиск",
-                            tint = Color.Gray,
+                            tint = if (pagerState.currentPage == 5) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -612,7 +612,7 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
                                 contentDescription = "Меню",
-                                tint = Color.Gray
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -627,7 +627,7 @@ fun LibraryScreen(
                     ) {
                         DropdownMenuItem(
                             text = { Text("Эквалайзер") },
-                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showEqualizerDialog = true
@@ -635,7 +635,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Таймер сна") },
-                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = {
                                 moreMenuExpanded = false
                                 showSleepTimerDialog = true
@@ -643,7 +643,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сканировать") },
-                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = {
                                 moreMenuExpanded = false
                                 viewModel.scanMusic()
@@ -651,7 +651,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Сортировка") },
-                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = {
                                 moreMenuExpanded = false
                                 sortMenuExpanded = true
@@ -659,7 +659,7 @@ fun LibraryScreen(
                         )
                         DropdownMenuItem(
                             text = { Text("Настройки") },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                             onClick = {
                                 moreMenuExpanded = false
                                 onNavigateToSettings()

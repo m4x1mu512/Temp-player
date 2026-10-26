@@ -17,16 +17,16 @@ enum class AccentColor(
 ) {
     TURQUOISE(
         id = "turquoise",
-        displayName = "Бирюзовый",
-        previewColor = Color(0xFF00E5BC),
-        lightPrimary = Color(0xFF008F84),
+        displayName = "Лаймовый",
+        previewColor = Color(0xFFC5F45B),
+        lightPrimary = Color(0xFF6D8F22),
         lightOnPrimary = Color(0xFFFFFFFF),
-        darkPrimary = Color(0xFF00E5BC),
-        darkOnPrimary = Color(0xFF00382E),
-        lightSecondary = Color(0xFF6C4AB6),
-        darkSecondary = Color(0xFFBD7BFF),
-        lightTertiary = Color(0xFF0288D1),
-        darkTertiary = Color(0xFF38D9F9)
+        darkPrimary = Color(0xFFC5F45B),
+        darkOnPrimary = Color(0xFF1A230C),
+        lightSecondary = Color(0xFF527A24),
+        darkSecondary = Color(0xFFA3CF43),
+        lightTertiary = Color(0xFF7A8B4D),
+        darkTertiary = Color(0xFFE3F6B0)
     ),
     PURPLE(
         id = "purple",

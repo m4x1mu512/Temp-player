@@ -63,7 +63,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -208,20 +207,27 @@ fun MiniPlayer(
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Frosted glass background layer with blur, semi-transparent base, and horizontal gradient
+                // A single translucent surface avoids the inner blurred rectangle artifact.
+                // Compose blur() blurs this layer's own pixels, not the content behind it.
+                // Keep the album-derived tint subtle so the library remains visible around the player.
                 val horizontalGradient = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
                     colors = listOf(
-                        colorScheme.backgroundColor.copy(alpha = 0.35f),
-                        colorScheme.accentColor.copy(alpha = 0.20f),
-                        colorScheme.backgroundColor.copy(alpha = 0.35f)
+                        colorScheme.backgroundColor.copy(alpha = 0.76f),
+                        colorScheme.accentColor.copy(alpha = 0.14f),
+                        colorScheme.backgroundColor.copy(alpha = 0.76f)
                     )
                 )
 
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .blur(16.dp)
-                        .background(if (colorScheme.isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.15f))
+                        .background(
+                            if (colorScheme.isDark) {
+                                Color(0xFF11150D).copy(alpha = 0.20f)
+                            } else {
+                                Color(0xFFF7F8F3).copy(alpha = 0.26f)
+                            }
+                        )
                         .background(horizontalGradient)
                 )
 
