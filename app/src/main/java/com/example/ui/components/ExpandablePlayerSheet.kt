@@ -604,11 +604,6 @@ fun ExpandablePlayerSheet(
                 // Keep the tint translucent and avoid nested backgrounds that could
                 // create the lighter inset rectangle seen in earlier screenshots.
                 if (!isExpanded || animOffsetY.isRunning) {
-                    val glassTint = if (colorScheme.isDark) {
-                        Color(0xFF777B80)
-                    } else {
-                        Color(0xFFE9EBEE)
-                    }
                     val glassShape = RoundedCornerShape(
                         topStart = sheetCornerRadius,
                         topEnd = sheetCornerRadius
@@ -637,13 +632,22 @@ fun ExpandablePlayerSheet(
                                 }
                             )
                             .background(
-                                // A single translucent tint keeps the glass uniform; the
-                                // backdrop blur supplies depth without a visible inner band.
-                                color = colorScheme.accentColor
-                                    .copy(alpha = if (colorScheme.isDark) 0.12f else 0.10f)
-                                    .compositeOver(
-                                        glassTint.copy(alpha = if (colorScheme.isDark) 0.35f else 0.32f)
-                                    ),
+                                // A restrained album-derived gradient keeps the whole collapsed
+                                // surface translucent. Keep it on this exact clipped layer so the
+                                // tint cannot form a separate inset rectangle over the artwork/text.
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        colorScheme.backgroundColor.copy(
+                                            alpha = if (colorScheme.isDark) 0.30f else 0.25f
+                                        ),
+                                        colorScheme.accentColor.copy(
+                                            alpha = if (colorScheme.isDark) 0.17f else 0.12f
+                                        ),
+                                        colorScheme.backgroundColor.copy(
+                                            alpha = if (colorScheme.isDark) 0.30f else 0.25f
+                                        )
+                                    )
+                                ),
                                 shape = glassShape
                             )
                             .border(
