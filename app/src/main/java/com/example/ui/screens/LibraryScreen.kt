@@ -583,16 +583,6 @@ fun LibraryScreen(
                 }
             }
         },
-        bottomBar = {
-            if (currentTrack != null) {
-                Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp)
-                        .navigationBarsPadding()
-                )
-            }
-        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
