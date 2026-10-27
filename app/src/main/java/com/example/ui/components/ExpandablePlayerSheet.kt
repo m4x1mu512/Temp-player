@@ -668,7 +668,9 @@ fun ExpandablePlayerSheet(
                 val context = LocalContext.current
                 val miniArtSize = if (isLandscape) 50.dp else 54.dp
                 val miniArtX = if (isLandscape) 20.dp else 14.dp
-                val miniArtY = if (isLandscape) 4.dp else 5.dp
+                // Center the artwork vertically in the collapsed mini-player so its center
+                // has equal spacing to the top and bottom edges in both orientations.
+                val miniArtY = ((miniBarHeight - miniArtSize) / 2).coerceAtLeast(0.dp)
                 val miniCornerRadius = 12.dp
 
                 val statusBarsTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
