@@ -604,14 +604,19 @@ fun ExpandablePlayerSheet(
                 // Keep the tint translucent and avoid nested backgrounds that could
                 // create the lighter inset rectangle seen in earlier screenshots.
                 if (!isExpanded || animOffsetY.isRunning) {
+                    // The collapsed glass surface ends just below the progress bar,
+                    // leaving a small gap to the device's bottom edge. Round all four corners
+                    // only on this surface; the full player keeps its existing sheet geometry.
                     val glassShape = RoundedCornerShape(
                         topStart = sheetCornerRadius,
-                        topEnd = sheetCornerRadius
+                        topEnd = sheetCornerRadius,
+                        bottomStart = if (isExpanded) 0.dp else 18.dp,
+                        bottomEnd = if (isExpanded) 0.dp else 18.dp
                     )
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(collapsedVisibleHeight)
+                            .height((miniBarHeight - 16.dp).coerceAtLeast(60.dp))
                             .graphicsLayer {
                                 alpha = (1f - progressForDrawing()).coerceIn(0f, 1f)
                             }
