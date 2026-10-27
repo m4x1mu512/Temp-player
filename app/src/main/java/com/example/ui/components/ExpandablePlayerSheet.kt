@@ -316,9 +316,12 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        // Keep the collapsed mini-player compact and lift its bottom edge further.
-        val miniBarHeight = if (isLandscape) 64.dp else 68.dp
-        val collapsedVisibleHeight = miniBarHeight + navBarsBottom
+        // Match the collapsed mini-player height to a track row:
+        // 54dp artwork + 16dp vertical content padding + 6dp outer vertical padding = 76dp.
+        val miniBarHeight = 76.dp
+        // Leave a visible gap between the mini-player and the screen's bottom edge.
+        val miniPlayerBottomGap = 12.dp
+        val collapsedVisibleHeight = miniBarHeight + navBarsBottom + miniPlayerBottomGap
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
         val collapsedVisibleHeightPx = with(density) { collapsedVisibleHeight.toPx() }
