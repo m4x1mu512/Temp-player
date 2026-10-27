@@ -488,8 +488,11 @@ fun ExpandablePlayerSheet(
                             topEnd = drawCornerRadius
                         )
                         clip = true
+                        // The container spans the whole screen. Keep its shadow off while
+                        // collapsed so it cannot leave vertical shadow lines below the mini-player.
+                        // Restore the sheet shadow as it expands.
                         shadowElevation = with(density) {
-                            lerp(12.dp, 0.dp, drawProgress).toPx()
+                            lerp(0.dp, 12.dp, drawProgress).toPx()
                         }
                     }
                     .drawBehind {
@@ -503,12 +506,6 @@ fun ExpandablePlayerSheet(
                             drawRect(color = colorScheme.backgroundColor, alpha = backgroundAlpha)
                         }
                     }
-                    .border(
-                        border = if (!isExpanded || animOffsetY.isRunning) {
-                            if (!colorScheme.isDark) BorderStroke(1.dp, Color(0x18000000)) else BorderStroke(1.dp, Color(0x1AFFFFFF))
-                        } else BorderStroke(0.dp, Color.Transparent),
-                        shape = RoundedCornerShape(topStart = sheetCornerRadius, topEnd = sheetCornerRadius)
-                    )
                     .pointerInput(maxDragPx, isExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
