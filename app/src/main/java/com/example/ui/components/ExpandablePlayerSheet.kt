@@ -316,8 +316,8 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        // Raise the collapsed mini-player's bottom edge while keeping room for the progress bar.
-        val miniBarHeight = if (isLandscape) 72.dp else 76.dp
+        // Keep the collapsed mini-player compact and lift its bottom edge further.
+        val miniBarHeight = if (isLandscape) 64.dp else 68.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
@@ -617,7 +617,7 @@ fun ExpandablePlayerSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height((miniBarHeight - 16.dp).coerceAtLeast(52.dp))
+                            .height(miniBarHeight)
                             .graphicsLayer {
                                 alpha = (1f - progressForDrawing()).coerceIn(0f, 1f)
                             }
@@ -847,19 +847,8 @@ fun ExpandablePlayerSheet(
                 // 2. MINI PLAYER ELEMENTS (Visible when collapsed, smoothly fades out on expansion)
                 val miniAlpha = 1f
                 if (!isExpanded || animOffsetY.isRunning) {
-                    // Non-interactive playback progress at the bottom, below artwork, text and controls.
-                    MiniPlayerProgressFromFlow(
-                        positionFlow = positionFlow,
-                        duration = duration,
-                        isPlaying = isPlaying,
-                        accentColor = colorScheme.accentColor,
-                        trackColor = colorScheme.progressTrackColor,
-                        modifier = Modifier
-                            .offset(y = miniBarHeight - 20.dp)
-                            .padding(horizontal = 14.dp)
-                            .graphicsLayer { alpha = (1f - progressForDrawing() * 2.5f).coerceIn(0f, 1f) },
-                        alpha = miniAlpha
-                    )
+                    // The collapsed mini-player intentionally has no progress bar.
+
 
                     // Mini player clickable backdrop
                     Box(
