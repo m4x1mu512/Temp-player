@@ -316,7 +316,8 @@ fun ExpandablePlayerSheet(
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val navBarsBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        val miniBarHeight = if (isLandscape) 84.dp else 92.dp
+        // Raise the collapsed mini-player's bottom edge while keeping room for the progress bar.
+        val miniBarHeight = if (isLandscape) 72.dp else 76.dp
         val collapsedVisibleHeight = miniBarHeight + navBarsBottom
 
         val screenHeightPx = with(density) { screenHeight.toPx() }
@@ -616,7 +617,7 @@ fun ExpandablePlayerSheet(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height((miniBarHeight - 16.dp).coerceAtLeast(60.dp))
+                            .height((miniBarHeight - 16.dp).coerceAtLeast(52.dp))
                             .graphicsLayer {
                                 alpha = (1f - progressForDrawing()).coerceIn(0f, 1f)
                             }
