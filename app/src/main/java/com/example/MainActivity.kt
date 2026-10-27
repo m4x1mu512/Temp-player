@@ -347,7 +347,8 @@ fun AppNavigation(viewModel: MainViewModel) {
                     if (backdropSupported) {
                         Modifier
                             .layerBackdrop(appBackdrop)
-                            .background(MaterialTheme.colorScheme.surface)
+                            // Keep the backdrop source transparent so the collapsed player
+                            // reveals the actual library content instead of a solid theme-colored block.
                             .graphicsLayer()
                     } else {
                         Modifier
