@@ -678,9 +678,9 @@ fun LibraryScreen(
                     ) { page ->
                         when (page) {
                             0 -> {
-                                // 1. "Список воспроизведения" (Queue of tracks from current folder/album/artist/playlist)
-                                val queueToDisplay = if (currentQueue.isNotEmpty()) currentQueue else allTracksOrdered
-                                if (queueToDisplay.isEmpty()) {
+                                // "Все треки" always shows the full media library, not the active playback queue.
+                                val allLibraryTracks = allTracksOrdered
+                                if (allLibraryTracks.isEmpty()) {
                                     EmptyState(
                                         title = "Список воспроизведения пуст",
                                         message = "Выберите трек из папки, альбома, плейлиста или исполнителя",
@@ -691,30 +691,31 @@ fun LibraryScreen(
                                 } else {
                                     Box(modifier = Modifier.fillMaxSize()) {
                                         ReorderableTrackList(
-                                            tracks = queueToDisplay,
+                                            tracks = allLibraryTracks,
                                             currentTrack = currentTrack,
                                             isPlaying = isPlaying,
-                                            currentTrackIndex = currentQueueIndex.takeIf { currentQueue.isNotEmpty() },
+                                            currentTrackIndex = allLibraryTracks.indexOfFirst { it.id == currentTrack?.id }.takeIf { it >= 0 },
+                                            reorderEnabled = false,
                                             favoriteIds = favoriteIds,
                                             listState = queueListState,
                                             onPlayTrack = { track ->
                                                 viewModel.playTrack(
                                                     track = track,
-                                                    queue = queueToDisplay
+                                                    queue = allLibraryTracks
                                                 )
                                             },
                                             onToggleFavorite = onToggleFavoriteCallback,
                                             onAddToPlaylist = onAddToPlaylistCallback,
                                             onEditTrackInfo = onEditTrackInfoCallback,
-                                            onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) },
-                                            onRemoveFromQueue = { track -> viewModel.removeFromQueue(track) }
+                                            onMoveTrack = { _, _ -> },
+                                            onRemoveFromQueue = null
                                         )
 
                                         ScrollToCurrentTrackFab(
                                             currentTrack = currentTrack,
                                             isPlaying = isPlaying,
                                             onClick = {
-                                                val targetIndex = queueToDisplay.indexOfFirst { it.id == currentTrack?.id }
+                                                val targetIndex = allLibraryTracks.indexOfFirst { it.id == currentTrack?.id }
                                                 if (targetIndex >= 0) {
                                                     scrollToTrackSmooth(queueListState, targetIndex)
                                                 }
