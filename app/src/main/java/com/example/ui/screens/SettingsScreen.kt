@@ -244,7 +244,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AccentColor.values().forEach { accent ->
@@ -252,7 +252,7 @@ fun SettingsScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
-                                    .width(60.dp)
+                                    .width(72.dp)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
