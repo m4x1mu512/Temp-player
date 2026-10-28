@@ -1812,15 +1812,15 @@ private fun FoldersSection(
                     if (tracks.isNotEmpty()) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Button(
                                 onClick = { onPlayTrack(tracks.first(), tracks) },
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(40.dp)
+                                    .height(48.dp)
                                     .testTag("play_folder_button")
                             ) {
                                 Icon(
@@ -1828,15 +1828,42 @@ private fun FoldersSection(
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text("Слушать", style = MaterialTheme.typography.labelLarge)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Слушать",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { tracks.forEach(onAddToQueue) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .testTag("add_folder_to_queue_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QueueMusic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Добавить\\nв очередь",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    lineHeight = MaterialTheme.typography.labelSmall.lineHeight
+                                )
                             }
 
                             OutlinedButton(
                                 onClick = { onShuffleTracks(tracks) },
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
                                 modifier = Modifier
-                                    .height(40.dp)
+                                    .weight(1f)
+                                    .height(48.dp)
                                     .testTag("shuffle_folder_button")
                             ) {
                                 Icon(
@@ -1844,8 +1871,12 @@ private fun FoldersSection(
                                     contentDescription = "Перемешать",
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text("Случайно", style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    "Случайно",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 1
+                                )
                             }
                         }
                     }
