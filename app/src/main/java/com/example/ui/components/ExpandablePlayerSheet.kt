@@ -117,6 +117,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -171,6 +172,9 @@ fun ExpandablePlayerSheet(
     backdrop: com.kyant.backdrop.backdrops.LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
+    // Capture the app theme before the player applies its own album-derived color scheme.
+    val appUsesLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
 
@@ -273,6 +277,9 @@ fun ExpandablePlayerSheet(
         customColorLong = miniPlayerCustomColor,
         trackKey = "${track.id}_${track.title}_${track.albumArtUriString}"
     )
+
+    val useWhiteAlbumModeControls =
+        appUsesLightTheme && miniPlayerBgMode == com.example.ui.util.MiniPlayerBgMode.ALBUM_ART
 
     val playerMaterialColorScheme = remember(colorScheme) {
         if (colorScheme.isDark) {
@@ -882,7 +889,7 @@ fun ExpandablePlayerSheet(
                                 text = track.title,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = colorScheme.onSurfaceColor,
+                                color = if (useWhiteAlbumModeControls) Color.White else colorScheme.onSurfaceColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -1444,14 +1451,14 @@ fun ExpandablePlayerSheet(
                                         onClick = { viewModel.seekBackward10s() },
                                         modifier = Modifier.size(46.dp).testTag("player_seek_back_10")
                                     ) {
-                                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 сек", modifier = Modifier.size(26.dp))
+                                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 сек", tint = if (useWhiteAlbumModeControls) Color.White else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(26.dp))
                                     }
 
                                     IconButton(
                                         onClick = onButtonPreviousTrack,
                                         modifier = Modifier.size(52.dp).testTag("player_prev_button")
                                     ) {
-                                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", modifier = Modifier.size(34.dp))
+                                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (useWhiteAlbumModeControls) Color.White else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(34.dp))
                                     }
 
                                     FilledIconButton(
@@ -1485,14 +1492,14 @@ fun ExpandablePlayerSheet(
                                         onClick = onSwipeNextTrack,
                                         modifier = Modifier.size(52.dp).testTag("player_next_button")
                                     ) {
-                                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", modifier = Modifier.size(34.dp))
+                                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (useWhiteAlbumModeControls) Color.White else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(34.dp))
                                     }
 
                                     IconButton(
                                         onClick = { viewModel.seekForward10s() },
                                         modifier = Modifier.size(46.dp).testTag("player_seek_forward_10")
                                     ) {
-                                        Icon(Icons.Default.Forward10, contentDescription = "Вперед на 10 сек", modifier = Modifier.size(26.dp))
+                                        Icon(Icons.Default.Forward10, contentDescription = "Вперед на 10 сек", tint = if (useWhiteAlbumModeControls) Color.White else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(26.dp))
                                     }
                                 }
 
