@@ -141,6 +141,7 @@ import com.example.R
 import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.RepeatMode
 import com.example.data.model.Track
+import com.example.data.model.MiniPlayerBgMode
 import com.example.ui.screens.AudioSpecsBadge
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.theme.NeonCyan
@@ -279,7 +280,7 @@ fun ExpandablePlayerSheet(
     )
 
     val useWhiteAlbumModeControls =
-        appUsesLightTheme && miniPlayerBgMode == com.example.ui.util.MiniPlayerBgMode.ALBUM_ART
+        appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
 
     val playerMaterialColorScheme = remember(colorScheme) {
         if (colorScheme.isDark) {
