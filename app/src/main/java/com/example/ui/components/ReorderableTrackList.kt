@@ -44,6 +44,8 @@ fun ReorderableTrackList(
     onMoveTrack: (fromIndex: Int, toIndex: Int) -> Unit,
     modifier: Modifier = Modifier,
     onEditTrackInfo: ((Track) -> Unit)? = null,
+    onPlayNext: ((Track) -> Unit)? = null,
+    onAddToQueue: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = 80.dp)
 ) {
@@ -150,6 +152,8 @@ fun ReorderableTrackList(
                     onToggleFavorite = { onToggleFavorite(track.id) },
                     onAddToPlaylist = { onAddToPlaylist(track) },
                     onEditTrackInfo = { onEditTrackInfo?.invoke(track) },
+                    onPlayNext = onPlayNext?.let { callback -> { callback(track) } },
+                    onAddToQueue = onAddToQueue?.let { callback -> { callback(track) } },
                     showReorderHandle = true,
                     isDragging = isDragging,
                     reorderModifier = Modifier.draggableHandle(
