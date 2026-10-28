@@ -636,7 +636,10 @@ private fun AudioEffectsTabContent(
                     Switch(
                         checked = isReverbEnabled,
                         onCheckedChange = onReverbEnabledChanged,
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                        colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    )
                     )
                 }
 
@@ -880,7 +883,10 @@ private fun AudioEffectCard(
                 Switch(
                     checked = isEnabled,
                     onCheckedChange = onEnabledChange,
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.primary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                    )
                 )
             }
 
