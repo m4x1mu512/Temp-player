@@ -693,6 +693,7 @@ fun LibraryScreen(
                                             tracks = queueToDisplay,
                                             currentTrack = currentTrack,
                                             isPlaying = isPlaying,
+                                            currentTrackIndex = currentQueueIndex.takeIf { currentQueue.isNotEmpty() },
                                             favoriteIds = favoriteIds,
                                             listState = queueListState,
                                             onPlayTrack = { track ->
