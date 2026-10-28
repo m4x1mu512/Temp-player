@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -70,7 +72,9 @@ fun TrackListItem(
     isHighlighted: Boolean = false,
     showReorderHandle: Boolean = false,
     reorderModifier: Modifier = Modifier,
-    onEditTrackInfo: (() -> Unit)? = null
+    onEditTrackInfo: (() -> Unit)? = null,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -271,6 +275,26 @@ fun TrackListItem(
                                 onEditTrackInfo()
                             },
                             modifier = Modifier.testTag("menu_edit_info_${track.id}")
+                        )
+                    }
+                    if (onPlayNext != null) {
+                        DropdownMenuItem(
+                            text = { Text("Играть следующей") },
+                            leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onPlayNext()
+                            }
+                        )
+                    }
+                    if (onAddToQueue != null) {
+                        DropdownMenuItem(
+                            text = { Text("Добавить в очередь") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onAddToQueue()
+                            }
                         )
                     }
                     DropdownMenuItem(
