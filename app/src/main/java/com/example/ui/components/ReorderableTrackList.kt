@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,6 +49,7 @@ fun ReorderableTrackList(
     onAddToQueue: ((Track) -> Unit)? = null,
     onRemoveFromQueue: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
+    currentTrackIndex: Int? = null,
     contentPadding: PaddingValues = PaddingValues(bottom = 80.dp)
 ) {
     val haptic = LocalHapticFeedback.current
@@ -83,15 +85,19 @@ fun ReorderableTrackList(
     }
 
     val currentList = remember { mutableStateListOf<Track>().apply { addAll(tracks) } }
-
-    var dragStartTrackId by remember { mutableStateOf<Long?>(null) }
-    var dragStartIndex by remember { mutableStateOf<Int?>(null) }
+    // Stable per-row keys: unlike Track.id, these identify an occurrence in the list.
+    val entryKeys = remember { mutableStateListOf<Long>().apply { tracks.indices.forEach { add(it.toLong()) } } }
+    var nextEntryKey by remember { mutableLongStateOf(tracks.size.toLong()) }
+    var dragStartEntryKey by remember { mutableStateOf<Long?>(null) }
 
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = listState,
         scrollThresholdPadding = contentPadding
     ) { from, to ->
         currentList.apply {
+            add(to.index, removeAt(from.index))
+        }
+        entryKeys.apply {
             add(to.index, removeAt(from.index))
         }
         try {
@@ -106,6 +112,7 @@ fun ReorderableTrackList(
         if (!reorderableLazyListState.isAnyItemDragging) {
             while (currentList.size > tracks.size) {
                 currentList.removeAt(currentList.lastIndex)
+                if (entryKeys.isNotEmpty()) entryKeys.removeAt(entryKeys.lastIndex)
             }
 
             for (index in tracks.indices) {
@@ -116,6 +123,7 @@ fun ReorderableTrackList(
                     }
                 } else {
                     currentList.add(track)
+                    entryKeys.add(nextEntryKey++)
                 }
             }
         }
@@ -126,18 +134,13 @@ fun ReorderableTrackList(
         contentPadding = contentPadding,
         modifier = modifier.fillMaxSize()
     ) {
-        // A track can occur more than once in the playback queue (for example,
-        // when tracks are appended from overlapping folders and albums). Track IDs
-        // identify the audio file, not an individual queue entry, so add the
-        // occurrence number to make every LazyColumn/ReorderableItem key unique.
+        // Each occurrence has its own key, which travels with it during reordering.
         itemsIndexed(
             items = currentList,
-            key = { index, track ->
-                "${track.id}#${currentList.take(index).count { it.id == track.id }}"
-            },
+            key = { index, _ -> entryKeys[index] },
             contentType = { _, _ -> "track" }
         ) { index, track ->
-            val itemKey = "${track.id}#${currentList.take(index).count { it.id == track.id }}"
+            val itemKey = entryKeys[index]
             ReorderableItem(reorderableLazyListState, key = itemKey) { isDragging ->
                 val interactionSource = remember { MutableInteractionSource() }
                 val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "reorder_elevation")
@@ -152,8 +155,8 @@ fun ReorderableTrackList(
 
                 TrackListItem(
                     track = track,
-                    isCurrent = currentTrack?.id == track.id,
-                    isPlaying = isPlaying && currentTrack?.id == track.id,
+                    isCurrent = currentTrackIndex?.let { it == index } ?: (currentTrack?.id == track.id),
+                    isPlaying = isPlaying && (currentTrackIndex?.let { it == index } ?: (currentTrack?.id == track.id)),
                     isFavorite = favoriteIds.contains(track.id),
                     isHighlighted = highlightedTrackId != null && highlightedTrackId == track.id,
                     onClick = { onPlayTrack(track) },
@@ -169,18 +172,16 @@ fun ReorderableTrackList(
                         interactionSource = interactionSource,
                         onDragStarted = {
                             triggerVibration()
-                            dragStartTrackId = track.id
-                            dragStartIndex = currentList.indexOfFirst { it.id == track.id }
+                            dragStartEntryKey = entryKeys[index]
                         },
                         onDragStopped = {
-                            val startId = dragStartTrackId
-                            val from = dragStartIndex
-                            val to = if (startId != null) currentList.indexOfFirst { it.id == startId } else -1
-                            if (from != null && from != -1 && to != -1 && from != to) {
+                            val startKey = dragStartEntryKey
+                            val from = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
+                            val to = entryKeys.indexOf(itemKey)
+                            if (from >= 0 && to >= 0 && from != to) {
                                 onMoveTrack(from, to)
                             }
-                            dragStartTrackId = null
-                            dragStartIndex = null
+                            dragStartEntryKey = null
                         }
                     ),
                     modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp))
