@@ -126,12 +126,19 @@ fun ReorderableTrackList(
         contentPadding = contentPadding,
         modifier = modifier.fillMaxSize()
     ) {
+        // A track can occur more than once in the playback queue (for example,
+        // when tracks are appended from overlapping folders and albums). Track IDs
+        // identify the audio file, not an individual queue entry, so add the
+        // occurrence number to make every LazyColumn/ReorderableItem key unique.
         itemsIndexed(
             items = currentList,
-            key = { _, track -> track.id },
+            key = { index, track ->
+                "${track.id}#${currentList.take(index).count { it.id == track.id }}"
+            },
             contentType = { _, _ -> "track" }
         ) { index, track ->
-            ReorderableItem(reorderableLazyListState, key = track.id) { isDragging ->
+            val itemKey = "${track.id}#${currentList.take(index).count { it.id == track.id }}"
+            ReorderableItem(reorderableLazyListState, key = itemKey) { isDragging ->
                 val interactionSource = remember { MutableInteractionSource() }
                 val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "reorder_elevation")
 
