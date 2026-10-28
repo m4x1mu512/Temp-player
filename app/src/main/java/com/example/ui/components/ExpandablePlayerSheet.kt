@@ -1543,6 +1543,7 @@ fun ExpandablePlayerSheet(
         AddToPlaylistDialog(
             track = track,
             playlists = playlists,
+            getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
             onPlaylistSelected = { pl ->
                 viewModel.addTrackToPlaylist(pl.id, track.id)
                 showAddToPlaylistDialog = false
