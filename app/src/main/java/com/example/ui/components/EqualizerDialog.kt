@@ -197,6 +197,9 @@ fun EqualizerDialog(
                             Text(
                                 text = "Эквалайзер",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
                             )
                         },
@@ -209,6 +212,9 @@ fun EqualizerDialog(
                             Text(
                                 text = "Эффекты",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
                             )
                         },
@@ -221,6 +227,9 @@ fun EqualizerDialog(
                             Text(
                                 text = "Скорость",
                                 style = MaterialTheme.typography.labelLarge,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
                             )
                         },
