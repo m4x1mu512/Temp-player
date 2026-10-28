@@ -74,7 +74,8 @@ fun TrackListItem(
     reorderModifier: Modifier = Modifier,
     onEditTrackInfo: (() -> Unit)? = null,
     onPlayNext: (() -> Unit)? = null,
-    onAddToQueue: (() -> Unit)? = null
+    onAddToQueue: (() -> Unit)? = null,
+    onRemoveFromQueue: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -294,6 +295,16 @@ fun TrackListItem(
                             onClick = {
                                 menuExpanded = false
                                 onAddToQueue()
+                            }
+                        )
+                    }
+                    if (onRemoveFromQueue != null) {
+                        DropdownMenuItem(
+                            text = { Text("Удалить из очереди") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onRemoveFromQueue()
                             }
                         )
                     }
