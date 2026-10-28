@@ -351,11 +351,15 @@ fun LibraryScreen(
         }
     }
 
-    // StateFlow survives navigation away from LibraryScreen, so a queue-open request
-    // triggered while Settings is on top is handled when LibraryScreen is composed again.
+    // Opening the queue from the expanded player should only navigate to the queue tab.
+    // Keep queueListState untouched so the previously viewed scroll position is restored.
     LaunchedEffect(openQueueEvent) {
         if (openQueueEvent > 0) {
-            navigateToQueueAndScrollToCurrentTrack()
+            coroutineScope.launch {
+                if (pagerState.currentPage != 0) {
+                    pagerState.scrollToPage(0)
+                }
+            }
         }
     }
 
