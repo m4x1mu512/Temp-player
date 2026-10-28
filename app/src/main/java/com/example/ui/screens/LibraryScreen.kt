@@ -1321,104 +1321,111 @@ private fun GroupedListSection(
                 )
             }
 
-            // Hero Artist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
+            // Artist hero card follows the folder card layout.
             Card(
                 shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
                     .border(
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)),
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                         RoundedCornerShape(26.dp)
                     )
             ) {
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(14.dp)
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (distinctArtUris.isNotEmpty()) {
-                        FolderCoverCollage(
-                            artUris = distinctArtUris,
-                            size = 76.dp,
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (distinctArtUris.isNotEmpty()) {
+                            FolderCoverCollage(
+                                artUris = distinctArtUris,
+                                size = 76.dp,
+                                shape = RoundedCornerShape(18.dp)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp)
+                            Text(
+                                text = "ИСПОЛНИТЕЛЬ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = selectedTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${tracks.size} треков • $formattedTotalDuration",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = selectedTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Исполнитель",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        if (tracks.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = { onPlayTrack(tracks.first(), tracks) },
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("play_artist_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
-                                }
-
-                                OutlinedButton(
-                                    onClick = { onShuffleTracks(tracks) },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("shuffle_artist_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Перемешать",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                    if (tracks.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { onPlayTrack(tracks.first(), tracks) },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("play_artist_button")
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Слушать", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                            }
+                            OutlinedButton(
+                                onClick = { tracks.forEach(onAddToQueue) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("add_artist_to_queue_button")
+                            ) {
+                                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                            }
+                            OutlinedButton(
+                                onClick = { onShuffleTracks(tracks) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("shuffle_artist_button")
+                            ) {
+                                Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Случайно", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
                         }
                     }
@@ -2111,100 +2118,111 @@ private fun AlbumsSection(
                 )
             }
 
-            // Hero Album Card with Cover, Title, Artist and Play Actions
+            // Album hero card follows the folder card layout.
             Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(26.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        RoundedCornerShape(26.dp)
+                    )
             ) {
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(14.dp)
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val coverRequest = remember(albumArtUri) {
-                            ImageRequest.Builder(context)
-                                .data(albumArtUri ?: R.drawable.ic_default_art)
-                                .size(260, 260)
-                                .crossfade(150)
-                                .error(R.drawable.ic_default_art)
-                                .build()
+                        Box(
+                            modifier = Modifier
+                                .size(76.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val coverRequest = remember(albumArtUri) {
+                                ImageRequest.Builder(context)
+                                    .data(albumArtUri ?: R.drawable.ic_default_art)
+                                    .size(260, 260)
+                                    .crossfade(150)
+                                    .error(R.drawable.ic_default_art)
+                                    .build()
+                            }
+                            AsyncImage(
+                                model = coverRequest,
+                                contentDescription = "Обложка альбома $selectedTitle",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
                         }
-                        AsyncImage(
-                            model = coverRequest,
-                            contentDescription = "Обложка альбома $selectedTitle",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = "АЛЬБОМ",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = selectedTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "$artistName • ${tracks.size} треков • $formattedTotalDuration",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = selectedTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = artistName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        if (tracks.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = { onPlayTrack(tracks.first(), tracks) },
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("play_album_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
-                                }
-
-                                OutlinedButton(
-                                    onClick = { onShuffleTracks(tracks) },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("shuffle_album_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Перемешать",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                    if (tracks.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { onPlayTrack(tracks.first(), tracks) },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("play_album_button")
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Слушать", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                            }
+                            OutlinedButton(
+                                onClick = { tracks.forEach(onAddToQueue) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("add_album_to_queue_button")
+                            ) {
+                                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                            }
+                            OutlinedButton(
+                                onClick = { onShuffleTracks(tracks) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("shuffle_album_button")
+                            ) {
+                                Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Случайно", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
                         }
                     }
@@ -2520,107 +2538,120 @@ private fun PlaylistsSection(
                 )
             }
 
-            // Hero Playlist Card with Collage/Icon, Title, Subtitle, Track count, Total duration and Play Actions
+            // Playlist hero card follows the folder card layout.
             Card(
                 shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .border(
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                        RoundedCornerShape(26.dp)
+                    )
             ) {
-                Row(
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier.padding(14.dp)
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (distinctArtUris.isNotEmpty()) {
-                        FolderCoverCollage(
-                            artUris = distinctArtUris,
-                            size = 76.dp,
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .size(76.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(
-                                    if (selectedCategoryTitle == "Избранное") FavoriteRed.copy(alpha = 0.15f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                ),
-                            contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (distinctArtUris.isNotEmpty()) {
+                            FolderCoverCollage(
+                                artUris = distinctArtUris,
+                                size = 76.dp,
+                                shape = RoundedCornerShape(18.dp)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(
+                                        if (selectedCategoryTitle == "Избранное") FavoriteRed.copy(alpha = 0.15f)
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when (selectedCategoryTitle) {
+                                        "Избранное" -> Icons.Default.Favorite
+                                        "Все треки" -> Icons.Default.MusicNote
+                                        else -> Icons.Default.QueueMusic
+                                    },
+                                    contentDescription = null,
+                                    tint = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(
-                                imageVector = when (selectedCategoryTitle) {
-                                    "Избранное" -> Icons.Default.Favorite
-                                    "Все треки" -> Icons.Default.MusicNote
-                                    else -> Icons.Default.QueueMusic
-                                },
-                                contentDescription = null,
-                                tint = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(36.dp)
+                            Text(
+                                text = subtitle.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${tracks.size} треков • $formattedTotalDuration",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Треков: ${tracks.size} • $formattedTotalDuration",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        if (tracks.isNotEmpty()) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = { onPlayTrack(tracks.first(), tracks) },
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("play_playlist_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Слушать", style = MaterialTheme.typography.labelMedium)
-                                }
-
-                                OutlinedButton(
-                                    onClick = { onShuffleTracks(tracks) },
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier
-                                        .height(34.dp)
-                                        .testTag("shuffle_playlist_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Shuffle,
-                                        contentDescription = "Перемешать",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
+                    if (tracks.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = { onPlayTrack(tracks.first(), tracks) },
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("play_playlist_button")
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Слушать", style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                            }
+                            OutlinedButton(
+                                onClick = { tracks.forEach(onAddToQueue) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 2.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("add_playlist_to_queue_button")
+                            ) {
+                                Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                            }
+                            OutlinedButton(
+                                onClick = { onShuffleTracks(tracks) },
+                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+                                modifier = Modifier.weight(1f).height(48.dp).testTag("shuffle_playlist_button")
+                            ) {
+                                Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Случайно", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                             }
                         }
                     }
