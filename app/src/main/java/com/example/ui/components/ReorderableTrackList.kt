@@ -89,6 +89,7 @@ fun ReorderableTrackList(
     val entryKeys = remember { mutableStateListOf<Long>().apply { tracks.indices.forEach { add(it.toLong()) } } }
     var nextEntryKey by remember { mutableLongStateOf(tracks.size.toLong()) }
     var dragStartEntryKey by remember { mutableStateOf<Long?>(null) }
+    var dragStartIndex by remember { mutableStateOf<Int?>(null) }
 
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -173,15 +174,17 @@ fun ReorderableTrackList(
                         onDragStarted = {
                             triggerVibration()
                             dragStartEntryKey = entryKeys[index]
+                            dragStartIndex = index
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
-                            val from = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
-                            val to = entryKeys.indexOf(itemKey)
+                            val from = dragStartIndex ?: -1
+                            val to = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
                             if (from >= 0 && to >= 0 && from != to) {
                                 onMoveTrack(from, to)
                             }
                             dragStartEntryKey = null
+                            dragStartIndex = null
                         }
                     ),
                     modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp))
