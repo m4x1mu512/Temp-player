@@ -50,6 +50,7 @@ fun ReorderableTrackList(
     onRemoveFromQueue: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
     currentTrackIndex: Int? = null,
+    reorderEnabled: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(bottom = 80.dp)
 ) {
     val haptic = LocalHapticFeedback.current
@@ -167,9 +168,9 @@ fun ReorderableTrackList(
                     onPlayNext = onPlayNext?.let { callback -> { callback(track) } },
                     onAddToQueue = onAddToQueue?.let { callback -> { callback(track) } },
                     onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(track) } },
-                    showReorderHandle = true,
+                    showReorderHandle = reorderEnabled,
                     isDragging = isDragging,
-                    reorderModifier = Modifier.draggableHandle(
+                    reorderModifier = if (reorderEnabled) Modifier.draggableHandle(
                         interactionSource = interactionSource,
                         onDragStarted = {
                             triggerVibration()
@@ -186,7 +187,7 @@ fun ReorderableTrackList(
                             dragStartEntryKey = null
                             dragStartIndex = null
                         }
-                    ),
+                    ) else Modifier,
                     modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp))
                 )
             }
