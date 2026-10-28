@@ -705,6 +705,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.setQueue(queue)
     }
 
+    fun removeFromQueue(track: Track) {
+        playbackManager.removeTrackFromQueue(track)
+    }
+
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
         if (playbackManager.queue.value.isEmpty() && allTracksOrdered.value.isNotEmpty()) {
             playbackManager.setQueue(allTracksOrdered.value)
