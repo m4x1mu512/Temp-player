@@ -2432,7 +2432,7 @@ private fun PlaylistsSection(
         val subtitle = when {
             selectedCategoryTitle == "Все треки" -> "Вся медиатека"
             selectedCategoryTitle == "Избранное" -> "Любимые композиции"
-            else -> "Пользовательский плейлист"
+            else -> "Плейлист"
         }
 
         val customPlaylistTracks = if (selectedPlaylist != null) {
