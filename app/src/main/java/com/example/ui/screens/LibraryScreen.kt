@@ -1273,6 +1273,7 @@ private fun GroupedListSection(
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
+    val overviewListState = rememberLazyListState()
     AnimatedContent(
         targetState = selectedTitle != null,
         transitionSpec = DrilldownSharedAxisTransition,
@@ -1474,6 +1475,7 @@ private fun GroupedListSection(
         val groupKeys = remember(groups) { groups.keys.toList() }
         val context = LocalContext.current
         LazyColumn(
+            state = overviewListState,
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
         ) {
@@ -1702,6 +1704,7 @@ private fun FoldersSection(
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
+    val overviewListState = rememberLazyListState()
     AnimatedContent(
         targetState = selectedTitle != null,
         transitionSpec = DrilldownSharedAxisTransition,
@@ -1911,6 +1914,7 @@ private fun FoldersSection(
         } else {
             val folderKeys = remember(folderGroups) { folderGroups.keys.toList() }
             LazyColumn(
+                state = overviewListState,
                 contentPadding = PaddingValues(bottom = 80.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
@@ -2024,6 +2028,7 @@ private fun AlbumsSection(
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     val context = LocalContext.current
+    val overviewGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
     AnimatedContent(
         targetState = selectedTitle != null,
@@ -2237,6 +2242,7 @@ private fun AlbumsSection(
         } else {
             val albumKeys = remember(albumGroups) { albumGroups.keys.toList() }
             LazyVerticalGrid(
+                state = overviewGridState,
                 columns = GridCells.Adaptive(minSize = 150.dp),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -2403,6 +2409,7 @@ private fun PlaylistsSection(
     onMovePlaylistTrack: (Long, Int, Int) -> Unit = { _, _, _ -> },
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
+    val overviewListState = rememberLazyListState()
     val isDrilldown = selectedCategoryTitle != null || selectedPlaylist != null
 
     AnimatedContent(
@@ -2662,6 +2669,7 @@ private fun PlaylistsSection(
         }
 
         LazyColumn(
+            state = overviewListState,
             contentPadding = PaddingValues(bottom = 80.dp),
             modifier = Modifier.fillMaxSize()
         ) {
