@@ -1283,6 +1283,7 @@ fun PlayerScreen(
         AddToPlaylistDialog(
             track = currentTrack!!,
             playlists = playlists,
+            getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
             onPlaylistSelected = { pl ->
                 viewModel.addTrackToPlaylist(pl.id, currentTrack!!.id)
                 showAddToPlaylistDialog = false
