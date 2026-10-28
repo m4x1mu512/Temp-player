@@ -696,12 +696,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playNext(track: Track) {
-        val queue = playbackManager.queue.value.toMutableList()
-        val currentTrack = playbackManager.currentTrack.value
-        val currentIndex = if (currentTrack != null) queue.indexOfFirst { it.id == currentTrack.id } else -1
-        val insertIndex = if (currentIndex >= 0) currentIndex + 1 else 0
-        queue.add(insertIndex.coerceIn(0, queue.size), track)
-        playbackManager.setQueue(queue)
+        playbackManager.addTrackNext(track)
     }
 
     fun addToQueue(track: Track) {
