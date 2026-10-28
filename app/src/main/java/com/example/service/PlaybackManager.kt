@@ -1081,6 +1081,51 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
+    fun addTrackNext(track: Track) {
+        val queue = _queue.value.toMutableList()
+        val currentTrack = _currentTrack.value
+        val currentIndex = if (currentTrack != null) queue.indexOfFirst { it.id == currentTrack.id } else -1
+        val insertIndex = if (currentIndex >= 0) currentIndex + 1 else 0
+        queue.add(insertIndex.coerceIn(0, queue.size), track)
+        _queue.value = queue
+
+        if (currentTrack != null) {
+            _queueIndex.value = queue.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
+        } else if (_queueIndex.value < 0) {
+            _queueIndex.value = -1
+        }
+
+        if (_isShuffle.value) {
+            val currentQueueIndex = _queueIndex.value
+            val previousShuffleOrder = shuffleIndices.toMutableList()
+            val previousCurrentPosition = previousShuffleOrder.indexOf(currentQueueIndex)
+            val insertedQueueIndex = insertIndex.coerceIn(0, queue.lastIndex)
+            val adjustedOrder = previousShuffleOrder
+                .map { if (it >= insertedQueueIndex) it + 1 else it }
+                .filter { it in queue.indices }
+                .toMutableList()
+            adjustedOrder.remove(insertedQueueIndex)
+            val currentPosition = adjustedOrder.indexOf(currentQueueIndex)
+            if (currentQueueIndex in queue.indices) {
+                if (currentPosition >= 0) {
+                    adjustedOrder.add(currentPosition + 1, insertedQueueIndex)
+                    shufflePosition = currentPosition
+                } else {
+                    adjustedOrder.add(0, currentQueueIndex)
+                    adjustedOrder.add(1.coerceAtMost(adjustedOrder.size), insertedQueueIndex)
+                    shufflePosition = 0
+                }
+            } else {
+                adjustedOrder.add(0, insertedQueueIndex)
+                shufflePosition = -1
+            }
+            val remaining = queue.indices.filter { it !in adjustedOrder }
+            adjustedOrder.addAll(remaining.shuffled())
+            shuffleIndices = adjustedOrder
+        }
+        saveCurrentState()
+    }
+
     fun setQueue(newQueue: List<Track>) {
         _queue.value = newQueue
         val currentPlaying = _currentTrack.value
