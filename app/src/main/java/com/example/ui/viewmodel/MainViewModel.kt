@@ -351,6 +351,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = SettingsDataStore.getInitialThemeMode(application)
     )
 
+    val globalBackgroundEnabled: StateFlow<Boolean> = settingsDataStore.globalBackgroundEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
+    )
+
     val accentColor: StateFlow<AccentColor> = settingsDataStore.accentColorFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -874,6 +880,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
             settingsDataStore.setThemeMode(mode)
+        }
+    }
+
+    fun setGlobalBackgroundEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setGlobalBackgroundEnabled(enabled)
         }
     }
 
