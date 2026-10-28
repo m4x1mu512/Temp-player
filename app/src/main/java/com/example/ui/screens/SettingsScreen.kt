@@ -100,6 +100,7 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+    val globalBackgroundEnabled by viewModel.globalBackgroundEnabled.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
@@ -211,6 +212,32 @@ fun SettingsScreen(
                                 )
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "Общий фон",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (globalBackgroundEnabled) "Использовать цвет выбранного акцента" else "Белый или чёрный фон без акцентного оттенка",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = globalBackgroundEnabled,
+                            onCheckedChange = { viewModel.setGlobalBackgroundEnabled(it) },
+                            modifier = Modifier.testTag("global_background_toggle_switch")
+                        )
                     }
                 }
             }
