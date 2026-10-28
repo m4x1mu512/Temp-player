@@ -1126,6 +1126,28 @@ class PlaybackManager private constructor(private val context: Context) {
         saveCurrentState()
     }
 
+    fun removeTrackFromQueue(track: Track) {
+        val currentQueue = _queue.value
+        val removeIndex = currentQueue.indexOfFirst { it.id == track.id }
+        if (removeIndex < 0) return
+
+        val currentTrackId = _currentTrack.value?.id
+        val updatedQueue = currentQueue.toMutableList().apply { removeAt(removeIndex) }
+        _queue.value = updatedQueue
+
+        val newCurrentIndex = if (currentTrackId != null) {
+            updatedQueue.indexOfFirst { it.id == currentTrackId }
+        } else {
+            -1
+        }
+        _queueIndex.value = newCurrentIndex
+
+        if (_isShuffle.value) {
+            rebuildShuffleOrder(newCurrentIndex)
+        }
+        saveCurrentState()
+    }
+
     fun setQueue(newQueue: List<Track>) {
         _queue.value = newQueue
         val currentPlaying = _currentTrack.value
