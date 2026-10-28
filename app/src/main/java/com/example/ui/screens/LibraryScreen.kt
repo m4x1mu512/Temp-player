@@ -1334,19 +1334,19 @@ private fun GroupedListSection(
                     )
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp)
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.padding(14.dp)
                 ) {
                     if (distinctArtUris.isNotEmpty()) {
                         FolderCoverCollage(
                             artUris = distinctArtUris,
-                            size = 104.dp,
+                            size = 76.dp,
                             shape = RoundedCornerShape(20.dp)
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(104.dp)
+                                .size(76.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center
@@ -1355,7 +1355,7 @@ private fun GroupedListSection(
                                 imageVector = icon,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
@@ -2089,13 +2089,13 @@ private fun AlbumsSection(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                     modifier = Modifier.padding(14.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(92.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .size(76.dp)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant),
                         contentAlignment = Alignment.Center
                     ) {
@@ -2498,19 +2498,19 @@ private fun PlaylistsSection(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(16.dp)
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier.padding(14.dp)
                 ) {
                     if (distinctArtUris.isNotEmpty()) {
                         FolderCoverCollage(
                             artUris = distinctArtUris,
-                            size = 104.dp,
+                            size = 76.dp,
                             shape = RoundedCornerShape(20.dp)
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(104.dp)
+                                .size(76.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(
                                     if (selectedCategoryTitle == "Избранное") FavoriteRed.copy(alpha = 0.15f)
@@ -2526,7 +2526,7 @@ private fun PlaylistsSection(
                                 },
                                 contentDescription = null,
                                 tint = if (selectedCategoryTitle == "Избранное") FavoriteRed else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(44.dp)
+                                modifier = Modifier.size(36.dp)
                             )
                         }
                     }
