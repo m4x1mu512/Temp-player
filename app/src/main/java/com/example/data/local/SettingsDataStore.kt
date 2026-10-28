@@ -105,6 +105,7 @@ class SettingsDataStore(private val context: Context) {
 
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
+        private val KEY_GLOBAL_BACKGROUND_ENABLED = booleanPreferencesKey("global_background_enabled")
         private val KEY_VISUALIZER_ENABLED = booleanPreferencesKey("visualizer_enabled")
         private val KEY_VISUALIZER_MODE = stringPreferencesKey("visualizer_mode")
         private val KEY_VISUALIZER_BANDS = intPreferencesKey("visualizer_bands")
@@ -335,6 +336,10 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    val globalBackgroundEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_GLOBAL_BACKGROUND_ENABLED] ?: true
+    }
+
     val accentColorFlow: Flow<AccentColor> = context.dataStore.data.map { preferences ->
         val name = preferences[KEY_ACCENT_COLOR]
         if (name != null) {
@@ -463,6 +468,12 @@ class SettingsDataStore(private val context: Context) {
         saveCachedThemeMode(context, mode)
         context.dataStore.edit { preferences ->
             preferences[KEY_THEME_MODE] = mode.name
+        }
+    }
+
+    suspend fun setGlobalBackgroundEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_GLOBAL_BACKGROUND_ENABLED] = enabled
         }
     }
 
