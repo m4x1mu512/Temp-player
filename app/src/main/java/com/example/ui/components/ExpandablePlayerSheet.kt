@@ -516,6 +516,21 @@ fun ExpandablePlayerSheet(
                     .pointerInput(maxDragPx, isExpanded) {
                         awaitEachGesture {
                             val down = awaitFirstDown(pass = PointerEventPass.Initial, requireUnconsumed = false)
+
+                            // When collapsed, this full-screen layer is translated over the
+                            // library list. Only the visible mini-player strip may initiate a
+                            // player gesture; otherwise an upward scroll of the queue can be
+                            // mistaken for a swipe-to-expand and open the player.
+                            val miniBarHeightPx = with(density) { miniBarHeight.toPx() }
+                            if (!isExpanded &&
+                                (down.position.y < 0f || down.position.y > miniBarHeightPx)
+                            ) {
+                                do {
+                                    val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                } while (event.changes.any { it.pressed })
+                                return@awaitEachGesture
+                            }
+
                             val velocityTracker = VelocityTracker()
                             velocityTracker.addPosition(down.uptimeMillis, down.position)
                             var totalDragX = 0f
