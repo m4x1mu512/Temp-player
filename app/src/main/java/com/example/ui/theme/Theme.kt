@@ -71,6 +71,7 @@ private fun createLightColorScheme(accentColor: AccentColor): ColorScheme {
 fun MyApplicationTheme(
   themeMode: ThemeMode = ThemeMode.SYSTEM,
   accentColor: AccentColor = AccentColor.TURQUOISE,
+  globalBackgroundEnabled: Boolean = true,
   darkTheme: Boolean = when (themeMode) {
     ThemeMode.LIGHT -> false
     ThemeMode.DARK -> true
@@ -80,8 +81,20 @@ fun MyApplicationTheme(
 ) {
   // Rebuilt two color schemes (7 Triple allocations each) on every recomposition of the
   // theme wrapper, i.e. on every frame of any animation driven through it.
-  val colorScheme = remember(darkTheme, accentColor) {
-    if (darkTheme) createDarkColorScheme(accentColor) else createLightColorScheme(accentColor)
+  val colorScheme = remember(darkTheme, accentColor, globalBackgroundEnabled) {
+    val accentScheme = if (darkTheme) {
+      createDarkColorScheme(accentColor)
+    } else {
+      createLightColorScheme(accentColor)
+    }
+    if (globalBackgroundEnabled) {
+      accentScheme
+    } else {
+      accentScheme.copy(
+        background = if (darkTheme) Color.Black else Color.White,
+        onBackground = if (darkTheme) Color.White else Color.Black
+      )
+    }
   }
 
   val view = LocalView.current
