@@ -1391,7 +1391,7 @@ fun ExpandablePlayerSheet(
                                         Icon(
                                             imageVector = if (isCurrentTrackFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                             contentDescription = if (isCurrentTrackFavorite) "Удалить из избранного" else "В избранное",
-                                            tint = favoriteHeartColor,
+                                            tint = if (isCurrentTrackFavorite) FavoriteRed else colorScheme.onSurfaceVariantColor,
                                             modifier = Modifier.graphicsLayer {
                                                 scaleX = favoriteHeartScale
                                                 scaleY = favoriteHeartScale
