@@ -131,6 +131,15 @@ fun ReorderableTrackList(
         }
     }
 
+    // Some lists (for example playlists containing the same track more than once)
+    // do not have a playback-queue index. In that case, highlight only the first matching
+    // occurrence instead of marking every row with the same media ID as currently playing.
+    val firstMatchingCurrentTrackIndex = if (currentTrackIndex == null && currentTrack != null) {
+        currentList.indexOfFirst { it.id == currentTrack.id }
+    } else {
+        -1
+    }
+
     LazyColumn(
         state = listState,
         contentPadding = contentPadding,
@@ -157,8 +166,16 @@ fun ReorderableTrackList(
 
                 TrackListItem(
                     track = track,
-                    isCurrent = currentTrackIndex?.let { it == index } ?: (currentTrack?.id == track.id),
-                    isPlaying = isPlaying && (currentTrackIndex?.let { it == index } ?: (currentTrack?.id == track.id)),
+                    isCurrent = if (currentTrackIndex != null) {
+                        currentTrackIndex == index
+                    } else {
+                        index == firstMatchingCurrentTrackIndex
+                    },
+                    isPlaying = isPlaying && if (currentTrackIndex != null) {
+                        currentTrackIndex == index
+                    } else {
+                        index == firstMatchingCurrentTrackIndex
+                    },
                     isFavorite = favoriteIds.contains(track.id),
                     isHighlighted = highlightedTrackId != null && highlightedTrackId == track.id,
                     onClick = { onPlayTrack(track) },
