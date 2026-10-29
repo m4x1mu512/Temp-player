@@ -2729,8 +2729,8 @@ private fun PlaylistsSection(
                         onToggleFavorite = { onToggleFavorite(it) },
                         onAddToPlaylist = { onAddToPlaylist(it) },
                         onEditTrackInfo = { onEditTrackInfo(it) },
-                        onPlayNext = if (selectedPlaylist != null) onPlayNext else null,
-                        onAddToQueue = if (selectedPlaylist != null) onAddToQueue else null,
+                        onPlayNext = onPlayNext,
+                        onAddToQueue = onAddToQueue,
                         onRemoveFromPlaylist = if (selectedPlaylist != null) { track -> onRemovePlaylistTrack(selectedPlaylist.id, track.id) } else null,
                         onMoveTrack = onMoveItem,
                         modifier = Modifier.fillMaxSize()
