@@ -1166,16 +1166,25 @@ class PlaybackManager private constructor(private val context: Context) {
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
         val current = _queue.value.toMutableList()
         if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
-        val currentPlaying = _currentTrack.value
+
+        // The active queue occurrence is identified by its index, not Track.id:
+        // the same media file can appear more than once in the queue.
+        val previousCurrentIndex = _queueIndex.value
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         _queue.value = current
-        if (currentPlaying != null) {
-            val newIdx = current.indexOfFirst { it.id == currentPlaying.id }
-            if (newIdx >= 0) {
-                _queueIndex.value = newIdx
-            }
+
+        val adjustedCurrentIndex = when {
+            previousCurrentIndex !in current.indices -> previousCurrentIndex
+            previousCurrentIndex == fromIndex -> toIndex
+            fromIndex < previousCurrentIndex && toIndex >= previousCurrentIndex -> previousCurrentIndex - 1
+            fromIndex > previousCurrentIndex && toIndex <= previousCurrentIndex -> previousCurrentIndex + 1
+            else -> previousCurrentIndex
         }
+        if (adjustedCurrentIndex in current.indices) {
+            _queueIndex.value = adjustedCurrentIndex
+        }
+
         if (_isShuffle.value) {
             rebuildShuffleOrder(_queueIndex.value)
         }
