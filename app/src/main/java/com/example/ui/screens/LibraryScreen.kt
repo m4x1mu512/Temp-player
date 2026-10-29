@@ -2039,16 +2039,22 @@ private fun FoldersSection(
 
                             Box(
                                 modifier = Modifier
-                                    .size(34.dp)
+                                    .size(44.dp)
                                     .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                    .clickable {
+                                        if (folderTracks.isNotEmpty()) {
+                                            onPlayTrack(folderTracks.first(), folderTracks)
+                                        }
+                                    }
+                                    .testTag("play_folder_$folderName"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "Открыть папку",
+                                    contentDescription = "Воспроизвести папку",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(19.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
