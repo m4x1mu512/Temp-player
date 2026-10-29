@@ -399,12 +399,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                         EnterTransition.None
                     } else slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-                        initialOffset = { -(it * 0.16f).toInt() }
-                    ) + scaleIn(
-                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-                        initialScale = 0.94f
-                    ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
+                        animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
+                        initialOffset = { -(it * 0.08f).toInt() }
+                    ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing))
                 }
             ) {
                 LibraryScreen(
@@ -419,24 +416,18 @@ fun AppNavigation(viewModel: MainViewModel) {
                 enterTransition = {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-                        initialOffset = { (it * 0.18f).toInt() }
-                    ) + scaleIn(
-                        animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-                        initialScale = 0.92f
-                    ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing))
+                        animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
+                        initialOffset = { (it * 0.08f).toInt() }
+                    ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing))
                 },
                 exitTransition = {
                     if (openingQueueFromPlayer) {
                         ExitTransition.None
                     } else slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Start,
-                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                        targetOffset = { -(it * 0.14f).toInt() }
-                    ) + scaleOut(
-                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                        targetScale = 0.94f
-                    ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
+                        animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
+                        targetOffset = { -(it * 0.06f).toInt() }
+                    ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
                 },
                 popEnterTransition = {
                     slideIntoContainer(
@@ -453,12 +444,9 @@ fun AppNavigation(viewModel: MainViewModel) {
                         ExitTransition.None
                     } else slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.End,
-                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                        targetOffset = { (it * 0.18f).toInt() }
-                    ) + scaleOut(
-                        animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                        targetScale = 0.92f
-                    ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
+                        animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
+                        targetOffset = { (it * 0.08f).toInt() }
+                    ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
                 }
             ) {
                 SettingsScreen(
