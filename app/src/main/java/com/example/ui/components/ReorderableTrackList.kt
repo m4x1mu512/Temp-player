@@ -49,6 +49,7 @@ fun ReorderableTrackList(
     onPlayNext: ((Track) -> Unit)? = null,
     onAddToQueue: ((Track) -> Unit)? = null,
     onRemoveFromQueue: ((Track) -> Unit)? = null,
+    onRemoveFromPlaylist: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
     currentTrackIndex: Int? = null,
     reorderEnabled: Boolean = true,
@@ -190,6 +191,7 @@ fun ReorderableTrackList(
                     onPlayNext = onPlayNext?.let { callback -> { callback(track) } },
                     onAddToQueue = onAddToQueue?.let { callback -> { callback(track) } },
                     onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(track) } },
+                    onRemoveFromPlaylist = onRemoveFromPlaylist?.let { callback -> { callback(track) } },
                     showReorderHandle = reorderEnabled,
                     isDragging = isDragging,
                     reorderModifier = if (reorderEnabled) Modifier.draggableHandle(
