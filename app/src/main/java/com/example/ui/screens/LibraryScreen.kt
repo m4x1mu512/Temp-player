@@ -1243,28 +1243,27 @@ fun LibraryScreen(
 
 private val DrilldownSharedAxisTransition: androidx.compose.animation.AnimatedContentTransitionScope<Boolean>.() -> androidx.compose.animation.ContentTransform = {
     if (targetState) {
-        // Lightweight detail entry: a short fade with a subtle horizontal movement.
-        (slideInHorizontally(
-            animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
-            initialOffsetX = { (it * 0.08f).toInt() }
-        ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing)))
-            .togetherWith(
-                slideOutHorizontally(
-                    animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
-                    targetOffsetX = { -(it * 0.06f).toInt() }
-                ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
+        // Push: the detail screen enters directly from the right; the overview moves left.
+        slideInHorizontally(
+            animationSpec = tween(180, easing = FastOutSlowInEasing),
+            initialOffsetX = { it }
+        ).togetherWith(
+            slideOutHorizontally(
+                animationSpec = tween(180, easing = FastOutSlowInEasing),
+                targetOffsetX = { -it }
             )
+        )
     } else {
-        (slideInHorizontally(
-            animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
-            initialOffsetX = { -(it * 0.06f).toInt() }
-        ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing)))
-            .togetherWith(
-                slideOutHorizontally(
-                    animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
-                    targetOffsetX = { (it * 0.08f).toInt() }
-                ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
+        // Pop: the detail screen leaves to the right while the overview returns from the left.
+        slideInHorizontally(
+            animationSpec = tween(180, easing = FastOutSlowInEasing),
+            initialOffsetX = { -it }
+        ).togetherWith(
+            slideOutHorizontally(
+                animationSpec = tween(180, easing = FastOutSlowInEasing),
+                targetOffsetX = { it }
             )
+        )
     }
 }
 
