@@ -91,6 +91,7 @@ fun ReorderableTrackList(
     var nextEntryKey by remember { mutableLongStateOf(tracks.size.toLong()) }
     var dragStartEntryKey by remember { mutableStateOf<Long?>(null) }
     var dragStartIndex by remember { mutableStateOf<Int?>(null) }
+    var dragInProgress by remember { mutableStateOf(false) }
 
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -110,8 +111,8 @@ fun ReorderableTrackList(
     // Synchronize without allocating temporary ID lists. Also refresh Track objects
     // when their IDs/order stay the same but metadata (title, artist, art URI) changes.
     // The effect runs only when the source list changes, never on drag animation frames.
-    LaunchedEffect(tracks) {
-        if (!reorderableLazyListState.isAnyItemDragging) {
+    LaunchedEffect(tracks, dragInProgress) {
+        if (!dragInProgress && !reorderableLazyListState.isAnyItemDragging) {
             while (currentList.size > tracks.size) {
                 currentList.removeAt(currentList.lastIndex)
                 if (entryKeys.isNotEmpty()) entryKeys.removeAt(entryKeys.lastIndex)
@@ -190,6 +191,7 @@ fun ReorderableTrackList(
                     reorderModifier = if (reorderEnabled) Modifier.draggableHandle(
                         interactionSource = interactionSource,
                         onDragStarted = {
+                            dragInProgress = true
                             triggerVibration()
                             dragStartEntryKey = entryKeys[index]
                             dragStartIndex = index
@@ -203,6 +205,8 @@ fun ReorderableTrackList(
                             }
                             dragStartEntryKey = null
                             dragStartIndex = null
+                            // Reconcile any source-list updates deferred during the drag.
+                            dragInProgress = false
                         }
                     ) else Modifier,
                     modifier = Modifier.shadow(elevation, RoundedCornerShape(16.dp))
