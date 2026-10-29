@@ -40,6 +40,7 @@ fun ReorderableTrackList(
     favoriteIds: Set<Long>,
     listState: LazyListState,
     onPlayTrack: (Track) -> Unit,
+    onPlayTrackAtIndex: ((Track, Int) -> Unit)? = null,
     onToggleFavorite: (Long) -> Unit,
     onAddToPlaylist: (Track) -> Unit,
     onMoveTrack: (fromIndex: Int, toIndex: Int) -> Unit,
@@ -179,7 +180,10 @@ fun ReorderableTrackList(
                     },
                     isFavorite = favoriteIds.contains(track.id),
                     isHighlighted = highlightedTrackId != null && highlightedTrackId == track.id,
-                    onClick = { onPlayTrack(track) },
+                    onClick = {
+                        val indexedCallback = onPlayTrackAtIndex
+                        if (indexedCallback != null) indexedCallback(track, index) else onPlayTrack(track)
+                    },
                     onToggleFavorite = { onToggleFavorite(track.id) },
                     onAddToPlaylist = { onAddToPlaylist(track) },
                     onEditTrackInfo = { onEditTrackInfo?.invoke(track) },
