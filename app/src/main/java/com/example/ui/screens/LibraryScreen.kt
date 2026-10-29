@@ -812,6 +812,7 @@ fun LibraryScreen(
                                     onMoveAllTracksTrack = { from, to -> viewModel.moveAllTracksTrack(from, to) },
                                     onMoveFavoriteTrack = { from, to -> viewModel.moveFavoriteTrack(from, to) },
                                     onMovePlaylistTrack = { id, from, to -> viewModel.movePlaylistTrack(id, from, to) },
+                                    onRemovePlaylistTrack = { id, trackId -> viewModel.removeTrackFromPlaylist(id, trackId) },
                                     onShuffleTracks = onShuffleTracksCallback
                                 )
                             }
@@ -2461,6 +2462,7 @@ private fun PlaylistsSection(
     onMoveAllTracksTrack: (Int, Int) -> Unit = { _, _ -> },
     onMoveFavoriteTrack: (Int, Int) -> Unit = { _, _ -> },
     onMovePlaylistTrack: (Long, Int, Int) -> Unit = { _, _, _ -> },
+    onRemovePlaylistTrack: (Long, Long) -> Unit = { _, _ -> },
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
 ) {
     val overviewListState = rememberLazyListState()
@@ -2702,6 +2704,7 @@ private fun PlaylistsSection(
                         onEditTrackInfo = { onEditTrackInfo(it) },
                         onPlayNext = if (selectedPlaylist != null) onPlayNext else null,
                         onAddToQueue = if (selectedPlaylist != null) onAddToQueue else null,
+                        onRemoveFromPlaylist = if (selectedPlaylist != null) { track -> onRemovePlaylistTrack(selectedPlaylist.id, track.id) } else null,
                         onMoveTrack = onMoveItem,
                         modifier = Modifier.fillMaxSize()
                     )
