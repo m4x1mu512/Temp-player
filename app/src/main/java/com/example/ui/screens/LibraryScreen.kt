@@ -1578,6 +1578,27 @@ private fun GroupedListSection(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                .clickable {
+                                    if (groupTracks.isNotEmpty()) {
+                                        onPlayTrack(groupTracks.first(), groupTracks)
+                                    }
+                                }
+                                .testTag("play_artist_group_$groupKey"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Воспроизвести исполнителя",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
