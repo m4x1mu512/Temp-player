@@ -778,8 +778,14 @@ class PlaybackManager private constructor(private val context: Context) {
         crossfadeController.cancelCrossfade()
         val q = _queue.value
         if (index in q.indices) {
-            _queueIndex.value = index
-            playTrack(q[index], startPaused = !autoPlay)
+            // Preserve the selected queue occurrence. Calling playTrack(track) without
+            // an explicit index resolves duplicate Track.id values to the first match.
+            playTrack(
+                track = q[index],
+                newQueue = q,
+                startIndex = index,
+                startPaused = !autoPlay
+            )
         }
     }
 
