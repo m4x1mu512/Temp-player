@@ -93,6 +93,7 @@ fun ReorderableTrackList(
     var nextEntryKey by remember { mutableLongStateOf(tracks.size.toLong()) }
     var dragStartEntryKey by remember { mutableStateOf<Long?>(null) }
     var dragStartIndex by remember { mutableStateOf<Int?>(null) }
+    var dragCurrentTrackEntryKey by remember { mutableStateOf<Long?>(null) }
     var dragInProgress by remember { mutableStateOf(false) }
 
     val reorderableLazyListState = rememberReorderableLazyListState(
@@ -167,18 +168,18 @@ fun ReorderableTrackList(
                     }
                 }
 
+                val isCurrentRow = if (dragInProgress && dragCurrentTrackEntryKey != null) {
+                    itemKey == dragCurrentTrackEntryKey
+                } else if (currentTrackIndex != null) {
+                    currentTrackIndex == index
+                } else {
+                    index == firstMatchingCurrentTrackIndex
+                }
+
                 TrackListItem(
                     track = track,
-                    isCurrent = if (currentTrackIndex != null) {
-                        currentTrackIndex == index
-                    } else {
-                        index == firstMatchingCurrentTrackIndex
-                    },
-                    isPlaying = isPlaying && if (currentTrackIndex != null) {
-                        currentTrackIndex == index
-                    } else {
-                        index == firstMatchingCurrentTrackIndex
-                    },
+                    isCurrent = isCurrentRow,
+                    isPlaying = isPlaying && isCurrentRow,
                     isFavorite = favoriteIds.contains(track.id),
                     isHighlighted = highlightedTrackId != null && highlightedTrackId == track.id,
                     onClick = {
@@ -201,6 +202,11 @@ fun ReorderableTrackList(
                             triggerVibration()
                             dragStartEntryKey = entryKeys[index]
                             dragStartIndex = index
+                            // Pin the playing occurrence to its stable entry key for the
+                            // whole drag. Index-based highlighting otherwise jumps between
+                            // rows as the dragged item crosses the current track.
+                            val currentIndex = currentTrackIndex ?: firstMatchingCurrentTrackIndex
+                            dragCurrentTrackEntryKey = entryKeys.getOrNull(currentIndex)
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
@@ -211,6 +217,7 @@ fun ReorderableTrackList(
                             }
                             dragStartEntryKey = null
                             dragStartIndex = null
+                            dragCurrentTrackEntryKey = null
                             // Reconcile any source-list updates deferred during the drag.
                             dragInProgress = false
                         }
