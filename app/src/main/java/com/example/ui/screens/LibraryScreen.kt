@@ -1430,7 +1430,7 @@ private fun GroupedListSection(
                             ) {
                                 Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
-                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                                Text("Добавить\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
                             }
                             OutlinedButton(
                                 onClick = { onShuffleTracks(tracks) },
@@ -1872,7 +1872,7 @@ private fun FoldersSection(
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
-                                    text = "Добавить\\nв очередь",
+                                    text = "Добавить\nв очередь",
                                     style = MaterialTheme.typography.labelSmall,
                                     maxLines = 2,
                                     lineHeight = MaterialTheme.typography.labelSmall.lineHeight
@@ -2227,7 +2227,7 @@ private fun AlbumsSection(
                             ) {
                                 Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
-                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                                Text("Добавить\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
                             }
                             OutlinedButton(
                                 onClick = { onShuffleTracks(tracks) },
@@ -2656,7 +2656,7 @@ private fun PlaylistsSection(
                             ) {
                                 Icon(Icons.Default.QueueMusic, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(3.dp))
-                                Text("Добавить\\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
+                                Text("Добавить\nв очередь", style = MaterialTheme.typography.labelSmall, maxLines = 2)
                             }
                             OutlinedButton(
                                 onClick = { onShuffleTracks(tracks) },
