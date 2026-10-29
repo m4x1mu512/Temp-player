@@ -46,7 +46,8 @@ enum class AccentColor(
         displayName = "Жёлтый",
         previewColor = Color(0xFFFFD600),
         lightPrimary = Color(0xFFCC9A00),
-        lightOnPrimary = Color(0xFF1F1800),
+        // Keep icons and checked switch thumbs white on the yellow accent surface in light theme.
+        lightOnPrimary = Color(0xFFFFFFFF),
         darkPrimary = Color(0xFFFFD600),
         darkOnPrimary = Color(0xFF3D2E00),
         lightSecondary = Color(0xFF008F84),
