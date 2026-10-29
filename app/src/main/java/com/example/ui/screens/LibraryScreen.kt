@@ -3020,7 +3020,10 @@ private fun PlaylistsSection(
                         }
 
                         Box {
-                            IconButton(onClick = { menuExpanded = true }) {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier.testTag("playlist_menu_${pl.id}")
+                            ) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Меню плейлиста")
                             }
                             DropdownMenu(
@@ -3044,6 +3047,29 @@ private fun PlaylistsSection(
                                     }
                                 )
                             }
+                        }
+
+                        Spacer(modifier = Modifier.width(2.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                .clickable {
+                                    if (plTracks.isNotEmpty()) {
+                                        onPlayTrack(plTracks.first(), plTracks)
+                                    }
+                                }
+                                .testTag("play_playlist_card_${pl.id}"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Воспроизвести плейлист",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 }
