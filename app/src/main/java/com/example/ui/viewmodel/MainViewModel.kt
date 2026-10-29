@@ -716,22 +716,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
-        if (playbackManager.queue.value.isEmpty() && allTracksOrdered.value.isNotEmpty()) {
-            playbackManager.setQueue(allTracksOrdered.value)
-        }
+        // Queue ordering belongs to the active playback queue only. Do not persist it
+        // as the library's "All tracks" order: the library and queue are independent lists.
         playbackManager.moveQueueTrack(fromIndex, toIndex)
-        val newQueue = playbackManager.queue.value
-        if (newQueue.isNotEmpty()) {
-            val newIds = newQueue.map { it.id }
-            _inMemoryAllTracksOrder.value = newIds
-            viewModelScope.launch {
-                try {
-                    settingsDataStore.saveCustomAllTracksOrder(newIds)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
     }
 
     fun movePlaylistTrack(playlistId: Long, fromIndex: Int, toIndex: Int) {
@@ -796,9 +783,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 e.printStackTrace()
             }
         }
-        if (playbackManager.queue.value.isNotEmpty()) {
-            playbackManager.setQueue(current)
-        }
+        // Reordering the library must not replace or reorder the active playback queue.
     }
 
     fun setSleepTimer(minutes: Int) {
