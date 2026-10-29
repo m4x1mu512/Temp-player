@@ -520,7 +520,7 @@ fun PlayerScreen(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
                                     pageSpacing = 16.dp,
-                                    key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                                    key = { page -> "$page-${pagerTracks.getOrNull(page)?.id ?: page}" }
                                 ) { page ->
                                     val pageTrack = pagerTracks.getOrNull(page)
                                     if (pageTrack != null) {
@@ -908,7 +908,7 @@ fun PlayerScreen(
                                 state = pagerState,
                                 modifier = Modifier.fillMaxSize(),
                                 pageSpacing = 16.dp,
-                                key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                                key = { page -> "$page-${pagerTracks.getOrNull(page)?.id ?: page}" }
                             ) { page ->
                                 val pageTrack = pagerTracks.getOrNull(page)
                                 if (pageTrack != null) {
