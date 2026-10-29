@@ -43,6 +43,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsDataStore = playbackManager.settingsDataStore
     private val playlistOrderSaveMutex = Mutex()
     private val favoriteOrderSaveMutex = Mutex()
+    private val allTracksOrderSaveMutex = Mutex()
 
     // Search and Filter State
     private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -777,10 +778,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val newIds = current.map { it.id }
         _inMemoryAllTracksOrder.value = newIds
         viewModelScope.launch {
-            try {
-                settingsDataStore.saveCustomAllTracksOrder(newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            allTracksOrderSaveMutex.withLock {
+                try {
+                    // A fast second drag must not be overwritten by a slower earlier save.
+                    val latestIds = _inMemoryAllTracksOrder.value ?: newIds
+                    settingsDataStore.saveCustomAllTracksOrder(latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
         // Reordering the library must not replace or reorder the active playback queue.
