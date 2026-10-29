@@ -353,14 +353,17 @@ fun LibraryScreen(
         }
     }
 
-    // Opening the queue from the expanded player should only navigate to the queue tab.
-    // Keep queueListState untouched so the previously viewed scroll position is restored.
+    // Treat the queue request as a one-shot event. NavHost may recreate this screen
+    // when returning from Settings; replaying an already handled event would force the
+    // pager back to page 0 and lose the previously selected library section.
+    var lastHandledOpenQueueEvent by rememberSaveable {
+        mutableIntStateOf(openQueueEvent)
+    }
     LaunchedEffect(openQueueEvent) {
-        if (openQueueEvent > 0) {
-            coroutineScope.launch {
-                if (pagerState.currentPage != 0) {
-                    pagerState.scrollToPage(0)
-                }
+        if (openQueueEvent > lastHandledOpenQueueEvent) {
+            lastHandledOpenQueueEvent = openQueueEvent
+            if (pagerState.currentPage != 0) {
+                pagerState.scrollToPage(0)
             }
         }
     }
