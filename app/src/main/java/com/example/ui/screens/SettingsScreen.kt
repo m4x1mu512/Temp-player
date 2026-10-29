@@ -100,6 +100,7 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+    val yellowAccentOnLightTheme = themeMode == ThemeMode.LIGHT && accentColor == AccentColor.CYBER_YELLOW
     val globalBackgroundEnabled by viewModel.globalBackgroundEnabled.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
@@ -208,7 +209,7 @@ fun SettingsScreen(
                                 modifier = Modifier.testTag("theme_chip_${mode.name.lowercase()}"),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    selectedLabelColor = if (yellowAccentOnLightTheme && mode == ThemeMode.LIGHT) Color.White else MaterialTheme.colorScheme.onPrimary
                                 )
                             )
                         }
@@ -371,8 +372,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_album_art"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
@@ -393,8 +394,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_light"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
                     }
@@ -422,8 +423,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_dark"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
@@ -434,7 +435,7 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_system"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
