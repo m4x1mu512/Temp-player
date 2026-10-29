@@ -52,6 +52,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -1074,11 +1075,11 @@ fun LibraryScreen(
                                                 contentPadding = PaddingValues(bottom = 80.dp),
                                                 modifier = Modifier.fillMaxSize()
                                             ) {
-                                                items(
+                                                itemsIndexed(
                                                     items = displayedTracks,
-                                                    key = { it.id },
-                                                    contentType = { "track" }
-                                                ) { track ->
+                                                    key = { index, track -> "$index-${track.id}" },
+                                                    contentType = { _, _ -> "track" }
+                                                ) { _, track ->
                                                     TrackListItem(
                                                         track = track,
                                                         isCurrent = currentTrack?.id == track.id,
@@ -1441,11 +1442,11 @@ private fun GroupedListSection(
                     contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(
+                    itemsIndexed(
                         items = tracks,
-                        key = { it.id },
-                        contentType = { "track" }
-                    ) { track ->
+                        key = { index, track -> "$index-${track.id}" },
+                        contentType = { _, _ -> "track" }
+                    ) { _, track ->
                         TrackListItem(
                             track = track,
                             isCurrent = currentTrack?.id == track.id,
@@ -1903,11 +1904,11 @@ private fun FoldersSection(
                     contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(
+                    itemsIndexed(
                         items = tracks,
-                        key = { it.id },
-                        contentType = { "track" }
-                    ) { track ->
+                        key = { index, track -> "$index-${track.id}" },
+                        contentType = { _, _ -> "track" }
+                    ) { _, track ->
                         TrackListItem(
                             track = track,
                             isCurrent = currentTrack?.id == track.id,
@@ -2242,11 +2243,11 @@ private fun AlbumsSection(
                     contentPadding = PaddingValues(bottom = 80.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(
+                    itemsIndexed(
                         items = tracks,
-                        key = { it.id },
-                        contentType = { "track" }
-                    ) { track ->
+                        key = { index, track -> "$index-${track.id}" },
+                        contentType = { _, _ -> "track" }
+                    ) { _, track ->
                         TrackListItem(
                             track = track,
                             isCurrent = currentTrack?.id == track.id,
