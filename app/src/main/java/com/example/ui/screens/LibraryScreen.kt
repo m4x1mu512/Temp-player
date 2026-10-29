@@ -705,6 +705,15 @@ fun LibraryScreen(
                                                     queue = queueTracks
                                                 )
                                             },
+                                            onPlayTrackAtIndex = { track, index ->
+                                                // Track.id is shared by duplicate queue entries; preserve
+                                                // the tapped occurrence instead of resolving the first match.
+                                                viewModel.playTrack(
+                                                    track = track,
+                                                    queue = queueTracks,
+                                                    index = index
+                                                )
+                                            },
                                             onToggleFavorite = onToggleFavoriteCallback,
                                             onAddToPlaylist = onAddToPlaylistCallback,
                                             onEditTrackInfo = onEditTrackInfoCallback,
