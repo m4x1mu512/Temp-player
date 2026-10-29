@@ -1243,41 +1243,28 @@ fun LibraryScreen(
 
 private val DrilldownSharedAxisTransition: androidx.compose.animation.AnimatedContentTransitionScope<Boolean>.() -> androidx.compose.animation.ContentTransform = {
     if (targetState) {
-        // Forward transition: entering drilldown (detail screen)
+        // Lightweight detail entry: a short fade with a subtle horizontal movement.
         (slideInHorizontally(
-            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-            initialOffsetX = { (it * 0.18f).toInt() }
-        ) + scaleIn(
-            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-            initialScale = 0.92f
-        ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing)))
-        .togetherWith(
-            slideOutHorizontally(
-                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                targetOffsetX = { -(it * 0.14f).toInt() }
-            ) + scaleOut(
-                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                targetScale = 0.94f
-            ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
-        )
+            animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
+            initialOffsetX = { (it * 0.08f).toInt() }
+        ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing)))
+            .togetherWith(
+                slideOutHorizontally(
+                    animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
+                    targetOffsetX = { -(it * 0.06f).toInt() }
+                ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
+            )
     } else {
-        // Reverse transition: returning back to root screen
         (slideInHorizontally(
-            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-            initialOffsetX = { -(it * 0.14f).toInt() }
-        ) + scaleIn(
-            animationSpec = tween(240, easing = PlayerEmphasizedDecelerateEasing),
-            initialScale = 0.94f
-        ) + fadeIn(animationSpec = tween(180, easing = PlayerEmphasizedDecelerateEasing)))
-        .togetherWith(
-            slideOutHorizontally(
-                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                targetOffsetX = { (it * 0.18f).toInt() }
-            ) + scaleOut(
-                animationSpec = tween(200, easing = PlayerEmphasizedAccelerateEasing),
-                targetScale = 0.92f
-            ) + fadeOut(animationSpec = tween(160, easing = PlayerEmphasizedAccelerateEasing))
-        )
+            animationSpec = tween(190, easing = PlayerEmphasizedDecelerateEasing),
+            initialOffsetX = { -(it * 0.06f).toInt() }
+        ) + fadeIn(animationSpec = tween(170, easing = PlayerEmphasizedDecelerateEasing)))
+            .togetherWith(
+                slideOutHorizontally(
+                    animationSpec = tween(150, easing = PlayerEmphasizedAccelerateEasing),
+                    targetOffsetX = { (it * 0.08f).toInt() }
+                ) + fadeOut(animationSpec = tween(130, easing = PlayerEmphasizedAccelerateEasing))
+            )
     }
 }
 
