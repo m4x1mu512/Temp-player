@@ -75,7 +75,8 @@ fun TrackListItem(
     onEditTrackInfo: (() -> Unit)? = null,
     onPlayNext: (() -> Unit)? = null,
     onAddToQueue: (() -> Unit)? = null,
-    onRemoveFromQueue: (() -> Unit)? = null
+    onRemoveFromQueue: (() -> Unit)? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -306,6 +307,17 @@ fun TrackListItem(
                                 menuExpanded = false
                                 onRemoveFromQueue()
                             }
+                        )
+                    }
+                    if (onRemoveFromPlaylist != null) {
+                        DropdownMenuItem(
+                            text = { Text("Удалить из плейлиста") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onRemoveFromPlaylist()
+                            },
+                            modifier = Modifier.testTag("menu_remove_from_playlist_${track.id}")
                         )
                     }
                     DropdownMenuItem(
