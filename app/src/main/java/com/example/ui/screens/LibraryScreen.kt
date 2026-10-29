@@ -2439,17 +2439,18 @@ private fun AlbumsSection(
                                     modifier = Modifier
                                         .align(Alignment.BottomEnd)
                                         .padding(10.dp)
-                                        .size(34.dp)
+                                        .size(44.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .clickable { onPlayTrack(tracks.first(), tracks) },
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f))
+                                        .clickable { onPlayTrack(tracks.first(), tracks) }
+                                        .testTag("play_album_group_$albumTitle"),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.PlayArrow,
                                         contentDescription = "Слушать $albumTitle",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(20.dp)
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
