@@ -750,6 +750,10 @@ fun LibraryScreen(
                                         selectedFolderTitle = title
                                         selectedFolderTracks = tracks
                                     },
+                                    selectedTracks = selectedFolderTracks,
+                                    onMoveTrack = { from, to ->
+                                        selectedFolderTracks = selectedFolderTracks?.toMutableList()?.apply { add(to, removeAt(from)) }
+                                    },
                                     onBackFromGroup = {
                                         selectedFolderTitle = null
                                         selectedFolderTracks = null
@@ -823,6 +827,10 @@ fun LibraryScreen(
                                         selectedAlbumTitle = title
                                         selectedAlbumTracks = tracks
                                     },
+                                    selectedTracks = selectedAlbumTracks,
+                                    onMoveTrack = { from, to ->
+                                        selectedAlbumTracks = selectedAlbumTracks?.toMutableList()?.apply { add(to, removeAt(from)) }
+                                    },
                                     onBackFromGroup = {
                                         selectedAlbumTitle = null
                                         selectedAlbumTracks = null
@@ -850,6 +858,10 @@ fun LibraryScreen(
                                     onSelectGroup = { title, tracks ->
                                         selectedArtistTitle = title
                                         selectedArtistTracks = tracks
+                                    },
+                                    selectedTracks = selectedArtistTracks,
+                                    onMoveTrack = { from, to ->
+                                        selectedArtistTracks = selectedArtistTracks?.toMutableList()?.apply { add(to, removeAt(from)) }
                                     },
                                     onBackFromGroup = {
                                         selectedArtistTitle = null
@@ -1286,7 +1298,9 @@ private fun GroupedListSection(
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
-) {
+,
+    selectedTracks: List<Track>? = null,
+    onMoveTrack: (Int, Int) -> Unit = { _, _ -> }) {
     val overviewListState = rememberLazyListState()
     AnimatedContent(
         targetState = selectedTitle != null,
@@ -1294,7 +1308,7 @@ private fun GroupedListSection(
         label = "artist_drilldown_transition"
     ) { hasSelectedTitle ->
         if (hasSelectedTitle && selectedTitle != null) {
-        val tracks = groups[selectedTitle] ?: emptyList()
+        val tracks = selectedTracks ?: groups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
             tracks.firstDistinctArtUris()
@@ -1447,30 +1461,21 @@ private fun GroupedListSection(
             }
 
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    itemsIndexed(
-                        items = tracks,
-                        key = { index, track -> "$index-${track.id}" },
-                        contentType = { _, _ -> "track" }
-                    ) { _, track ->
-                        TrackListItem(
-                            track = track,
-                            isCurrent = currentTrack?.id == track.id,
-                            isPlaying = isPlaying && currentTrack?.id == track.id,
-                            isFavorite = favoriteIds.contains(track.id),
-                            onClick = { onPlayTrack(track, tracks) },
-                            onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) },
-                            onPlayNext = { onPlayNext(track) },
-                            onAddToQueue = { onAddToQueue(track) },
-                            onEditTrackInfo = { onEditTrackInfo(track) }
-                        )
-                    }
-                }
+                ReorderableTrackList(
+                    tracks = tracks,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    favoriteIds = favoriteIds,
+                    listState = listState,
+                    onPlayTrack = { track -> onPlayTrack(track, tracks) },
+                    onToggleFavorite = onToggleFavorite,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onMoveTrack = onMoveTrack,
+                    onEditTrackInfo = onEditTrackInfo,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                )
 
                 val coroutineScope = rememberCoroutineScope()
                 ScrollToCurrentTrackFab(
@@ -1724,7 +1729,9 @@ private fun FoldersSection(
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
-) {
+,
+    selectedTracks: List<Track>? = null,
+    onMoveTrack: (Int, Int) -> Unit = { _, _ -> }) {
     val overviewListState = rememberLazyListState()
     AnimatedContent(
         targetState = selectedTitle != null,
@@ -1732,7 +1739,7 @@ private fun FoldersSection(
         label = "folders_drilldown_transition"
     ) { hasSelectedTitle ->
         if (hasSelectedTitle && selectedTitle != null) {
-            val tracks = folderGroups[selectedTitle] ?: emptyList()
+            val tracks = selectedTracks ?: folderGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val distinctArtUris = remember(tracks) {
             tracks.firstDistinctArtUris()
@@ -1909,30 +1916,21 @@ private fun FoldersSection(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    itemsIndexed(
-                        items = tracks,
-                        key = { index, track -> "$index-${track.id}" },
-                        contentType = { _, _ -> "track" }
-                    ) { _, track ->
-                        TrackListItem(
-                            track = track,
-                            isCurrent = currentTrack?.id == track.id,
-                            isPlaying = isPlaying && currentTrack?.id == track.id,
-                            isFavorite = favoriteIds.contains(track.id),
-                            onClick = { onPlayTrack(track, tracks) },
-                            onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) },
-                            onPlayNext = { onPlayNext(track) },
-                            onAddToQueue = { onAddToQueue(track) },
-                            onEditTrackInfo = { onEditTrackInfo(track) }
-                        )
-                    }
-                }
+                ReorderableTrackList(
+                    tracks = tracks,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    favoriteIds = favoriteIds,
+                    listState = listState,
+                    onPlayTrack = { track -> onPlayTrack(track, tracks) },
+                    onToggleFavorite = onToggleFavorite,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onMoveTrack = onMoveTrack,
+                    onEditTrackInfo = onEditTrackInfo,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                )
 
                 val coroutineScope = rememberCoroutineScope()
                 ScrollToCurrentTrackFab(
@@ -2078,7 +2076,9 @@ private fun AlbumsSection(
     favoriteIds: Set<Long> = emptySet(),
     onNavigateToQueue: () -> Unit = {},
     onShuffleTracks: (List<Track>) -> Unit = { list -> if (list.isNotEmpty()) onPlayTrack(list.random(), list) }
-) {
+,
+    selectedTracks: List<Track>? = null,
+    onMoveTrack: (Int, Int) -> Unit = { _, _ -> }) {
     val context = LocalContext.current
     val overviewGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
 
@@ -2088,7 +2088,7 @@ private fun AlbumsSection(
         label = "albums_drilldown_transition"
     ) { hasSelectedTitle ->
         if (hasSelectedTitle && selectedTitle != null) {
-        val tracks = albumGroups[selectedTitle] ?: emptyList()
+        val tracks = selectedTracks ?: albumGroups[selectedTitle] ?: emptyList()
         val listState = rememberLazyListState()
         val albumArtUri = remember(tracks) {
             tracks.firstOrNull { it.albumArtUri != null }?.albumArtUri
@@ -2248,30 +2248,21 @@ private fun AlbumsSection(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    itemsIndexed(
-                        items = tracks,
-                        key = { index, track -> "$index-${track.id}" },
-                        contentType = { _, _ -> "track" }
-                    ) { _, track ->
-                        TrackListItem(
-                            track = track,
-                            isCurrent = currentTrack?.id == track.id,
-                            isPlaying = isPlaying && currentTrack?.id == track.id,
-                            isFavorite = favoriteIds.contains(track.id),
-                            onClick = { onPlayTrack(track, tracks) },
-                            onToggleFavorite = { onToggleFavorite(track.id) },
-                            onAddToPlaylist = { onAddToPlaylist(track) },
-                            onPlayNext = { onPlayNext(track) },
-                            onAddToQueue = { onAddToQueue(track) },
-                            onEditTrackInfo = { onEditTrackInfo(track) }
-                        )
-                    }
-                }
+                ReorderableTrackList(
+                    tracks = tracks,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    favoriteIds = favoriteIds,
+                    listState = listState,
+                    onPlayTrack = { track -> onPlayTrack(track, tracks) },
+                    onToggleFavorite = onToggleFavorite,
+                    onAddToPlaylist = onAddToPlaylist,
+                    onMoveTrack = onMoveTrack,
+                    onEditTrackInfo = onEditTrackInfo,
+                    onPlayNext = onPlayNext,
+                    onAddToQueue = onAddToQueue,
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                )
 
                 val coroutineScope = rememberCoroutineScope()
                 ScrollToCurrentTrackFab(
