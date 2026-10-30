@@ -1609,15 +1609,50 @@ private fun FolderCoverCollage(
 ) {
     val context = LocalContext.current
     val distinctUris = remember(artUris) { artUris.distinct() }
-    // Rebuilt on every recomposition before: each card change (current track, favourite,
-    // scan) produced four new ImageRequest objects and restarted their crossfades.
+    // Keep Coil requests stable across unrelated recompositions (e.g. playback state changes).
+    // Preserve the existing sizes and crossfade settings for each collage layout.
     val tileRequests = remember(distinctUris) {
-        distinctUris.take(4).map { uri ->
-            ImageRequest.Builder(context)
-                .data(uri)
-                .size(120, 120)
-                .crossfade(100)
-                .build()
+        when {
+            distinctUris.size >= 4 -> distinctUris.take(4).map { uri ->
+                ImageRequest.Builder(context)
+                    .data(uri)
+                    .size(120, 120)
+                    .crossfade(100)
+                    .build()
+            }
+            distinctUris.size == 3 -> listOf(
+                ImageRequest.Builder(context)
+                    .data(distinctUris[0])
+                    .size(120, 120)
+                    .crossfade(100)
+                    .build(),
+                ImageRequest.Builder(context)
+                    .data(distinctUris[1])
+                    .size(120, 120)
+                    .crossfade(100)
+                    .build(),
+                ImageRequest.Builder(context)
+                    .data(distinctUris[2])
+                    .size(240, 120)
+                    .crossfade(100)
+                    .build()
+            )
+            distinctUris.size == 2 -> distinctUris.map { uri ->
+                ImageRequest.Builder(context)
+                    .data(uri)
+                    .size(150, 150)
+                    .crossfade(100)
+                    .build()
+            }
+            distinctUris.size == 1 -> listOf(
+                ImageRequest.Builder(context)
+                    .data(distinctUris[0])
+                    .size(240, 240)
+                    .crossfade(100)
+                    .error(R.drawable.ic_default_art)
+                    .build()
+            )
+            else -> emptyList()
         }
     }
 
@@ -1683,7 +1718,7 @@ private fun FolderCoverCollage(
                     }
                     Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface))
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(distinctUris[2]).size(240, 120).crossfade(100).build(),
+                        model = tileRequests[2],
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.weight(1f).fillMaxWidth()
@@ -1693,14 +1728,14 @@ private fun FolderCoverCollage(
             distinctUris.size == 2 -> {
                 Row(modifier = Modifier.fillMaxSize()) {
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(distinctUris[0]).size(150, 150).crossfade(100).build(),
+                        model = tileRequests[0],
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.weight(1f).fillMaxHeight()
                     )
                     Spacer(modifier = Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface))
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(distinctUris[1]).size(150, 150).crossfade(100).build(),
+                        model = tileRequests[1],
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.weight(1f).fillMaxHeight()
@@ -1709,7 +1744,7 @@ private fun FolderCoverCollage(
             }
             distinctUris.size == 1 -> {
                 AsyncImage(
-                    model = ImageRequest.Builder(context).data(distinctUris[0]).size(240, 240).crossfade(100).error(R.drawable.ic_default_art).build(),
+                    model = tileRequests[0],
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
