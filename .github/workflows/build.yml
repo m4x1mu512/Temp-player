@@ -47,10 +47,30 @@ jobs:
       - name: Run Kotlin unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      # No release keystore is stored in GitHub. This validates the real release
-      # variant (including R8/resource shrinking) and produces an unsigned AAB.
-      - name: Build Google Play release bundle (unsigned in CI)
-        run: ./gradlew --no-daemon bundleRelease
+      # Generate a disposable CI-only signing key. It is never used for Play
+      # uploads and is not retained as a repository secret or artifact.
+      - name: Create temporary CI release signing key
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$GITHUB_WORKSPACE/ci-release-key.jks" \
+            -storepass ci-only-store-password \
+            -alias ci-release \
+            -keypass ci-only-key-password \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Temporary CI Key,O=CI,C=US"
+          cat > keystore.properties <<EOF
+          storeFile=$GITHUB_WORKSPACE/ci-release-key.jks
+          storePassword=ci-only-store-password
+          keyAlias=ci-release
+          keyPassword=ci-only-key-password
+          EOF
+
+      # These CI-signed artifacts are for installation/testing only. Use your
+      # own backed-up upload key locally for the actual Google Play submission.
+      - name: Build release APK and Google Play AAB
+        run: ./gradlew --no-daemon assembleRelease bundleRelease
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -59,4 +79,5 @@ jobs:
           if-no-files-found: error
           path: |
             app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
             app/build/outputs/bundle/release/*.aab
