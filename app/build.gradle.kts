@@ -1,4 +1,24 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.FileInputStream
+import java.util.Properties
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.isFile) {
+  FileInputStream(keystorePropertiesFile).use(keystoreProperties::load)
+  val requiredProperties = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+  val missingProperties = requiredProperties.filter {
+    keystoreProperties.getProperty(it).isNullOrBlank()
+  }
+  check(missingProperties.isEmpty()) {
+    "Invalid keystore.properties: missing " + missingProperties.joinToString()
+  }
+  val configuredKeystore = rootProject.file(keystoreProperties.getProperty("storeFile"))
+  check(configuredKeystore.isFile) {
+    "Release keystore not found: $configuredKeystore"
+  }
+}
+val releaseSigningConfigured = keystorePropertiesFile.isFile
 
 plugins {
   alias(libs.plugins.android.application)
@@ -24,12 +44,13 @@ android {
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+    if (releaseSigningConfigured) {
+      create("release") {
+        storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+        storePassword = keystoreProperties.getProperty("storePassword")
+        keyAlias = keystoreProperties.getProperty("keyAlias")
+        keyPassword = keystoreProperties.getProperty("keyPassword")
+      }
     }
     create("debugConfig") {
       val rootKeystore = file("${rootDir}/debug.keystore")
@@ -50,7 +71,13 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      // Local builds are signed when keystore.properties is present. CI intentionally
+      // builds an unsigned AAB to verify the release/R8 variant without storing secrets.
+      signingConfig = if (releaseSigningConfigured) {
+        signingConfigs.getByName("release")
+      } else {
+        null
+      }
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
     // Target for the :benchmark module: release-like (R8 on, so measurements match what ships)
