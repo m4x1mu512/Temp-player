@@ -2,7 +2,8 @@
 
 This project produces an Android App Bundle (AAB) for Google Play. The release
 variant uses R8 and resource shrinking. GitHub Actions builds an **unsigned**
-release bundle; the local upload key must never be committed to this repository.
+release bundle and a release APK. CI uses a disposable signing key for test artifacts;
+the real local upload key must never be committed to this repository.
 
 ## Local upload-key setup
 
@@ -14,8 +15,9 @@ release bundle; the local upload key must never be committed to this repository.
 4. Copy `keystore.properties.example` to `keystore.properties` in the
    repository root and fill in the real path, passwords, and alias.
 5. Confirm that `keystore.properties` and the keystore are ignored by Git.
-6. Sync Gradle, then run `./gradlew bundleRelease` (Windows:
-   `gradlew.bat bundleRelease`). The signed bundle is written to
+6. Sync Gradle, then run `./gradlew assembleRelease bundleRelease` (Windows:
+   `gradlew.bat assembleRelease bundleRelease`). The signed APK is written to
+   `app/build/outputs/apk/release/` and the signed bundle to
    `app/build/outputs/bundle/release/`.
 
 Example properties file (use your own values):
@@ -38,8 +40,10 @@ app-signing key and your local keystore is the upload key.
 - Target Android version: API 36.
 - First Play release can use versionCode 1 / versionName 1.0. Increase
   versionCode for every subsequent Play upload.
-- CI runs Debug assembly, unit tests, and the minified Release AAB build. The
-  CI AAB is unsigned by design; sign locally for Play Console.
+- CI runs Debug assembly, unit tests, and minified Release APK/AAB builds. CI
+  artifacts are signed with a disposable key for installation/testing only.
+  Never upload those CI artifacts to Play Console; build locally with your own
+  upload key for the actual Play submission.
 
 ## Before submitting to Play Console
 
