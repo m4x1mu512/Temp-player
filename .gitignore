@@ -18,3 +18,8 @@ local.properties
 debug.keystore
 hs_err_pid*.log
 replay_pid*.log
+
+# Release signing credentials (never commit private keys or passwords)
+keystore.properties
+*.jks
+*.keystore
