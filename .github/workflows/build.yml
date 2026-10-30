@@ -52,6 +52,7 @@ jobs:
       - name: Create temporary CI release signing key
         run: |
           keytool -genkeypair -v \
+            -storetype JKS \
             -keystore "$GITHUB_WORKSPACE/ci-release-key.jks" \
             -storepass ci-only-store-password \
             -alias ci-release \
