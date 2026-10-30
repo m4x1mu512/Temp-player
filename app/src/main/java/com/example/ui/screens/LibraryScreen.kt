@@ -677,7 +677,12 @@ fun LibraryScreen(
                 } else {
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        // Keep only the neighboring pages composed. This lets the next section
+                        // prepare its layout and image requests before the user reaches it,
+                        // without eagerly composing all six library sections.
+                        beyondViewportPageCount = 1,
+                        key = { page -> page }
                     ) { page ->
                         when (page) {
                             0 -> {
