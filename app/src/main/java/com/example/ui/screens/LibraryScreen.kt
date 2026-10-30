@@ -325,10 +325,9 @@ fun LibraryScreen(
         }
     }
 
-    // Reset drilldowns whenever user changes tabs / swipes between screens so initial screen opens
-    LaunchedEffect(pagerState.currentPage) {
-        resetAllDrilldowns()
-    }
+    // Reset drilldowns once after a page transition settles. Resetting on both currentPage
+    // and settledPage caused the same state to be written twice during a tab change, adding
+    // avoidable recomposition work while the pager was animating.
     LaunchedEffect(pagerState.settledPage) {
         resetAllDrilldowns()
     }
