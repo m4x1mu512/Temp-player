@@ -53,7 +53,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -64,7 +63,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -89,9 +87,6 @@ import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
 import com.example.ui.util.KEY_PLAYER_CONTAINER
 import com.example.ui.util.KEY_PLAYER_TRACK_TEXT
-import com.example.ui.util.formatTime
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import com.example.ui.components.InteractiveMiniProgressBar
 import com.example.ui.util.playerSharedBounds
@@ -175,6 +170,7 @@ fun MiniPlayer(
 
         val configuration = LocalConfiguration.current
         val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val isCompactWidth = configuration.screenWidthDp < 360
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
             albumArtUri = currentTrack.albumArtUri,
@@ -183,7 +179,7 @@ fun MiniPlayer(
         )
 
         Card(
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color.Transparent
             ),
@@ -205,50 +201,39 @@ fun MiniPlayer(
                     sharedTransitionScope = sharedTransitionScope,
                     animatedVisibilityScope = animatedVisibilityScope,
                     key = KEY_PLAYER_CONTAINER,
-                    clipShape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                    clipShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
                 )
                 .testTag("mini_player")
         ) {
             Box(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Frosted glass background layer with blur, semi-transparent base, and horizontal gradient
+                // A single translucent surface avoids the inner blurred rectangle artifact.
+                // Compose blur() blurs this layer's own pixels, not the content behind it.
+                // Keep the album-derived tint subtle so the library remains visible around the player.
                 val horizontalGradient = colorScheme.miniPlayerBrush ?: Brush.horizontalGradient(
                     colors = listOf(
-                        colorScheme.backgroundColor.copy(alpha = 0.35f),
-                        colorScheme.accentColor.copy(alpha = 0.20f),
-                        colorScheme.backgroundColor.copy(alpha = 0.35f)
+                        colorScheme.backgroundColor.copy(alpha = 0.64f),
+                        colorScheme.accentColor.copy(alpha = 0.12f),
+                        colorScheme.backgroundColor.copy(alpha = 0.64f)
                     )
                 )
 
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .blur(16.dp)
-                        .background(if (colorScheme.isDark) Color.White.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.15f))
+                        .background(
+                            if (colorScheme.isDark) {
+                                Color(0xFF11150D).copy(alpha = 0.14f)
+                            } else {
+                                Color(0xFFF7F8F3).copy(alpha = 0.18f)
+                            }
+                        )
                         .background(horizontalGradient)
                 )
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                 val getMiniControlsAlpha: () -> Float = { 1f }
-                var isMiniScrubbing by remember { mutableStateOf(false) }
-                var miniScrubPos by remember { mutableLongStateOf(0L) }
-
-                InteractiveMiniProgressBar(
-                    position = position,
-                    duration = duration,
-                    isPlaying = isPlaying,
-                    onSeek = { onSeek?.invoke(it) },
-                    accentColor = colorScheme.accentColor,
-                    trackColor = colorScheme.progressTrackColor,
-                    alpha = getMiniControlsAlpha(),
-                    onScrubbingStateChanged = { scrubbing, seekPos ->
-                        isMiniScrubbing = scrubbing
-                        miniScrubPos = seekPos
-                    },
-                    testTag = "mini_player_progress"
-                )
-
                 val context = LocalContext.current
 
                 if (isLandscape) {
@@ -364,23 +349,6 @@ fun MiniPlayer(
                             }
                         }
 
-                        // Time badge in landscape
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = colorScheme.onSurfaceColor.copy(alpha = 0.08f),
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp)
-                                .graphicsLayer { alpha = getMiniControlsAlpha() }
-                                .clickable { onClick() }
-                        ) {
-                            Text(
-                                text = "${formatTime(position)} / ${formatTime(duration)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colorScheme.onSurfaceVariantColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-
                         // Favorite button if available
                         if (onToggleFavorite != null) {
                             IconButton(
@@ -466,7 +434,7 @@ fun MiniPlayer(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .padding(horizontal = if (isCompactWidth) 10.dp else 14.dp, vertical = 10.dp)
                     ) {
                         // Clickable info section: Album art + Title/Artist opens full player
                         Row(
@@ -485,10 +453,10 @@ fun MiniPlayer(
                                 }
                                 .clickable { onClick() }
                         ) {
-                            // Album art (taller: 56.dp)
+                            // Album art scales down slightly on narrow phones to preserve control space.
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
+                                    .size(if (isCompactWidth) 48.dp else 56.dp)
                                     .playerSharedElement(
                                         sharedTransitionScope = sharedTransitionScope,
                                         animatedVisibilityScope = animatedVisibilityScope,
@@ -509,7 +477,7 @@ fun MiniPlayer(
                                             painter = painterResource(R.drawable.ic_default_art),
                                             contentDescription = "Обложка трека",
                                             contentScale = ContentScale.Crop,
-                                            modifier = Modifier.size(56.dp)
+                                            modifier = Modifier.size(if (isCompactWidth) 48.dp else 56.dp)
                                         )
                                     } else {
                                         val miniPortraitArtRequest = remember(artUri) {
@@ -524,13 +492,13 @@ fun MiniPlayer(
                                             model = miniPortraitArtRequest,
                                             contentDescription = "Обложка трека",
                                             contentScale = ContentScale.Crop,
-                                            modifier = Modifier.size(56.dp)
+                                            modifier = Modifier.size(if (isCompactWidth) 48.dp else 56.dp)
                                         )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(14.dp))
+                            Spacer(modifier = Modifier.width(if (isCompactWidth) 8.dp else 14.dp))
 
                             // Title & Artist
                             Column(
@@ -552,57 +520,36 @@ fun MiniPlayer(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
-                                val displayPos = if (isMiniScrubbing) miniScrubPos else position
-                                val formattedPos = remember((displayPos / 1000L)) { formatTime(displayPos) }
-                                val formattedDur = remember(duration) { formatTime(duration) }
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(
-                                        text = currentTrack.artist,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = colorScheme.accentColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "• $formattedPos / $formattedDur",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isMiniScrubbing) colorScheme.accentColor else colorScheme.onSurfaceVariantColor,
-                                        fontWeight = if (isMiniScrubbing) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1
-                                    )
-                                }
+                                Text(
+                                    text = currentTrack.artist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colorScheme.accentColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(if (isCompactWidth) 3.dp else 6.dp))
 
                         // Control buttons: Previous, Play/Pause, Next
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactWidth) 2.dp else 4.dp),
                             modifier = Modifier.graphicsLayer { alpha = getMiniControlsAlpha() }
                         ) {
-                            // Previous track button (long press rewinds 10s)
-                            @OptIn(ExperimentalFoundationApi::class)
+                            // Previous track button
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(if (isCompactWidth) 36.dp else 42.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onPreviousTrack,
-                                        onLongClick = { onSeekBackward10s?.invoke() }
-                                    )
+                                    .clickable(onClick = onPreviousTrack)
                                     .testTag("mini_player_previous"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
-                                    contentDescription = "Предыдущий трек (удержание: перемотка назад на 10 сек)",
+                                    contentDescription = "Предыдущий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
@@ -616,7 +563,7 @@ fun MiniPlayer(
                                     contentColor = colorScheme.onAccentColor
                                 ),
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(if (isCompactWidth) 42.dp else 48.dp)
                                     .testTag("mini_player_play_pause")
                             ) {
                                 AnimatedContent(
@@ -635,22 +582,18 @@ fun MiniPlayer(
                                 }
                             }
 
-                            // Next track button (long press forwards 10s)
-                            @OptIn(ExperimentalFoundationApi::class)
+                            // Next track button
                             Box(
                                 modifier = Modifier
-                                    .size(42.dp)
+                                    .size(if (isCompactWidth) 36.dp else 42.dp)
                                     .clip(CircleShape)
-                                    .combinedClickable(
-                                        onClick = onNextTrack,
-                                        onLongClick = { onSeekForward10s?.invoke() }
-                                    )
+                                    .clickable(onClick = onNextTrack)
                                     .testTag("mini_player_next"),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
-                                    contentDescription = "Следующий трек (удержание: перемотка вперед на 10 сек)",
+                                    contentDescription = "Следующий трек",
                                     tint = colorScheme.onSurfaceColor,
                                     modifier = Modifier.size(26.dp)
                                 )
@@ -658,6 +601,20 @@ fun MiniPlayer(
                         }
                     }
                 }
+
+                // Non-interactive playback progress, placed beneath the artwork, metadata and controls.
+                InteractiveMiniProgressBar(
+                    position = position,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    onSeek = {},
+                    accentColor = colorScheme.accentColor,
+                    trackColor = colorScheme.progressTrackColor,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp),
+                    alpha = getMiniControlsAlpha(),
+                    interactive = false,
+                    testTag = "mini_player_progress"
+                )
             }
         }
     }

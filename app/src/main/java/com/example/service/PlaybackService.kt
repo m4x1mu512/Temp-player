@@ -158,22 +158,22 @@ class PlaybackService : MediaSessionService() {
 
             override fun seekToNext() {
                 Log.d(TAG, "next")
-                playbackManager.nextTrack(autoPlayIfPaused = true)
+                playbackManager.nextTrack(autoPlayIfPaused = false)
             }
 
             override fun seekToNextMediaItem() {
                 Log.d(TAG, "next")
-                playbackManager.nextTrack(autoPlayIfPaused = true)
+                playbackManager.nextTrack(autoPlayIfPaused = false)
             }
 
             override fun seekToPrevious() {
                 Log.d(TAG, "previous")
-                playbackManager.previousTrack(autoPlayIfPaused = true)
+                playbackManager.previousTrack(autoPlayIfPaused = false)
             }
 
             override fun seekToPreviousMediaItem() {
                 Log.d(TAG, "previous")
-                playbackManager.previousTrack(autoPlayIfPaused = true)
+                playbackManager.previousTrack(autoPlayIfPaused = false)
             }
 
             override fun seekTo(positionMs: Long) {
@@ -182,6 +182,21 @@ class PlaybackService : MediaSessionService() {
 
             override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
                 playbackManager.seekTo(positionMs)
+            }
+
+            // Some MP3 files (especially VBR files without a Xing/Info header) can
+            // report TIME_UNSET from the extractor even though the library has a
+            // known duration. Expose that known duration to MediaSession/system UI.
+            override fun getDuration(): Long {
+                val playerDuration = super.getDuration()
+                if (playerDuration != C.TIME_UNSET && playerDuration > 0L) {
+                    return playerDuration
+                }
+                return playbackManager.duration.value.takeIf { it > 0L } ?: C.TIME_UNSET
+            }
+
+            override fun isCurrentMediaItemSeekable(): Boolean {
+                return super.isCurrentMediaItemSeekable() || playbackManager.duration.value > 0L
             }
 
             override fun getAvailableCommands(): Player.Commands {
@@ -232,13 +247,13 @@ class PlaybackService : MediaSessionService() {
             requestSystemAudioFocus()
         }
 
-        Log.d(TAG, "Creating dual ExoPlayers for crossfade support")
+        // Only the first player is built here. The second one exists solely for crossfading
+        // and PlaybackManager creates it a few seconds into playback, so a cold start no
+        // longer constructs two full ExoPlayer instances before the first frame.
         val p1 = buildExoPlayer()
-        val p2 = buildExoPlayer()
         player1 = p1
-        player2 = p2
 
-        playbackManager.attachPlayers(p1, p2)
+        playbackManager.attachPlayers(p1)
 
         val sessionActivityPendingIntent = PendingIntent.getActivity(
             this,
@@ -322,14 +337,13 @@ class PlaybackService : MediaSessionService() {
         } catch (_: Exception) {}
         abandonSystemAudioFocus()
         serviceScope.cancel()
-        playbackManager.detachPlayer()
         mediaSession?.run {
             release()
             mediaSession = null
         }
-        Log.d(TAG, "RELEASING PLAYERS IN SERVICE")
-        player1?.release()
-        player2?.release()
+        // detachPlayer() releases both players, including a secondary one that only the
+        // manager knows about (it is created lazily during playback).
+        playbackManager.detachPlayer()
         player1 = null
         player2 = null
         super.onDestroy()

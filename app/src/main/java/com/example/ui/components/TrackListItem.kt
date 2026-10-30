@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -69,16 +72,26 @@ fun TrackListItem(
     isHighlighted: Boolean = false,
     showReorderHandle: Boolean = false,
     reorderModifier: Modifier = Modifier,
-    onEditTrackInfo: (() -> Unit)? = null
+    onEditTrackInfo: (() -> Unit)? = null,
+    onPlayNext: (() -> Unit)? = null,
+    onAddToQueue: (() -> Unit)? = null,
+    onRemoveFromQueue: (() -> Unit)? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
+    // Track rows can recompose when playback/favorite state changes. Keep the
+    // formatted subtitle stable unless its actual source fields change.
+    val trackSubtitle = remember(track.artist, track.duration) {
+        "${track.artist} • ${track.formattedDuration()}"
+    }
+
     val targetBgColor = when {
         isDragging -> MaterialTheme.colorScheme.surfaceVariant
-        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        else -> Color.Transparent
+        isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.085f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.22f)
     }
 
     val itemBgColor by animateColorAsState(
@@ -87,24 +100,41 @@ fun TrackListItem(
         label = "track_item_bg_${track.id}"
     )
 
-    val itemShape = if (isDragging) RoundedCornerShape(16.dp) else RoundedCornerShape(0.dp)
+    val itemShape = RoundedCornerShape(if (isDragging) 18.dp else 14.dp)
+    val itemBorderColor = when {
+        isDragging -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.70f)
+        isCurrent -> MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
+        isHighlighted -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.28f)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f)
+    }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 3.dp)
             .clip(itemShape)
             .clickable { onClick() }
             .background(itemBgColor)
-            .padding(start = 16.dp, end = 2.dp, top = 6.dp, bottom = 6.dp)
+            .border(
+                width = 1.dp,
+                color = itemBorderColor,
+                shape = itemShape
+            )
+            .padding(start = 9.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
             .testTag("track_item_${track.id}")
     ) {
         // Thumbnail with playing overlay
         Box(
             modifier = Modifier
-                .size(50.dp)
+                .size(54.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
+                    shape = RoundedCornerShape(12.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             val thumbnailRequest = remember(track.albumArtUri) {
@@ -120,14 +150,19 @@ fun TrackListItem(
                 model = thumbnailRequest,
                 contentDescription = "Обложка ${track.title}",
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(50.dp)
+                modifier = Modifier.size(54.dp)
             )
 
             if (isCurrent) {
+                val playingOverlayAlpha by animateFloatAsState(
+                    targetValue = if (isPlaying) 0.46f else 0.28f,
+                    animationSpec = tween(durationMillis = 260),
+                    label = "playing_overlay_alpha_${track.id}"
+                )
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = playingOverlayAlpha)),
                     contentAlignment = Alignment.Center
                 ) {
                     val eqScale by animateFloatAsState(
@@ -163,7 +198,7 @@ fun TrackListItem(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${track.artist} • ${track.formattedDuration()}",
+                text = trackSubtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -227,7 +262,11 @@ fun TrackListItem(
 
                 DropdownMenu(
                     expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false }
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(26.dp),
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 8.dp
                 ) {
                     if (onEditTrackInfo != null) {
                         DropdownMenuItem(
@@ -238,6 +277,47 @@ fun TrackListItem(
                                 onEditTrackInfo()
                             },
                             modifier = Modifier.testTag("menu_edit_info_${track.id}")
+                        )
+                    }
+                    if (onPlayNext != null) {
+                        DropdownMenuItem(
+                            text = { Text("Играть следующей") },
+                            leadingIcon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onPlayNext()
+                            }
+                        )
+                    }
+                    if (onAddToQueue != null) {
+                        DropdownMenuItem(
+                            text = { Text("Добавить в очередь") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onAddToQueue()
+                            }
+                        )
+                    }
+                    if (onRemoveFromQueue != null) {
+                        DropdownMenuItem(
+                            text = { Text("Удалить из очереди") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onRemoveFromQueue()
+                            }
+                        )
+                    }
+                    if (onRemoveFromPlaylist != null) {
+                        DropdownMenuItem(
+                            text = { Text("Удалить из плейлиста") },
+                            leadingIcon = { Icon(Icons.Default.QueueMusic, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                onRemoveFromPlaylist()
+                            },
+                            modifier = Modifier.testTag("menu_remove_from_playlist_${track.id}")
                         )
                     }
                     DropdownMenuItem(

@@ -34,6 +34,8 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
@@ -58,8 +60,13 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -93,11 +100,12 @@ fun SettingsScreen(
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
+    val yellowAccentOnLightTheme = themeMode == ThemeMode.LIGHT && accentColor == AccentColor.CYBER_YELLOW
+    val globalBackgroundEnabled by viewModel.globalBackgroundEnabled.collectAsStateWithLifecycle()
     val visualizerEnabled by viewModel.visualizerEnabled.collectAsStateWithLifecycle()
     val visualizerSensitivity by viewModel.visualizerSensitivity.collectAsStateWithLifecycle()
 
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
-    val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
@@ -106,20 +114,32 @@ fun SettingsScreen(
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
 
-    val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
     val isEqualizerEnabled by viewModel.isEqualizerEnabled.collectAsStateWithLifecycle()
-
     val rawTracks by viewModel.rawTracks.collectAsStateWithLifecycle()
+    val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
-    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val position by viewModel.playbackPosition.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    // Playback position and isPlaying were collected here but never read: every 250 ms the
+    // whole settings screen recomposed while music played. Equalizer bands and the sleep
+    // timer countdown are read inside their dialogs instead.
 
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val folderPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: Exception) { }
+            viewModel.addMusicFolder(uri.toString())
+        }
+    }
 
     Scaffold(
         modifier = modifier
@@ -150,16 +170,6 @@ fun SettingsScreen(
                 )
             )
         },
-        bottomBar = {
-            if (currentTrack != null) {
-                Spacer(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(72.dp)
-                        .navigationBarsPadding()
-                )
-            }
-        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -174,6 +184,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -198,10 +209,36 @@ fun SettingsScreen(
                                 modifier = Modifier.testTag("theme_chip_${mode.name.lowercase()}"),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    selectedLabelColor = if (yellowAccentOnLightTheme && mode == ThemeMode.LIGHT) Color.White else MaterialTheme.colorScheme.onPrimary
                                 )
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                            Text(
+                                text = "Общий фон",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (globalBackgroundEnabled) "Использовать цвет выбранного акцента" else "Белый или чёрный фон без акцентного оттенка",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = globalBackgroundEnabled,
+                            onCheckedChange = { viewModel.setGlobalBackgroundEnabled(it) },
+                            modifier = Modifier.testTag("global_background_toggle_switch")
+                        )
                     }
                 }
             }
@@ -212,6 +249,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -219,12 +257,12 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Акцентный цвет интерфейса",
+                        text = "Акцент фона",
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Неоновые цвета кнопок, вкладок, ползунков и индикаторов",
+                        text = "Выбери оттенок фона и акцентных элементов приложения",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -234,7 +272,7 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AccentColor.values().forEach { accent ->
@@ -242,6 +280,7 @@ fun SettingsScreen(
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
+                                    .width(72.dp)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
@@ -296,6 +335,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -332,8 +372,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_album_art"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
@@ -354,8 +394,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_light"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
                     }
@@ -383,8 +423,8 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_dark"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary,
+                                selectedLeadingIconColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
@@ -395,20 +435,10 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("mini_player_bg_system"),
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
                             )
                         )
 
-                        FilterChip(
-                            selected = miniPlayerBgMode == MiniPlayerBgMode.CUSTOM,
-                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.CUSTOM) },
-                            label = { Text("Палитра") },
-                            modifier = Modifier.testTag("mini_player_bg_custom"),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -448,12 +478,12 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK, MiniPlayerBgMode.CUSTOM -> {
+                        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK -> {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 val paletteTitle = when (miniPlayerBgMode) {
                                     MiniPlayerBgMode.LIGHT -> "Светлые однотонные оттенки:"
                                     MiniPlayerBgMode.DARK -> "Тёмные однотонные оттенки:"
-                                    else -> "Выбор оттенка фона:"
+                                    else -> ""
                                 }
                                 Text(
                                     text = paletteTitle,
@@ -479,16 +509,7 @@ fun SettingsScreen(
                                         0xFF27131BL to "Винный бордо",
                                         0xFF20132DL to "Тёмный аметист"
                                     )
-                                    else -> listOf(
-                                        0xFFFFFFFFL to "Белый",
-                                        0xFFFAF6F0L to "Крем",
-                                        0xFFEBF4F6L to "Голубой",
-                                        0xFF17171AL to "Оникс",
-                                        0xFF1F2026L to "Графит",
-                                        0xFF141D2CL to "Синий",
-                                        0xFF0E221BL to "Изумруд",
-                                        0xFF27131BL to "Бордо"
-                                    )
+                                    else -> emptyList()
                                 }
 
                                 Row(
@@ -561,6 +582,7 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                        MiniPlayerBgMode.CUSTOM -> Unit
                     }
                 }
             }
@@ -571,6 +593,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -612,6 +635,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -649,6 +673,13 @@ fun SettingsScreen(
 
                     if (visualizerEnabled) {
                         Spacer(modifier = Modifier.height(14.dp))
+                        // Drag locally and persist once. Previously every pixel of movement
+                        // wrote DataStore, and the thumb only moved after the write came back
+                        // through the flow - the slider felt sticky and the file was rewritten
+                        // dozens of times per second.
+                        var localSensitivity by remember(visualizerSensitivity) {
+                            mutableFloatStateOf(visualizerSensitivity)
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -660,15 +691,22 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "${(visualizerSensitivity * 100).roundToInt()}%",
+                                text = "${(localSensitivity * 100).roundToInt()}%",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Slider(
-                            value = visualizerSensitivity,
-                            onValueChange = { viewModel.setVisualizerSensitivity(((it * 10).roundToInt()) / 10f) },
+                            value = localSensitivity,
+                            onValueChange = { raw ->
+                                val snapped = (raw * 10).roundToInt() / 10f
+                                localSensitivity = snapped
+                                viewModel.previewVisualizerSensitivity(snapped)
+                            },
+                            onValueChangeFinished = {
+                                viewModel.setVisualizerSensitivity(localSensitivity)
+                            },
                             valueRange = 0.2f..3.0f,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -686,6 +724,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -722,6 +761,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -755,6 +795,10 @@ fun SettingsScreen(
 
                     if (crossfadeEnabled) {
                         Spacer(modifier = Modifier.height(12.dp))
+                        // Same as the sensitivity slider: drag locally, persist on release.
+                        var localCrossfade by remember(crossfadeDuration) {
+                            mutableFloatStateOf(crossfadeDuration.toFloat())
+                        }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -766,15 +810,18 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = "$crossfadeDuration с",
+                                text = "${localCrossfade.roundToInt()} с",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Slider(
-                            value = crossfadeDuration.toFloat(),
-                            onValueChange = { viewModel.setCrossfadeDurationSeconds(it.roundToInt()) },
+                            value = localCrossfade,
+                            onValueChange = { localCrossfade = it.roundToInt().toFloat() },
+                            onValueChangeFinished = {
+                                viewModel.setCrossfadeDurationSeconds(localCrossfade.roundToInt())
+                            },
                             valueRange = 1f..10f,
                             steps = 8,
                             modifier = Modifier
@@ -788,6 +835,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -821,11 +869,47 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
             ) {
                 Column {
+                    SettingsActionItem(
+                        icon = Icons.Default.FolderOpen,
+                        title = "Папки с музыкой",
+                        subtitle = if (musicFolders.isEmpty()) "Папки не выбраны" else "Выбрано папок: ${musicFolders.size}",
+                        onClick = { folderPicker.launch(null) },
+                        testTag = "settings_music_folders"
+                    )
+
+                    if (musicFolders.isNotEmpty()) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            musicFolders.forEach { folderUri ->
+                                val folderLabel = remember(folderUri) {
+                                    Uri.decode(folderUri.substringAfterLast("/tree/").substringBefore("/document/"))
+                                        .substringAfter(":")
+                                        .ifBlank { folderUri }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Text(
+                                        text = folderLabel,
+                                        modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 2
+                                    )
+                                    IconButton(onClick = { viewModel.removeMusicFolder(folderUri) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Удалить папку")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     SettingsActionItem(
                         icon = Icons.Default.Refresh,
                         title = "Пересканировать медиатеку",
@@ -852,6 +936,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -875,6 +960,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -907,6 +993,7 @@ fun SettingsScreen(
 
     // Dialogs
     if (showEqualizerDialog) {
+        val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
         EqualizerDialog(
             isEnabled = isEqualizerEnabled,
             bands = equalizerBands,
@@ -920,6 +1007,7 @@ fun SettingsScreen(
     }
 
     if (showSleepTimerDialog) {
+        val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
         SleepTimerDialog(
             currentMode = sleepTimerMode,
             remainingMillis = sleepTimerRemaining,

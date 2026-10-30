@@ -19,6 +19,7 @@ import com.example.data.model.ThemeMode
 import com.example.data.model.Track
 import com.example.data.model.VisualizerMode
 import com.example.service.PlaybackManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,14 +29,21 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val playbackManager = PlaybackManager.getInstance(application)
     private val repository = playbackManager.repository
     private val settingsDataStore = playbackManager.settingsDataStore
+    private val playlistOrderSaveMutex = Mutex()
+    private val favoriteOrderSaveMutex = Mutex()
+    private val allTracksOrderSaveMutex = Mutex()
 
     // Search and Filter State
     private val _navigateToPlayerEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -92,6 +100,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _selectedTab.value = tabIndex
     }
 
+    val musicFolders: StateFlow<List<String>> = settingsDataStore.musicFoldersFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = emptyList()
+    )
+
+    val musicFolderSetupCompleted: StateFlow<Boolean> = settingsDataStore.musicFolderSetupCompletedFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false
+    )
+
+    fun completeMusicFolderSetup() {
+        viewModelScope.launch {
+            settingsDataStore.completeMusicFolderSetup()
+        }
+    }
+
+    fun addMusicFolder(uri: String) {
+        viewModelScope.launch {
+            val updated = (musicFolders.value + uri).distinct()
+            settingsDataStore.saveMusicFolders(updated)
+        }
+    }
+
+    fun removeMusicFolder(uri: String) {
+        viewModelScope.launch {
+            settingsDataStore.saveMusicFolders(musicFolders.value.filterNot { it == uri })
+        }
+    }
+
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
@@ -132,9 +171,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             sortTrackList(tracks, sort)
         }
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
-        started = SharingStarted.Eagerly,
+        // Rendered only by the playlists tab. Eagerly starting it meant every heart tap
+        // re-filtered and re-sorted the favourites list no matter which tab was open.
+        started = SharingStarted.WhileSubscribed(5_000),
         initialValue = emptyList()
     )
 
@@ -162,7 +203,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             sortTrackList(tracks, sort)
         }
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList()
@@ -175,6 +216,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     )
 
     // Filtered and Sorted Tracks
+    // Filtering/sorting runs off the main thread: with 5-10k tracks the previous
+    // implementation did 4x String.lowercase() per track plus a sort on every keystroke
+    // and on every Room invalidation, blocking the frame.
     val displayedTracks: StateFlow<List<Track>> = combine(
         rawTracks,
         searchQuery,
@@ -183,16 +227,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val filtered = if (query.isBlank()) {
             tracks
         } else {
-            val q = query.trim().lowercase()
+            val q = query.trim()
             tracks.filter {
-                it.title.lowercase().contains(q) ||
-                        it.artist.lowercase().contains(q) ||
-                        it.album.lowercase().contains(q) ||
-                        it.folderName.lowercase().contains(q)
+                it.title.contains(q, ignoreCase = true) ||
+                        it.artist.contains(q, ignoreCase = true) ||
+                        it.album.contains(q, ignoreCase = true) ||
+                        it.folderName.contains(q, ignoreCase = true)
             }
         }
         sortTrackList(filtered, sort)
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.Eagerly,
         initialValue = emptyList()
@@ -224,25 +268,47 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Groupings
-    val folderGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.folderName }
-    }.stateIn(
+    // One pass builds all three maps. Previously each grouping ran its own groupBy plus a
+    // redundant combine(searchQuery) — three full passes over the library on every emission,
+    // even when the visible tab never rendered two of them.
+    private data class LibraryGroups(
+        val folders: Map<String, List<Track>> = emptyMap(),
+        val artists: Map<String, List<Track>> = emptyMap(),
+        val albums: Map<String, List<Track>> = emptyMap()
+    )
+
+    private val libraryGroups: StateFlow<LibraryGroups> = displayedTracks
+        .map { tracks ->
+            val folders = LinkedHashMap<String, MutableList<Track>>()
+            val artists = LinkedHashMap<String, MutableList<Track>>()
+            val albums = LinkedHashMap<String, MutableList<Track>>()
+            for (track in tracks) {
+                folders.getOrPut(track.folderName) { ArrayList() }.add(track)
+                artists.getOrPut(track.artist) { ArrayList() }.add(track)
+                albums.getOrPut(track.album) { ArrayList() }.add(track)
+            }
+            LibraryGroups(folders, artists, albums)
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = LibraryGroups()
+        )
+
+    val folderGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.folders }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()
     )
 
-    val artistGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.artist }
-    }.stateIn(
+    val artistGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.artists }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()
     )
 
-    val albumGroups: StateFlow<Map<String, List<Track>>> = displayedTracks.combine(searchQuery) { tracks, _ ->
-        tracks.groupBy { it.album }
-    }.stateIn(
+    val albumGroups: StateFlow<Map<String, List<Track>>> = libraryGroups.map { it.albums }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyMap()
@@ -284,6 +350,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = SettingsDataStore.getInitialThemeMode(application)
+    )
+
+    val globalBackgroundEnabled: StateFlow<Boolean> = settingsDataStore.globalBackgroundEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = true
     )
 
     val accentColor: StateFlow<AccentColor> = settingsDataStore.accentColorFlow.stateIn(
@@ -394,9 +466,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun scanMusic() {
         viewModelScope.launch {
+            if (musicFolders.value.isEmpty()) {
+                _scanMessage.value = "Сначала выберите папки с музыкой в настройках"
+                return@launch
+            }
             _isScanning.value = true
             try {
-                val count = repository.scanLocalMusic()
+                val count = repository.scanLocalMusic(musicFolders.value)
                 _scanMessage.value = if (count > 0) "Найдено треков: $count" else "Аудиофайлы не найдены"
                 if (currentQueue.value.isEmpty()) {
                     playbackManager.restoreSavedQueueAndTrack()
@@ -471,12 +547,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleFavorite(trackId: Long) {
+        // Track no longer carries isFavorite (the library flow would have to be rebuilt for
+        // every tap); the favourite set is the single source of truth here.
         val currentSet = _favoriteIds.value
-        val isCurrentlyFav = if (currentSet.isNotEmpty() || rawTracks.value.isEmpty()) {
-            currentSet.contains(trackId)
-        } else {
-            rawTracks.value.find { it.id == trackId }?.isFavorite == true
-        }
+        val isCurrentlyFav = currentSet.contains(trackId)
         val newSet = if (isCurrentlyFav) currentSet - trackId else currentSet + trackId
         _favoriteIds.value = newSet
 
@@ -611,7 +685,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                // WhileSubscribed, not Eagerly: the cache keeps one flow per playlist forever,
+                // and eagerly started flows meant a Room observer per playlist that re-ran on
+                // every change in the database, whether or not the playlist was on screen.
+                started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
             )
         }
@@ -625,23 +702,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.playWithShuffle(tracks, startTrack)
     }
 
+    fun playNext(track: Track) {
+        playbackManager.addTrackNext(track)
+    }
+
+    fun addToQueue(track: Track) {
+        val queue = playbackManager.queue.value.toMutableList()
+        queue.add(track)
+        playbackManager.setQueue(queue)
+    }
+
+    fun removeFromQueue(track: Track) {
+        playbackManager.removeTrackFromQueue(track)
+    }
+
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
-        if (playbackManager.queue.value.isEmpty() && allTracksOrdered.value.isNotEmpty()) {
-            playbackManager.setQueue(allTracksOrdered.value)
-        }
+        // Queue ordering belongs to the active playback queue only. Do not persist it
+        // as the library's "All tracks" order: the library and queue are independent lists.
         playbackManager.moveQueueTrack(fromIndex, toIndex)
-        val newQueue = playbackManager.queue.value
-        if (newQueue.isNotEmpty()) {
-            val newIds = newQueue.map { it.id }
-            _inMemoryAllTracksOrder.value = newIds
-            viewModelScope.launch {
-                try {
-                    settingsDataStore.saveCustomAllTracksOrder(newIds)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
     }
 
     fun movePlaylistTrack(playlistId: Long, fromIndex: Int, toIndex: Int) {
@@ -652,12 +730,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         current.add(toIndex, item)
         val newIds = current.map { it.id }
         _inMemoryPlaylistOrder.getOrPut(playlistId) { MutableStateFlow(null) }.value = newIds
+        // Commit the new order to the local cache immediately so it survives process restarts.
         settingsDataStore.saveCachedPlaylistOrder(playlistId, newIds)
         viewModelScope.launch {
-            try {
-                repository.reorderPlaylistTracks(playlistId, newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            playlistOrderSaveMutex.withLock {
+                try {
+                    // A second drag may finish before the previous database write starts.
+                    // Persist the latest in-memory order, not a stale snapshot from an earlier drag.
+                    val latestIds = _inMemoryPlaylistOrder[playlistId]?.value ?: newIds
+                    settingsDataStore.saveCachedPlaylistOrder(playlistId, latestIds)
+                    repository.reorderPlaylistTracks(playlistId, latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -669,12 +754,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         current.add(toIndex, item)
         val newIds = current.map { it.id }
         _inMemoryFavoriteOrder.value = newIds
+        // Persist the visible order immediately; serialize database writes so a
+        // previous drag cannot overwrite a newer order.
         settingsDataStore.saveCachedFavoritesOrder(newIds)
         viewModelScope.launch {
-            try {
-                repository.reorderFavorites(newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            favoriteOrderSaveMutex.withLock {
+                try {
+                    val latestIds = _inMemoryFavoriteOrder.value ?: newIds
+                    settingsDataStore.saveCachedFavoritesOrder(latestIds)
+                    repository.reorderFavorites(latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
@@ -687,15 +778,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val newIds = current.map { it.id }
         _inMemoryAllTracksOrder.value = newIds
         viewModelScope.launch {
-            try {
-                settingsDataStore.saveCustomAllTracksOrder(newIds)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            allTracksOrderSaveMutex.withLock {
+                try {
+                    // A fast second drag must not be overwritten by a slower earlier save.
+                    val latestIds = _inMemoryAllTracksOrder.value ?: newIds
+                    settingsDataStore.saveCustomAllTracksOrder(latestIds)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
-        if (playbackManager.queue.value.isNotEmpty()) {
-            playbackManager.setQueue(current)
-        }
+        // Reordering the library must not replace or reorder the active playback queue.
     }
 
     fun setSleepTimer(minutes: Int) {
@@ -780,6 +873,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setGlobalBackgroundEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setGlobalBackgroundEnabled(enabled)
+        }
+    }
+
     fun setAccentColor(accentColor: AccentColor) {
         viewModelScope.launch {
             settingsDataStore.setAccentColor(accentColor)
@@ -829,6 +928,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             settingsDataStore.setVisualizerSensitivity(sensitivity)
             playbackManager.visualizerController.updateConfig(visualizerBands.value, sensitivity)
         }
+    }
+
+    /**
+     * Live feedback while the user drags the slider: reconfigures the running visualizer
+     * without touching DataStore. The value is persisted once, when the drag ends.
+     */
+    fun previewVisualizerSensitivity(sensitivity: Float) {
+        playbackManager.visualizerController.updateConfig(visualizerBands.value, sensitivity)
     }
 
     fun setMiniPlayerBgMode(mode: MiniPlayerBgMode) {

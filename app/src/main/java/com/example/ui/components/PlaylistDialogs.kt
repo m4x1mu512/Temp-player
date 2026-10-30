@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -27,6 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -84,14 +88,16 @@ fun CreatePlaylistDialog(
 fun AddToPlaylistDialog(
     track: Track,
     playlists: List<Playlist>,
+    getPlaylistTracks: (Long) -> StateFlow<List<Track>>,
     onPlaylistSelected: (Playlist) -> Unit,
     onCreateNewClicked: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
@@ -141,28 +147,50 @@ fun AddToPlaylistDialog(
                     )
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxWidth().height(200.dp)) {
-                        items(playlists) { pl ->
+                        items(playlists, key = { it.id }) { pl ->
+                            val playlistTracksFlow = remember(pl.id) { getPlaylistTracks(pl.id) }
+                            val playlistTracks by playlistTracksFlow.collectAsStateWithLifecycle()
+                            val alreadyContainsTrack = playlistTracks.any { it.id == track.id }
+
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .background(
+                                        color = if (alreadyContainsTrack) {
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        },
+                                        shape = RoundedCornerShape(14.dp)
+                                    )
                                     .clickable {
                                         onPlaylistSelected(pl)
                                         onDismiss()
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 4.dp)
+                                    .padding(vertical = 12.dp, horizontal = 10.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.QueueMusic,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = if (alreadyContainsTrack) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(end = 12.dp)
                                 )
                                 Text(
                                     text = pl.name,
                                     style = MaterialTheme.typography.bodyLarge,
+                                    color = if (alreadyContainsTrack) MaterialTheme.colorScheme.onPrimaryContainer
+                                    else MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
+                                if (alreadyContainsTrack) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Трек уже добавлен",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
                             }
                         }
                     }

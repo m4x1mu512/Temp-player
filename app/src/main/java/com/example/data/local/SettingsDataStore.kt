@@ -77,7 +77,7 @@ class SettingsDataStore(private val context: Context) {
                 context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_CACHED_THEME_MODE, mode.name)
-                    .commit()
+                    .apply()
             } catch (_: Exception) {}
         }
 
@@ -99,12 +99,13 @@ class SettingsDataStore(private val context: Context) {
                 context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY_CACHED_ACCENT_COLOR, accentColor.name)
-                    .commit()
+                    .apply()
             } catch (_: Exception) {}
         }
 
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_ACCENT_COLOR = stringPreferencesKey("accent_color")
+        private val KEY_GLOBAL_BACKGROUND_ENABLED = booleanPreferencesKey("global_background_enabled")
         private val KEY_VISUALIZER_ENABLED = booleanPreferencesKey("visualizer_enabled")
         private val KEY_VISUALIZER_MODE = stringPreferencesKey("visualizer_mode")
         private val KEY_VISUALIZER_BANDS = intPreferencesKey("visualizer_bands")
@@ -136,6 +137,32 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_QUEUE_TRACK_IDS = stringPreferencesKey("queue_track_ids")
         private val KEY_LAST_QUEUE_INDEX = intPreferencesKey("last_queue_index")
         private val KEY_CUSTOM_ALL_TRACKS_ORDER = stringPreferencesKey("custom_all_tracks_order")
+        private val KEY_MUSIC_FOLDERS = stringPreferencesKey("music_folders")
+        private val KEY_MUSIC_FOLDER_SETUP_COMPLETED = booleanPreferencesKey("music_folder_setup_completed")
+    }
+
+    val musicFoldersFlow: Flow<List<String>> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MUSIC_FOLDERS]
+            ?.split("\n")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+    }
+
+    val musicFolderSetupCompletedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_MUSIC_FOLDER_SETUP_COMPLETED] ?: false
+    }
+
+    suspend fun completeMusicFolderSetup() {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MUSIC_FOLDER_SETUP_COMPLETED] = true
+        }
+    }
+
+    suspend fun saveMusicFolders(uris: List<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_MUSIC_FOLDERS] = uris.distinct().joinToString("\n")
+        }
     }
 
     fun getInitialCustomAllTracksOrder(): List<Long> {
@@ -169,7 +196,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString("cached_favorites_order", ids.joinToString(","))
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -188,7 +215,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_CACHED_SORT_ORDER, order.name)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -203,7 +230,7 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString("cached_playlist_order_$playlistId", ids.joinToString(","))
-                .commit()
+                .apply()
         } catch (_: Exception) {}
     }
 
@@ -241,7 +268,7 @@ class SettingsDataStore(private val context: Context) {
                 .edit()
                 .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, str)
                 .putString(KEY_CACHED_QUEUE_TRACK_IDS, str)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = str
@@ -307,6 +334,10 @@ class SettingsDataStore(private val context: Context) {
         } catch (_: Exception) {
             ThemeMode.SYSTEM
         }
+    }
+
+    val globalBackgroundEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_GLOBAL_BACKGROUND_ENABLED] ?: true
     }
 
     val accentColorFlow: Flow<AccentColor> = context.dataStore.data.map { preferences ->
@@ -440,6 +471,12 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun setGlobalBackgroundEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_GLOBAL_BACKGROUND_ENABLED] = enabled
+        }
+    }
+
     suspend fun setAccentColor(accentColor: AccentColor) {
         saveCachedAccentColor(context, accentColor)
         context.dataStore.edit { preferences ->
@@ -489,7 +526,9 @@ class SettingsDataStore(private val context: Context) {
             if (queueIndex != null) {
                 editor.putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
             }
-            editor.commit()
+            // apply() writes in the background; commit() blocked the caller until the disk
+            // flush completed, and this runs on UI-adjacent paths.
+            editor.apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_LAST_TRACK_ID] = trackId
@@ -513,7 +552,7 @@ class SettingsDataStore(private val context: Context) {
                 .putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
                 .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
                 .putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
-                .commit()
+                .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_QUEUE_TRACK_IDS] = qStr

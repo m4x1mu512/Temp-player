@@ -10,10 +10,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TrackDao {
-    @Query("SELECT * FROM tracks ORDER BY title COLLATE NOCASE ASC")
+    // No ORDER BY on purpose: SQLite sorted every row with COLLATE NOCASE on each emission,
+    // and the result was sorted again in memory by the view model (the library has a user
+    // selectable sort order), so the SQL sort was duplicated work on the database thread.
+    @Query("SELECT * FROM tracks")
     fun getAllTracks(): Flow<List<TrackEntity>>
 
-    @Query("SELECT * FROM tracks ORDER BY title COLLATE NOCASE ASC")
+    @Query("SELECT * FROM tracks")
     fun getAllTracksDirect(): List<TrackEntity>
 
     @Query("SELECT * FROM tracks WHERE id = :id LIMIT 1")
@@ -39,6 +42,9 @@ interface TrackDao {
 
     @Query("UPDATE tracks SET title = :title, artist = :artist, album = :album, genre = :genre, year = :year, isCustomEdited = 1 WHERE id = :id")
     suspend fun updateTrackInfo(id: Long, title: String, artist: String, album: String, genre: String, year: String)
+
+    @Query("DELETE FROM tracks WHERE id IN (:ids)")
+    suspend fun deleteTracksByIds(ids: List<Long>)
 
     @Query("DELETE FROM tracks WHERE id NOT IN (:validIds)")
     suspend fun deleteTracksNotIn(validIds: List<Long>)

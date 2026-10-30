@@ -107,6 +107,15 @@ abstract class RhythmAudioProcessor : AudioProcessor {
             return
         }
 
+        // Pass the buffer straight through when the effect is inactive. Copying it into our
+        // own buffer first meant a full memcpy per audio buffer on the audio thread - four
+        // processors are chained, and with every effect off none of them has anything to do.
+        // The samples are identical either way.
+        if (isBypassed()) {
+            outputBuffer = inputBuffer
+            return
+        }
+
         val size = inputBuffer.remaining()
         if (buffer.capacity() < size) {
             if (buffer !== AudioProcessor.EMPTY_BUFFER) releaseByteBuffer(buffer)
@@ -117,20 +126,16 @@ abstract class RhythmAudioProcessor : AudioProcessor {
         buffer.flip()
         outputBuffer = buffer
 
-        if (isBypassed()) {
-            return
-        }
-
         val sampleCount = size / 2
         val samples = acquireShortArray(sampleCount)
         try {
-            buffer.position(0)
-            buffer.asShortBuffer().get(samples, 0, sampleCount)
+            val shortBuffer = buffer.asShortBuffer()
+            shortBuffer.get(samples, 0, sampleCount)
 
             processSamples(samples, sampleCount)
 
-            buffer.position(0)
-            buffer.asShortBuffer().put(samples, 0, sampleCount)
+            shortBuffer.position(0)
+            shortBuffer.put(samples, 0, sampleCount)
         } finally {
             releaseShortArray(samples)
         }

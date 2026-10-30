@@ -59,7 +59,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -256,9 +256,25 @@ fun PlayerScreen(
     }
 
     val coroutineScope = rememberCoroutineScope()
-    val dragOffsetY = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        dragOffsetY.snapTo(0f)
+    // Pointer movement updates this scalar directly; graphicsLayer reads it without
+    // recomposing the player hierarchy. Animatable is reserved for settle animation.
+    val dragOffsetY = remember { mutableFloatStateOf(0f) }
+    val dragSettleAnimation = remember { Animatable(0f) }
+    var isDragSettling by remember { mutableStateOf(false) }
+    val returnDragToStart: () -> Unit = {
+        coroutineScope.launch {
+            dragSettleAnimation.snapTo(dragOffsetY.value)
+            isDragSettling = true
+            dragSettleAnimation.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+            dragOffsetY.value = 0f
+            isDragSettling = false
+        }
     }
     val localDensity = LocalDensity.current
     val dismissThresholdPx = with(localDensity) { 90.dp.toPx() }
@@ -328,7 +344,10 @@ fun PlayerScreen(
         }
     }
 
-    MaterialTheme(colorScheme = playerMaterialColorScheme) {
+    MaterialTheme(
+        colorScheme = playerMaterialColorScheme,
+        typography = com.example.ui.theme.Typography
+    ) {
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -347,7 +366,7 @@ fun PlayerScreen(
                     }
                 )
                 .graphicsLayer {
-                    translationY = dragOffsetY.value.coerceAtLeast(0f)
+                    translationY = (if (isDragSettling) dragSettleAnimation.value else dragOffsetY.value).coerceAtLeast(0f)
                 }
                 .testTag("player_screen")
         ) {
@@ -367,24 +386,21 @@ fun PlayerScreen(
                                 if (dragOffsetY.value > dismissThresholdPx) {
                                     onNavigateBack()
                                 } else {
-                                    coroutineScope.launch {
-                                        dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                    }
+                                    returnDragToStart()
                                 }
                                 dragDistanceY = 0f
                             },
                             onDragCancel = {
-                                coroutineScope.launch {
-                                    dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                }
+                                returnDragToStart()
                                 dragDistanceY = 0f
                             },
                             onDrag = { _, dragAmount ->
                                 dragDistanceY += dragAmount.y
-                                if (dragAmount.y > 0 || dragOffsetY.value > 0f) {
-                                    coroutineScope.launch {
-                                        dragOffsetY.snapTo((dragOffsetY.value + dragAmount.y).coerceAtLeast(0f))
-                                    }
+                                if (dragAmount.y > 0f || dragOffsetY.value > 0f) {
+                                    // No coroutine or Animatable mutation per pointer event.
+                                    // The graphics layer consumes this value directly.
+                                    dragOffsetY.value =
+                                        (dragOffsetY.value + dragAmount.y).coerceAtLeast(0f)
                                 }
                             }
                         )
@@ -504,7 +520,7 @@ fun PlayerScreen(
                                     state = pagerState,
                                     modifier = Modifier.fillMaxSize(),
                                     pageSpacing = 16.dp,
-                                    key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                                    key = { page -> "$page-${pagerTracks.getOrNull(page)?.id ?: page}" }
                                 ) { page ->
                                     val pageTrack = pagerTracks.getOrNull(page)
                                     if (pageTrack != null) {
@@ -599,7 +615,7 @@ fun PlayerScreen(
                                 Text(
                                     text = track.artist,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -860,24 +876,19 @@ fun PlayerScreen(
                                         if (dragOffsetY.value > dismissThresholdPx) {
                                             onNavigateBack()
                                         } else {
-                                            coroutineScope.launch {
-                                                dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                            }
+                                            returnDragToStart()
                                         }
                                         dragDistanceY = 0f
                                     },
                                     onDragCancel = {
-                                        coroutineScope.launch {
-                                            dragOffsetY.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow))
-                                        }
+                                        returnDragToStart()
                                         dragDistanceY = 0f
                                     },
                                     onVerticalDrag = { _, dragAmount ->
                                         dragDistanceY += dragAmount
                                         if (dragAmount > 0f || dragOffsetY.value > 0f) {
-                                            coroutineScope.launch {
-                                                dragOffsetY.snapTo((dragOffsetY.value + dragAmount).coerceAtLeast(0f))
-                                            }
+                                            dragOffsetY.value =
+                                                (dragOffsetY.value + dragAmount).coerceAtLeast(0f)
                                         }
                                     }
                                 )
@@ -897,7 +908,7 @@ fun PlayerScreen(
                                 state = pagerState,
                                 modifier = Modifier.fillMaxSize(),
                                 pageSpacing = 16.dp,
-                                key = { page -> pagerTracks.getOrNull(page)?.id ?: page }
+                                key = { page -> "$page-${pagerTracks.getOrNull(page)?.id ?: page}" }
                             ) { page ->
                                 val pageTrack = pagerTracks.getOrNull(page)
                                 if (pageTrack != null) {
@@ -921,10 +932,10 @@ fun PlayerScreen(
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
-                                .fillMaxWidth()
+                                // Extend beyond the padded player column so the visualizer reaches both screen edges.
+                                .requiredWidth(configuration.screenWidthDp.dp)
                                 .height(if (isCompact) 30.dp else if (isMedium) 36.dp else 42.dp)
                                 .padding(vertical = 1.dp)
-                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { viewModel.cycleVisualizerMode() }
                                 .graphicsLayer { alpha = getPlayerControlsAlpha() }
                                 .testTag("player_visualizer_container_portrait")
@@ -983,7 +994,7 @@ fun PlayerScreen(
                         Text(
                             text = track.artist,
                             style = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1272,6 +1283,7 @@ fun PlayerScreen(
         AddToPlaylistDialog(
             track = currentTrack!!,
             playlists = playlists,
+            getPlaylistTracks = { viewModel.getPlaylistTracks(it) },
             onPlaylistSelected = { pl ->
                 viewModel.addTrackToPlaylist(pl.id, currentTrack!!.id)
                 showAddToPlaylistDialog = false
@@ -1538,10 +1550,10 @@ private fun PlayerArtworkCard(
                 modifier = Modifier
                     .fillMaxSize(0.94f)
                     .shadow(
-                        elevation = if (isPlaying) (if (isLandscape) 20.dp else 28.dp) else (if (isLandscape) 8.dp else 10.dp),
+                        elevation = if (isPlaying) (if (isLandscape) 16.dp else 22.dp) else (if (isLandscape) 7.dp else 9.dp),
                         shape = RoundedCornerShape(if (isLandscape) 22.dp else 28.dp),
-                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.2f),
-                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.45f) else Color.Transparent
+                        spotColor = if (isPlaying) NeonCyan.copy(alpha = 0.32f) else Color.Black.copy(alpha = 0.16f),
+                        ambientColor = if (isPlaying) NeonPurple.copy(alpha = 0.18f) else Color.Transparent
                     )
             )
             Box(
@@ -1632,10 +1644,10 @@ private fun PlayerProgressSection(
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
             inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            trackHeight = 3.dp,
-            thumbRadius = 5.5.dp,
-            glowRadius = 18.dp,
-            glowAlpha = 0.55f,
+            trackHeight = 4.dp,
+            thumbRadius = 5.dp,
+            glowRadius = 14.dp,
+            glowAlpha = 0.36f,
             testTag = sliderTestTag
         )
 

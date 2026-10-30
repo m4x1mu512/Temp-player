@@ -24,6 +24,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -67,6 +68,21 @@ fun GlowProgressSlider(
     val currentOnValueChange by rememberUpdatedState(onValueChange)
     val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
 
+    // One gradient, drawn through a translate/scale transform. Building a fresh
+    // Brush.radialGradient for every frame allocated a list plus a shader ~60 times per
+    // second for the whole duration of playback.
+    val glowBrush = remember(accentColor, glowAlpha) {
+        Brush.radialGradient(
+            colors = listOf(
+                accentColor.copy(alpha = glowAlpha),
+                accentColor.copy(alpha = glowAlpha * 0.45f),
+                Color.Transparent
+            ),
+            center = Offset(1f, 1f),
+            radius = 1f
+        )
+    }
+
     LaunchedEffect(currentTargetFraction, isDragging) {
         if (!isDragging) {
             if (abs(animatedFraction.value - currentTargetFraction) > 0.05f) {
@@ -79,8 +95,6 @@ fun GlowProgressSlider(
             }
         }
     }
-
-    val displayFraction = if (isDragging) dragProgressFraction else animatedFraction.value
 
     Box(
         modifier = modifier
@@ -145,7 +159,11 @@ fun GlowProgressSlider(
             val availableWidth = (endX - startX).coerceAtLeast(1f)
 
             val centerY = size.height / 2f
-            val thumbX = startX + availableWidth * displayFraction.coerceIn(0f, 1f)
+            // Read in the draw phase only: reading the Animatable during composition
+            // recomposed this whole node on every animation frame.
+            val fraction =
+                (if (isDragging) dragProgressFraction else animatedFraction.value).coerceIn(0f, 1f)
+            val thumbX = startX + availableWidth * fraction
 
             // 1. Inactive Track (Thinner, with rounded caps)
             drawLine(
@@ -171,19 +189,16 @@ fun GlowProgressSlider(
             // Uses drawRect with Brush.radialGradient centered at Offset(thumbX, centerY)
             // Colors transition from accentColor.copy(alpha = 0.55f) to Color.Transparent at radius ~18.dp
             val effectiveGlowRadius = if (isDragging) glowRadiusPx * 1.25f else glowRadiusPx
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        accentColor.copy(alpha = glowAlpha),
-                        accentColor.copy(alpha = glowAlpha * 0.45f),
-                        Color.Transparent
-                    ),
-                    center = Offset(thumbX, centerY),
-                    radius = effectiveGlowRadius
-                ),
-                topLeft = Offset(thumbX - effectiveGlowRadius, centerY - effectiveGlowRadius),
-                size = Size(effectiveGlowRadius * 2f, effectiveGlowRadius * 2f)
-            )
+            withTransform({
+                translate(thumbX - effectiveGlowRadius, centerY - effectiveGlowRadius)
+                scale(effectiveGlowRadius, effectiveGlowRadius, pivot = Offset.Zero)
+            }) {
+                drawRect(
+                    brush = glowBrush,
+                    topLeft = Offset.Zero,
+                    size = Size(2f, 2f)
+                )
+            }
 
             // 4. Thumb Knob (Sleek circle with subtle elevation & inner core)
             val currentThumbRadius = if (isDragging) thumbRadiusPx * 1.25f else thumbRadiusPx

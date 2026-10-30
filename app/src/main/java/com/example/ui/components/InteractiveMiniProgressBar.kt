@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
@@ -52,6 +53,7 @@ fun InteractiveMiniProgressBar(
     modifier: Modifier = Modifier,
     alpha: Float = 1f,
     onScrubbingStateChanged: ((isScrubbing: Boolean, seekPositionMs: Long) -> Unit)? = null,
+    interactive: Boolean = true,
     testTag: String = "mini_player_interactive_progress"
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
@@ -79,13 +81,35 @@ fun InteractiveMiniProgressBar(
         }
     }
 
-    val displayFraction = if (isScrubbing) scrubFraction else animatedFraction.value
-
     val animatedTrackHeight: Dp by animateDpAsState(
         targetValue = if (isScrubbing) 5.dp else 3.5.dp,
         animationSpec = tween(120),
         label = "mini_track_height"
     )
+
+    // Hoisted: one shader per state instead of a new radial gradient every drawn frame.
+    val glowBrushIdle = remember(accentColor) {
+        Brush.radialGradient(
+            colors = listOf(
+                accentColor.copy(alpha = 0.40f),
+                accentColor.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(1f, 1f),
+            radius = 1f
+        )
+    }
+    val glowBrushScrubbing = remember(accentColor) {
+        Brush.radialGradient(
+            colors = listOf(
+                accentColor.copy(alpha = 0.65f),
+                accentColor.copy(alpha = 0.15f),
+                Color.Transparent
+            ),
+            center = Offset(1f, 1f),
+            radius = 1f
+        )
+    }
 
     Box(
         modifier = modifier
@@ -94,46 +118,52 @@ fun InteractiveMiniProgressBar(
             .graphicsLayer { this.alpha = alpha }
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(
-                    current = (displayFraction * duration.toFloat()),
+                    // Reading the Animatable here recomposed this node on every animation
+                    // frame for as long as the mini player was on screen.
+                    current = position.toFloat(),
                     range = 0f..(if (duration > 0) duration.toFloat() else 1f)
                 )
             }
-            .pointerInput(duration) {
-                detectTapGestures { offset ->
-                    if (duration > 0) {
-                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnSeek(targetMs)
+            .pointerInput(duration, interactive) {
+                if (interactive) {
+                    detectTapGestures { offset ->
+                        if (duration > 0) {
+                            val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnSeek(targetMs)
+                        }
                     }
                 }
             }
-            .pointerInput(duration) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                        isScrubbing = true
-                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        scrubFraction = fraction
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnScrubbingStateChanged?.invoke(true, targetMs)
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
-                        scrubFraction = fraction
-                        val targetMs = (fraction * duration).toLong()
-                        currentOnScrubbingStateChanged?.invoke(true, targetMs)
-                    },
-                    onDragEnd = {
-                        isScrubbing = false
-                        val targetMs = (scrubFraction * duration).toLong()
-                        currentOnSeek(targetMs)
-                        currentOnScrubbingStateChanged?.invoke(false, targetMs)
-                    },
-                    onDragCancel = {
-                        isScrubbing = false
-                        currentOnScrubbingStateChanged?.invoke(false, position)
-                    }
-                )
+            .pointerInput(duration, interactive) {
+                if (interactive) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            isScrubbing = true
+                            val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            scrubFraction = fraction
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnScrubbingStateChanged?.invoke(true, targetMs)
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            val fraction = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            scrubFraction = fraction
+                            val targetMs = (fraction * duration).toLong()
+                            currentOnScrubbingStateChanged?.invoke(true, targetMs)
+                        },
+                        onDragEnd = {
+                            isScrubbing = false
+                            val targetMs = (scrubFraction * duration).toLong()
+                            currentOnSeek(targetMs)
+                            currentOnScrubbingStateChanged?.invoke(false, targetMs)
+                        },
+                        onDragCancel = {
+                            isScrubbing = false
+                            currentOnScrubbingStateChanged?.invoke(false, position)
+                        }
+                    )
+                }
             }
             .testTag(testTag),
         contentAlignment = Alignment.CenterStart
@@ -141,7 +171,8 @@ fun InteractiveMiniProgressBar(
         Canvas(modifier = Modifier.matchParentSize()) {
             val centerY = size.height / 2f
             val width = size.width
-            val currentFraction = displayFraction.coerceIn(0f, 1f)
+            val currentFraction =
+                (if (isScrubbing) scrubFraction else animatedFraction.value).coerceIn(0f, 1f)
             val thumbX = width * currentFraction
             val trackHeightPx = animatedTrackHeight.toPx()
 
@@ -167,19 +198,16 @@ fun InteractiveMiniProgressBar(
 
             // 3. Radial Glow behind Thumb
             val glowRadiusPx = if (isScrubbing) 16.dp.toPx() else 10.dp.toPx()
-            drawRect(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        accentColor.copy(alpha = if (isScrubbing) 0.65f else 0.40f),
-                        accentColor.copy(alpha = 0.15f),
-                        Color.Transparent
-                    ),
-                    center = Offset(thumbX, centerY),
-                    radius = glowRadiusPx
-                ),
-                topLeft = Offset(thumbX - glowRadiusPx, centerY - glowRadiusPx),
-                size = Size(glowRadiusPx * 2f, glowRadiusPx * 2f)
-            )
+            withTransform({
+                translate(thumbX - glowRadiusPx, centerY - glowRadiusPx)
+                scale(glowRadiusPx, glowRadiusPx, pivot = Offset.Zero)
+            }) {
+                drawRect(
+                    brush = if (isScrubbing) glowBrushScrubbing else glowBrushIdle,
+                    topLeft = Offset.Zero,
+                    size = Size(2f, 2f)
+                )
+            }
 
             // 4. Thumb Knob
             val thumbRadiusPx = if (isScrubbing) 6.dp.toPx() else 3.5.dp.toPx()

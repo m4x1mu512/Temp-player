@@ -44,11 +44,24 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      // R8 on release: smaller dex means fewer page faults and faster class loading on the
+      // low-end Android 8-9 devices this app targets; it also removes dead Compose/Media3 code
+      // that would otherwise be verified and JIT-ed. Debug builds stay unminified.
+      isMinifyEnabled = true
+      isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    // Target for the :benchmark module: release-like (R8 on, so measurements match what ships)
+    // but signed with the debug key so it installs without the upload keystore.
+    create("benchmark") {
+      initWith(getByName("release"))
+      signingConfig = signingConfigs.getByName("debugConfig")
+      matchingFallbacks += listOf("release")
+      isDebuggable = false
+      isProfileable = true
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -79,6 +92,7 @@ googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.W
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
+  implementation(libs.kyant.backdrop)
   // implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
@@ -103,6 +117,10 @@ dependencies {
   implementation(libs.coil.compose)
   implementation(libs.reorderable)
   implementation(libs.androidx.palette.ktx)
+  // Installs the baseline profiles shipped inside the AndroidX artifacts (Compose UI,
+  // lifecycle, ...) on Android 8-11, where ART does not pick them up from the APK itself.
+  // Pure startup / first-scroll win: no visual or behavioural change.
+  implementation(libs.androidx.profileinstaller)
 
   // Media3 ExoPlayer & Session
   implementation(libs.androidx.media3.exoplayer)

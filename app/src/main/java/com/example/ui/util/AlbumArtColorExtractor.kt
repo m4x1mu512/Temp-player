@@ -16,10 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.palette.graphics.Palette
-import coil.ImageLoader
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.example.data.model.MiniPlayerBgMode
@@ -61,18 +63,18 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     val width = bitmap.width
     val height = bitmap.height
     if (width == 0 || height == 0) {
-        val fallback = Color(0xFF1B1C24)
-        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFF5B8DEF))
+        val fallback = Color(0xFF151A11)
+        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFFC5F45B))
     }
 
     val palette = Palette.from(bitmap)
         .maximumColorCount(24)
         .generate()
 
-    val fallbackVibrant = android.graphics.Color.parseColor("#4A6FA5")
-    val fallbackDarkVibrant = android.graphics.Color.parseColor("#1B1E2B")
-    val fallbackMuted = android.graphics.Color.parseColor("#262938")
-    val fallbackDominant = android.graphics.Color.parseColor("#171822")
+    val fallbackVibrant = android.graphics.Color.parseColor("#6B7D3A")
+    val fallbackDarkVibrant = android.graphics.Color.parseColor("#20271A")
+    val fallbackMuted = android.graphics.Color.parseColor("#293020")
+    val fallbackDominant = android.graphics.Color.parseColor("#11150D")
 
     // 1. Vibrant Color
     val vibrantRgb = palette.getVibrantColor(
@@ -127,7 +129,7 @@ suspend fun loadAlbumCoverTones(
 ): ExtractedAlbumCoverTones = withContext(Dispatchers.IO) {
     if (uri != null) {
         try {
-            val loader = ImageLoader(context)
+            val loader = context.imageLoader
             val request = ImageRequest.Builder(context)
                 .data(uri)
                 .size(128, 128)
@@ -240,17 +242,24 @@ fun rememberPlayerColors(
     // Default neutral dark gradient stops when album art is loading or unavailable
     val defaultDarkGradient = remember {
         AlbumGradientStops(
-            top = Color(0xFF262834),
-            middle = Color(0xFF1B1C24),
-            bottom = Color(0xFF111217),
+            top = Color(0xFF252D1B),
+            middle = Color(0xFF191F13),
+            bottom = Color(0xFF0C0F0A),
             accent = systemPrimary
         )
+    }
+
+    // Palette-to-gradient conversion uses HSV operations and temporary arrays.
+    // Recompute it only when the extracted album tones change, not on every
+    // recomposition caused by the animated color stops below.
+    val albumArtStops = remember(extractedTones, defaultDarkGradient) {
+        extractedTones?.let(::generateAlbumGradientStops) ?: defaultDarkGradient
     }
 
     val (targetTop, targetMiddle, targetBottom, targetAccent, isGradient, isDark, onSurface, onSurfaceVariant, onAccent, trackColor) =
         when (bgMode) {
             MiniPlayerBgMode.ALBUM_ART -> {
-                val stops = extractedTones?.let { generateAlbumGradientStops(it) } ?: defaultDarkGradient
+                val stops = albumArtStops
                 TargetParams(
                     top = stops.top,
                     middle = stops.middle,
@@ -258,9 +267,9 @@ fun rememberPlayerColors(
                     accent = stops.accent,
                     isGradient = true,
                     isDark = true,
-                    onSurface = Color(0xFFF7F7FA),
-                    onSurfaceVariant = Color(0xFFB4B4C0),
-                    onAccent = Color(0xFF0D0E12),
+                    onSurface = Color(0xFFF3F7EC),
+                    onSurfaceVariant = Color(0xFFB8C2A9),
+                    onAccent = Color(0xFF1A230C),
                     trackColor = Color(0x38FFFFFF)
                 )
             }
@@ -326,10 +335,15 @@ fun rememberPlayerColors(
                 }
             }
             MiniPlayerBgMode.SYSTEM -> {
+                // Match the current-track row highlight in the playback list:
+                // TrackListItem uses primary at 9% alpha over the normal surface.
+                val selectedTrackBackground = systemPrimary
+                    .copy(alpha = 0.09f)
+                    .compositeOver(systemSurface)
                 TargetParams(
-                    top = systemSurface,
-                    middle = systemSurface,
-                    bottom = systemSurface,
+                    top = selectedTrackBackground,
+                    middle = selectedTrackBackground,
+                    bottom = selectedTrackBackground,
                     accent = systemPrimary,
                     isGradient = false,
                     isDark = false,
@@ -357,20 +371,50 @@ fun rememberPlayerColors(
     }
 
     // Vertical gradient for full expanded PlayerScreen occupying Modifier.fillMaxSize()
-    val playerScreenBrush = if (isGradient) {
-        Brush.verticalGradient(colors = gradientStopsList)
-    } else null
+    val playerScreenBrush = remember(isGradient, gradientStopsList) {
+        if (isGradient) Brush.verticalGradient(colors = gradientStopsList) else null
+    }
 
-    // Horizontal gradient for MiniPlayer with depth alpha values
-    val miniPlayerHorizontalBrush = if (isGradient) {
-        Brush.horizontalGradient(
-            colors = listOf(
-                animTop.copy(alpha = 0.35f),
-                animMiddle.copy(alpha = 0.20f),
-                animBottom.copy(alpha = 0.35f)
+    // In a light app theme, keep the album-art palette but lift the mini-player
+    // colors so the collapsed/expanded mini-player does not look unnecessarily dark.
+    // The full-screen player keeps its original album-art gradient.
+    val isLightAppTheme = systemSurface.luminance() > 0.5f
+    fun liftForLightTheme(color: Color): Color {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+        // Stronger lift: make album-derived colors visibly lighter in light mode.
+        hsv[2] = (hsv[2] + (1f - hsv[2]) * 0.68f).coerceIn(0f, 1f)
+        hsv[1] = (hsv[1] * 0.72f).coerceIn(0f, 1f)
+        return Color(android.graphics.Color.HSVToColor(color.alpha.let { (it * 255).toInt() }, hsv))
+    }
+
+    // Cache HSV conversions until the animated color or theme actually changes.
+    // These values are read during color animation, so avoiding repeated allocations
+    // here helps older devices keep up with the same visual transition.
+    val miniTop = remember(animTop, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animTop) else animTop
+    }
+    val miniMiddle = remember(animMiddle, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animMiddle) else animMiddle
+    }
+    val miniBottom = remember(animBottom, isLightAppTheme, isGradient) {
+        if (isLightAppTheme && isGradient) liftForLightTheme(animBottom) else animBottom
+    }
+
+    // Keep the brush stable between frames when its actual colors have not changed.
+    val miniPlayerHorizontalBrush = remember(
+        isGradient, miniTop, miniMiddle, miniBottom, isLightAppTheme
+    ) {
+        if (isGradient) {
+            Brush.horizontalGradient(
+                colors = listOf(
+                    miniTop.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f),
+                    miniMiddle.copy(alpha = if (isLightAppTheme) 0.62f else 0.20f),
+                    miniBottom.copy(alpha = if (isLightAppTheme) 0.72f else 0.35f)
+                )
             )
-        )
-    } else null
+        } else null
+    }
 
     return PlayerColorScheme(
         backgroundColor = animTop,
