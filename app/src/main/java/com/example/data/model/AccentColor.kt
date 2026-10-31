@@ -106,6 +106,32 @@ enum class AccentColor(
         darkSecondary = Color(0xFF00E5BC),
         lightTertiary = Color(0xFF00FF66),
         darkTertiary = Color(0xFF00F0FF)
+    ),
+    BLACK(
+        id = "black",
+        displayName = "Чёрный",
+        previewColor = Color(0xFF000000),
+        lightPrimary = Color(0xFF000000),
+        lightOnPrimary = Color(0xFFFFFFFF),
+        darkPrimary = Color(0xFFFFFFFF),
+        darkOnPrimary = Color(0xFF000000),
+        lightSecondary = Color(0xFF424242),
+        darkSecondary = Color(0xFFE0E0E0),
+        lightTertiary = Color(0xFF616161),
+        darkTertiary = Color(0xFFBDBDBD)
+    ),
+    WHITE(
+        id = "white",
+        displayName = "Белый",
+        previewColor = Color(0xFFFFFFFF),
+        lightPrimary = Color(0xFF424242),
+        lightOnPrimary = Color(0xFFFFFFFF),
+        darkPrimary = Color(0xFFFFFFFF),
+        darkOnPrimary = Color(0xFF000000),
+        lightSecondary = Color(0xFF616161),
+        darkSecondary = Color(0xFFE0E0E0),
+        lightTertiary = Color(0xFF757575),
+        darkTertiary = Color(0xFFBDBDBD)
     );
 
     companion object {
