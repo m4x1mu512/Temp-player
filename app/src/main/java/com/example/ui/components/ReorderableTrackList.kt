@@ -138,11 +138,22 @@ fun ReorderableTrackList(
     // Some lists (for example playlists containing the same track more than once)
     // do not have a playback-queue index. In that case, highlight only the first matching
     // occurrence instead of marking every row with the same media ID as currently playing.
-    val firstMatchingCurrentTrackIndex = if (currentTrackIndex == null && currentTrack != null) {
+    val firstMatchingCurrentTrackIndex = if (currentTrack != null) {
         currentList.indexOfFirst { it.id == currentTrack.id }
     } else {
         -1
     }
+
+    // Queue index can briefly lag behind the locally reordered list while the parent
+    // updates playback state. Never use an index that points at a different track:
+    // otherwise the row next to the playing track appears active after a reorder.
+    val resolvedCurrentTrackIndex = currentTrackIndex
+        ?.takeIf { index ->
+            index in currentList.indices &&
+                currentTrack != null &&
+                currentList[index].id == currentTrack.id
+        }
+        ?: firstMatchingCurrentTrackIndex
 
     LazyColumn(
         state = listState,
@@ -170,10 +181,8 @@ fun ReorderableTrackList(
 
                 val isCurrentRow = if (dragInProgress && dragCurrentTrackEntryKey != null) {
                     itemKey == dragCurrentTrackEntryKey
-                } else if (currentTrackIndex != null) {
-                    currentTrackIndex == index
                 } else {
-                    index == firstMatchingCurrentTrackIndex
+                    index == resolvedCurrentTrackIndex
                 }
 
                 TrackListItem(
@@ -205,8 +214,7 @@ fun ReorderableTrackList(
                             // Pin the playing occurrence to its stable entry key for the
                             // whole drag. Index-based highlighting otherwise jumps between
                             // rows as the dragged item crosses the current track.
-                            val currentIndex = currentTrackIndex ?: firstMatchingCurrentTrackIndex
-                            dragCurrentTrackEntryKey = entryKeys.getOrNull(currentIndex)
+                            dragCurrentTrackEntryKey = entryKeys.getOrNull(resolvedCurrentTrackIndex)
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
