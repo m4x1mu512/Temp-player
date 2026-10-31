@@ -311,7 +311,11 @@ fun SettingsScreen(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Выбрано",
-                                            tint = if (accent == AccentColor.CYBER_YELLOW || accent == AccentColor.MATRIX_GREEN) Color.Black else Color.White,
+                                            tint = when (accent) {
+                                                AccentColor.CYBER_YELLOW, AccentColor.MATRIX_GREEN, AccentColor.WHITE -> Color.Black
+                                                AccentColor.BLACK -> Color.White
+                                                else -> Color.White
+                                            },
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
