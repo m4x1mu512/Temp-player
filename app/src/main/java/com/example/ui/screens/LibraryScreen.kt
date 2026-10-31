@@ -411,8 +411,8 @@ fun LibraryScreen(
                         brush = Brush.verticalGradient(
                             colors = if (isLightTheme) {
                                 listOf(
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f)
                                 )
                             } else {
                                 listOf(
