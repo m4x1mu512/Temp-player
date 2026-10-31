@@ -26,6 +26,8 @@ private fun createDarkColorScheme(accentColor: AccentColor): ColorScheme {
     AccentColor.MATRIX_GREEN -> Triple(Color(0xFF031108), Color(0xFF0A1F11), Color(0xFF12351D))
     AccentColor.NEON_ORANGE -> Triple(Color(0xFF170A03), Color(0xFF281206), Color(0xFF421E0A))
     AccentColor.ELECTRIC_BLUE -> Triple(Color(0xFF030D19), Color(0xFF091A2B), Color(0xFF102A42))
+    AccentColor.BLACK -> Triple(Color(0xFF000000), Color(0xFF101010), Color(0xFF242424))
+    AccentColor.WHITE -> Triple(Color(0xFF101010), Color(0xFF202020), Color(0xFF383838))
   }
   return darkColorScheme(
     primary = accentColor.darkPrimary,
@@ -51,6 +53,8 @@ private fun createLightColorScheme(accentColor: AccentColor): ColorScheme {
     AccentColor.MATRIX_GREEN -> Triple(Color(0xFFF0FAF1), Color(0xFFFAFFFA), Color(0xFFDDEFE0))
     AccentColor.NEON_ORANGE -> Triple(Color(0xFFFFF4EC), Color(0xFFFFFBF7), Color(0xFFF8E2D0))
     AccentColor.ELECTRIC_BLUE -> Triple(Color(0xFFEEF7FF), Color(0xFFFAFCFF), Color(0xFFDDEBFA))
+    AccentColor.BLACK -> Triple(Color(0xFFF5F5F5), Color(0xFFFFFFFF), Color(0xFFE0E0E0))
+    AccentColor.WHITE -> Triple(Color(0xFFFFFFFF), Color(0xFFFFFFFF), Color(0xFFF0F0F0))
   }
   return lightColorScheme(
     primary = accentColor.lightPrimary,
