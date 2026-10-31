@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -1173,6 +1174,7 @@ fun ExpandablePlayerSheet(
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                                             Text(
                                                 text = currentT.title,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
@@ -1181,6 +1183,7 @@ fun ExpandablePlayerSheet(
                                             )
                                             Text(
                                                 text = currentT.artist,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.primary,
                                                 textAlign = TextAlign.Center,
@@ -1190,6 +1193,7 @@ fun ExpandablePlayerSheet(
                                             if (currentT.album.isNotBlank() && currentT.album != "Неизвестный альбом") {
                                                 Text(
                                                     text = currentT.album,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center,
@@ -1339,6 +1343,7 @@ fun ExpandablePlayerSheet(
                                         ) {
                                             Text(
                                                 text = currentT.title,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.headlineSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 textAlign = TextAlign.Center,
@@ -1348,6 +1353,7 @@ fun ExpandablePlayerSheet(
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
                                                 text = currentT.artist,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
@@ -1358,6 +1364,7 @@ fun ExpandablePlayerSheet(
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = currentT.album,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center,
