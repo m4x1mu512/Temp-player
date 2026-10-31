@@ -115,6 +115,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -400,6 +401,7 @@ fun LibraryScreen(
         modifier = modifier.testTag("library_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
+            val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
             val glassShape = RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
             Column(
                 modifier = Modifier
@@ -407,15 +409,26 @@ fun LibraryScreen(
                     .clip(glassShape)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
-                            )
+                            colors = if (isLightTheme) {
+                                listOf(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.97f),
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.91f)
+                                )
+                            } else {
+                                listOf(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
+                                )
+                            }
                         ),
                         shape = glassShape
                     )
                     .border(
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                        BorderStroke(
+                            1.dp,
+                            (if (isLightTheme) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
+                                .copy(alpha = 0.08f)
+                        ),
                         shape = glassShape
                     )
                     .statusBarsPadding()
@@ -433,7 +446,7 @@ fun LibraryScreen(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.8.sp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (isLightTheme) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                         )
                         Text(
                             text = when (pagerState.currentPage) {
@@ -446,7 +459,7 @@ fun LibraryScreen(
                             },
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (isLightTheme) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Box {
