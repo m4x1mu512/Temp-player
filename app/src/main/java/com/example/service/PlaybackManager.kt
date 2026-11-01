@@ -1021,7 +1021,7 @@ class PlaybackManager private constructor(private val context: Context) {
         // Switch active index to incomingPlayer
         activePlayerIndex = if (activePlayerIndex == 0) 1 else 0
         _currentTrack.value = nextTrack
-        _queueIndex.value = nextIdx
+        publishQueue(_queue.value, nextIdx)
         if (_isShuffle.value && shuffleIndices.isNotEmpty()) {
             val pos = shuffleIndices.indexOf(nextIdx)
             if (pos >= 0) {
@@ -1580,7 +1580,6 @@ class PlaybackManager private constructor(private val context: Context) {
             }
 
             if (restoredQueue.isNotEmpty()) {
-                _queue.value = restoredQueue
                 val targetIndex = if (savedQueueIndex in restoredQueue.indices) {
                     savedQueueIndex
                 } else if (lastTrackId > 0) {
@@ -1588,7 +1587,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 } else {
                     0
                 }
-                _queueIndex.value = targetIndex
+                publishQueue(restoredQueue, targetIndex)
 
                 val trackToRestore = if (lastTrackId > 0) {
                     restoredQueue.find { it.id == lastTrackId } ?: restoredQueue.getOrNull(targetIndex)
@@ -1619,9 +1618,8 @@ class PlaybackManager private constructor(private val context: Context) {
                     .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 val track = allTracks.find { it.id == lastTrackId }
                 if (track != null && _currentTrack.value == null) {
-                    _queue.value = allTracks
                     val idx = allTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-                    _queueIndex.value = idx
+                    publishQueue(allTracks, idx)
                     _currentTrack.value = track
                     _duration.value = track.duration
                     _playbackPosition.value = lastPos
