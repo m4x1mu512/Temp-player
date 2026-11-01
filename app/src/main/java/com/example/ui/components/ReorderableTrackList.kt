@@ -157,8 +157,8 @@ fun ReorderableTrackList(
         val matchingIndices = currentList.indices.filter { currentList[it].id == currentTrack.id }
         when {
             matchingIndices.isEmpty() -> -1
-            currentTrackIndex in currentList.indices ->
-                matchingIndices.minByOrNull { kotlin.math.abs(it - currentTrackIndex!!) } ?: -1
+            currentTrackIndex != null && currentTrackIndex in currentList.indices ->
+                matchingIndices.minByOrNull { kotlin.math.abs(it - currentTrackIndex) } ?: -1
             else -> matchingIndices.first()
         }
     } else {
