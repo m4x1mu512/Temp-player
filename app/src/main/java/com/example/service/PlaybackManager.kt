@@ -669,29 +669,14 @@ class PlaybackManager private constructor(private val context: Context) {
         try {
             crossfadeController.cancelCrossfade()
 
-            if (newQueue != null && newQueue.isNotEmpty()) {
-                _queue.value = newQueue
-                _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-                if (_isShuffle.value) {
-                    rebuildShuffleOrder(_queueIndex.value)
-                }
-            } else if (!_queue.value.any { it.id == track.id }) {
-                _queue.value = listOf(track)
-                _queueIndex.value = 0
-                if (_isShuffle.value) {
-                    rebuildShuffleOrder(0)
-                }
-            } else {
-                _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
-                if (_isShuffle.value) {
-                    val pos = shuffleIndices.indexOf(_queueIndex.value)
-                    if (pos >= 0) {
-                        shufflePosition = pos
-                    } else {
-                        rebuildShuffleOrder(_queueIndex.value)
-                    }
-                }
+            val previousQueue = _queueState.value
+            val selectedQueue = if (!newQueue.isNullOrEmpty()) newQueue else if (previousQueue.tracks.any { it.id == track.id }) previousQueue.tracks else listOf(track)
+            val selectedIndex = when {
+                !newQueue.isNullOrEmpty() && startIndex in selectedQueue.indices && selectedQueue[startIndex].id == track.id -> startIndex
+                else -> selectedQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
             }
+            publishQueue(selectedQueue, selectedIndex)
+            if (_isShuffle.value) rebuildShuffleOrder(selectedIndex)
 
             _currentTrack.value = track
             _duration.value = if (track.duration > 0) track.duration else {
