@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.example.data.model.Track
+import com.example.TrackMoveLogger
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -100,12 +101,24 @@ fun ReorderableTrackList(
         lazyListState = listState,
         scrollThresholdPadding = contentPadding
     ) { from, to ->
+        TrackMoveLogger.log(
+            context,
+            "REORDER_CALLBACK_BEFORE",
+            "fromIndex=${from.index} toIndex=${to.index} currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} rows=" +
+                currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
+        )
         currentList.apply {
             add(to.index, removeAt(from.index))
         }
         entryKeys.apply {
             add(to.index, removeAt(from.index))
         }
+        TrackMoveLogger.log(
+            context,
+            "REORDER_CALLBACK_AFTER",
+            "currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} rows=" +
+                currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
+        )
         try {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         } catch (_: Exception) {}
@@ -215,11 +228,28 @@ fun ReorderableTrackList(
                             // whole drag. Index-based highlighting otherwise jumps between
                             // rows as the dragged item crosses the current track.
                             dragCurrentTrackEntryKey = entryKeys.getOrNull(resolvedCurrentTrackIndex)
+                            TrackMoveLogger.log(
+                                context,
+                                "DRAG_START",
+                                "draggedIndex=$index draggedTrackId=${currentList.getOrNull(index)?.id} draggedEntryKey=${entryKeys.getOrNull(index)} " +
+                                    "currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
+                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
+                                    currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
+                            )
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
                             val from = dragStartIndex ?: -1
                             val to = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
+                            TrackMoveLogger.log(
+                                context,
+                                "DRAG_STOP",
+                                "fromOriginalIndex=$from resolvedToIndex=$to draggedEntryKey=$startKey " +
+                                    "draggedTrackId=${currentList.getOrNull(to)?.id} currentTrackId=${currentTrack?.id} " +
+                                    "currentTrackIndex=${currentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
+                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
+                                    currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
+                            )
                             if (from >= 0 && to >= 0 && from != to) {
                                 onMoveTrack(from, to)
                             }
