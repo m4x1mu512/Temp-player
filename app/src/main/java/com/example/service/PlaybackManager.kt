@@ -1155,16 +1155,36 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun setQueue(newQueue: List<Track>) {
-        _queue.value = newQueue
+        // Keep the active queue occurrence, not merely the first item with the same media ID.
+        // A queue may contain the same track more than once, so resolving by ID alone can
+        // silently move the playing marker to a different occurrence after a reorder/sort.
+        val oldQueue = _queue.value
+        val oldIndex = _queueIndex.value
         val currentPlaying = _currentTrack.value
-        if (currentPlaying != null) {
-            val idx = newQueue.indexOfFirst { it.id == currentPlaying.id }
-            if (idx >= 0) {
-                _queueIndex.value = idx
+        val activeOccurrence = oldQueue.getOrNull(oldIndex)
+            ?.takeIf { currentPlaying != null && it.id == currentPlaying.id }
+
+        val newIndex = when {
+            activeOccurrence == null -> currentPlaying?.let { track ->
+                newQueue.indexOfFirst { it.id == track.id }
+            } ?: -1
+            else -> {
+                // First prefer the same occurrence at the same position if it still matches.
+                if (newQueue.getOrNull(oldIndex)?.id == activeOccurrence.id) {
+                    oldIndex
+                } else {
+                    // For duplicate IDs, select the matching occurrence nearest the old index.
+                    newQueue.indices
+                        .filter { newQueue[it].id == activeOccurrence.id }
+                        .minByOrNull { kotlin.math.abs(it - oldIndex) } ?: -1
+                }
             }
         }
+
+        _queueIndex.value = newIndex
+        _queue.value = newQueue
         if (_isShuffle.value) {
-            rebuildShuffleOrder(_queueIndex.value)
+            rebuildShuffleOrder(newIndex)
         }
         saveCurrentState()
     }
