@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -99,6 +100,14 @@ fun ReorderableTrackList(
     // Keep the locally reordered rows until the parent publishes the same order.
     // Otherwise the old source snapshot can immediately overwrite the drag result.
     var pendingParentOrder by remember { mutableStateOf<List<Track>?>(null) }
+
+    // Reorderable handles can outlive the composition in which their modifier was
+    // created. Read queue/playback values and callbacks through updated state so a
+    // later drag never operates on the previous queue snapshot.
+    val latestCurrentTrack by rememberUpdatedState(currentTrack)
+    val latestCurrentTrackIndex by rememberUpdatedState(currentTrackIndex)
+    val latestIsPlaying by rememberUpdatedState(isPlaying)
+    val latestOnMoveTrack by rememberUpdatedState(onMoveTrack)
 
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -247,21 +256,24 @@ fun ReorderableTrackList(
                         onDragStarted = {
                             dragInProgress = true
                             triggerVibration()
-                            dragStartEntryKey = entryKeys[index]
-                            dragStartIndex = index
+                            val liveDraggedIndex = entryKeys.indexOf(itemKey)
+                            dragStartEntryKey = itemKey
+                            dragStartIndex = liveDraggedIndex
                             // Pin the playing occurrence to its stable entry key for the
                             // whole drag. Index-based highlighting otherwise jumps between
                             // rows as the dragged item crosses the current track.
                             // Resolve the playing row from the live list at gesture time.
                             // The queue index can be stale after a local reorder, and a captured
                             // resolvedCurrentTrackIndex may refer to the row that moved into that slot.
-                            val liveCurrentIndex = currentTrack?.let { playing ->
+                            val liveTrack = latestCurrentTrack
+                            val liveQueueIndex = latestCurrentTrackIndex
+                            val liveCurrentIndex = liveTrack?.let { playing ->
                                 val matchingIndices = currentList.indices.filter { currentList[it].id == playing.id }
                                 when {
                                     matchingIndices.isEmpty() -> -1
-                                    currentTrackIndex != null && currentTrackIndex in currentList.indices ->
+                                    liveQueueIndex != null && liveQueueIndex in currentList.indices ->
                                         matchingIndices.minByOrNull {
-                                            kotlin.math.abs(it - currentTrackIndex)
+                                            kotlin.math.abs(it - liveQueueIndex)
                                         } ?: -1
                                     else -> matchingIndices.first()
                                 }
@@ -270,9 +282,9 @@ fun ReorderableTrackList(
                             TrackMoveLogger.log(
                                 context,
                                 "DRAG_START",
-                                "draggedIndex=$index draggedTrackId=${currentList.getOrNull(index)?.id} draggedEntryKey=${entryKeys.getOrNull(index)} " +
-                                    "currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
-                                    "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
+                                "draggedIndex=$liveDraggedIndex draggedTrackId=${currentList.getOrNull(liveDraggedIndex)?.id} draggedEntryKey=$itemKey " +
+                                    "currentTrackId=${liveTrack?.id} currentTrackIndex=${liveQueueIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
+                                    "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$latestIsPlaying rows=" +
                                     currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
                             )
                         },
@@ -284,9 +296,9 @@ fun ReorderableTrackList(
                                 context,
                                 "DRAG_STOP",
                                 "fromOriginalIndex=$from resolvedToIndex=$to draggedEntryKey=$startKey " +
-                                    "draggedTrackId=${currentList.getOrNull(to)?.id} currentTrackId=${currentTrack?.id} " +
-                                    "currentTrackIndex=${currentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
-                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
+                                    "draggedTrackId=${currentList.getOrNull(to)?.id} currentTrackId=${latestCurrentTrack?.id} " +
+                                    "currentTrackIndex=${latestCurrentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
+                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$latestIsPlaying rows=" +
                                     currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
                             )
                             if (from >= 0 && to >= 0 && from != to) {
@@ -294,7 +306,7 @@ fun ReorderableTrackList(
                                 // drag start; 'to' is the final index in the locally reordered
                                 // list. Keep that exact result until the parent queue catches up.
                                 pendingParentOrder = currentList.toList()
-                                onMoveTrack(from, to)
+                                latestOnMoveTrack(from, to)
                             }
                             dragStartEntryKey = null
                             dragStartIndex = null
