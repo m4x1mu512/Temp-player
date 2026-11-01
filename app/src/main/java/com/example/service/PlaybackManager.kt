@@ -960,7 +960,7 @@ class PlaybackManager private constructor(private val context: Context) {
             val updatedQueue = q.map { track ->
                 if (track.id == updatedTrack.id) updatedTrack else track
             }
-            _queue.value = updatedQueue
+            publishQueue(updatedQueue, _queueIndex.value)
         }
     }
 
