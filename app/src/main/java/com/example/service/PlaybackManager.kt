@@ -1165,37 +1165,18 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun setQueue(newQueue: List<Track>) {
-        // Keep the active queue occurrence, not merely the first item with the same media ID.
-        // A queue may contain the same track more than once, so resolving by ID alone can
-        // silently move the playing marker to a different occurrence after a reorder/sort.
-        val oldQueue = _queue.value
-        val oldIndex = _queueIndex.value
-        val currentPlaying = _currentTrack.value
-        val activeOccurrence = oldQueue.getOrNull(oldIndex)
-            ?.takeIf { currentPlaying != null && it.id == currentPlaying.id }
-
+        val old = _queueState.value
+        val activeTrackId = _currentTrack.value?.id
+        val oldActive = old.tracks.getOrNull(old.currentIndex)
         val newIndex = when {
-            activeOccurrence == null -> currentPlaying?.let { track ->
-                newQueue.indexOfFirst { it.id == track.id }
-            } ?: -1
-            else -> {
-                // First prefer the same occurrence at the same position if it still matches.
-                if (newQueue.getOrNull(oldIndex)?.id == activeOccurrence.id) {
-                    oldIndex
-                } else {
-                    // For duplicate IDs, select the matching occurrence nearest the old index.
-                    newQueue.indices
-                        .filter { newQueue[it].id == activeOccurrence.id }
-                        .minByOrNull { kotlin.math.abs(it - oldIndex) } ?: -1
-                }
-            }
+            oldActive == null || oldActive.id != activeTrackId ->
+                activeTrackId?.let { id -> newQueue.indexOfFirst { it.id == id } } ?: -1
+            newQueue.getOrNull(old.currentIndex)?.id == oldActive.id -> old.currentIndex
+            else -> newQueue.indices.filter { newQueue[it].id == oldActive.id }
+                .minByOrNull { kotlin.math.abs(it - old.currentIndex) } ?: -1
         }
-
-        _queueIndex.value = newIndex
-        _queue.value = newQueue
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(newIndex)
-        }
+        publishQueue(newQueue, newIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newIndex)
         saveCurrentState()
     }
 
