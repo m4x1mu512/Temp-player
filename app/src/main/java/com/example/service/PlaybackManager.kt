@@ -1814,11 +1814,12 @@ class PlaybackManager private constructor(private val context: Context) {
                 }
             }
 
+            if (_currentTrack.value?.id != track.id) return@launch
+
             _trackAudioSpecs.value = AudioTrackSpecs(
                 format = detectedFormat,
                 sampleRateHz = sampleRate,
                 bitrateKbps = bitrate,
-                bitDepth = if (isLossless && (sampleRate > 48000 || bitrate > 2000)) 24 else 16,
                 bitDepth = bitDepth,
                 channelCount = if (channelCount > 0) channelCount else (playerFormat?.channelCount ?: 2),
                 isLossless = isLossless
