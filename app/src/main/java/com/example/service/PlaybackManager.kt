@@ -55,6 +55,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.DataInputStream
 
 data class PlaybackQueueState(val tracks: List<Track> = emptyList(), val currentIndex: Int = -1)
 
@@ -255,16 +256,11 @@ class PlaybackManager private constructor(private val context: Context) {
             serviceScope.launch {
                 try {
                     val currentSpecs = _trackAudioSpecs.value
-            val bitDepth = when (encoding) {
-                C.ENCODING_PCM_24BIT -> 24
-                C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
-                else -> 16
-            }
+            // Visualizer encoding describes decoded PCM, not the source file.
             if (currentSpecs != null) {
                 _trackAudioSpecs.value = currentSpecs.copy(
                     sampleRateHz = if (sampleRate > 0) sampleRate else currentSpecs.sampleRateHz,
-                    channelCount = if (channels > 0) channels else currentSpecs.channelCount,
-                    bitDepth = if (bitDepth > 0) bitDepth else currentSpecs.bitDepth
+                    channelCount = if (channels > 0) channels else currentSpecs.channelCount
                 )
             }
         } catch (t: Throwable) {
@@ -1694,21 +1690,14 @@ class PlaybackManager private constructor(private val context: Context) {
         var channels = if ((audioFormat?.channelCount ?: 0) > 0) audioFormat!!.channelCount else visualizerController.getCurrentChannelCount()
         if (channels <= 0) channels = currentSpecs.channelCount
 
-        val encoding = visualizerController.getCurrentEncoding()
-        val bitDepth = when (encoding) {
-            C.ENCODING_PCM_24BIT -> 24
-            C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
-            else -> currentSpecs.bitDepth
-        }
-
-        val format = detectFormat(track, audioFormat?.sampleMimeType)
+         val format = detectFormat(track, audioFormat?.sampleMimeType)
         val isLossless = format in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
 
         _trackAudioSpecs.value = AudioTrackSpecs(
             format = format,
             sampleRateHz = sampleRate,
             bitrateKbps = bitrateKbps,
-            bitDepth = bitDepth,
+            bitDepth = currentSpecs.bitDepth,
             channelCount = channels,
             isLossless = isLossless
         )
@@ -1750,7 +1739,8 @@ class PlaybackManager private constructor(private val context: Context) {
         }
 
         val sampleRate = if (isLossless && (format == "FLAC" || format == "WAV")) 48000 else 44100
-        val bitDepth = if (isLossless && calcBitrate > 2000) 24 else 16
+        // FLAC bit depth is read from STREAMINFO; bitrate is not a reliable indicator.
+        val bitDepth = if (format == "FLAC") 0 else 16
 
         return AudioTrackSpecs(
             format = format,
@@ -1771,6 +1761,8 @@ class PlaybackManager private constructor(private val context: Context) {
             var bitrate = initial.bitrateKbps
             var detectedFormat = initial.format
             var isLossless = initial.isLossless
+            var bitDepth = initial.bitDepth
+            var channelCount = initial.channelCount
 
             try {
                 val mmr = MediaMetadataRetriever()
@@ -1800,12 +1792,21 @@ class PlaybackManager private constructor(private val context: Context) {
 
                 mmr.release()
             } catch (e: Exception) {
-                // Fallback to initial
+                // Keep the initial values if platform metadata is unavailable.
+            }
+
+            // Read original encoded characteristics, independently of the decoded PCM output.
+            if (detectedFormat == "FLAC") {
+                readFlacStreamInfo(track)?.let { info ->
+                    sampleRate = info.sampleRateHz
+                    bitDepth = info.bitDepth
+                    channelCount = info.channelCount
+                }
             }
 
             val playerFormat = withContext(Dispatchers.Main) { player?.audioFormat }
             if (playerFormat != null) {
-                if (playerFormat.sampleRate > 0) sampleRate = playerFormat.sampleRate
+                if (playerFormat.sampleRate > 0 && detectedFormat != "FLAC") sampleRate = playerFormat.sampleRate
                 if (playerFormat.bitrate > 0) bitrate = playerFormat.bitrate / 1000
                 if (!playerFormat.sampleMimeType.isNullOrBlank()) {
                     detectedFormat = detectFormat(track, playerFormat.sampleMimeType)
@@ -1818,9 +1819,64 @@ class PlaybackManager private constructor(private val context: Context) {
                 sampleRateHz = sampleRate,
                 bitrateKbps = bitrate,
                 bitDepth = if (isLossless && (sampleRate > 48000 || bitrate > 2000)) 24 else 16,
-                channelCount = playerFormat?.channelCount ?: 2,
+                bitDepth = bitDepth,
+                channelCount = if (channelCount > 0) channelCount else (playerFormat?.channelCount ?: 2),
                 isLossless = isLossless
             )
+        }
+    }
+
+    private data class FlacStreamInfo(val sampleRateHz: Int, val channelCount: Int, val bitDepth: Int)
+
+    /** Reads the FLAC STREAMINFO block (original sample rate, channels and bits per sample). */
+    private fun readFlacStreamInfo(track: Track): FlacStreamInfo? {
+        return try {
+            val input = if (track.path.isNotBlank() && File(track.path).isFile) {
+                File(track.path).inputStream()
+            } else {
+                context.contentResolver.openInputStream(track.uri) ?: return null
+            }
+            input.use { raw ->
+                val data = DataInputStream(raw)
+                if (data.readInt() != 0x664C6143) return null // fLaC
+
+                while (true) {
+                    val header = data.read()
+                    if (header < 0) return null
+                    val isLast = (header and 0x80) != 0
+                    val blockType = header and 0x7F
+                    val blockLength = (data.readUnsignedByte() shl 16) or
+                        (data.readUnsignedByte() shl 8) or data.readUnsignedByte()
+
+                    if (blockType == 0) {
+                        if (blockLength != 34) return null
+                        val info = ByteArray(34)
+                        data.readFully(info)
+                        var packed = 0L
+                        for (index in 10..17) packed = (packed shl 8) or (info[index].toLong() and 0xFFL)
+                        val rate = (packed ushr 44).toInt()
+                        val channels = ((packed ushr 41) and 0x7L).toInt() + 1
+                        val depth = ((packed ushr 36) and 0x1FL).toInt() + 1
+                        if (rate <= 0 || channels !in 1..8 || depth !in 4..32) return null
+                        return FlacStreamInfo(rate, channels, depth)
+                    }
+
+                    var remaining = blockLength
+                    while (remaining > 0) {
+                        val skipped = data.skip(remaining.toLong()).toInt()
+                        if (skipped <= 0) {
+                            if (data.read() < 0) return null
+                            remaining--
+                        } else remaining -= skipped
+                    }
+                    if (isLast) return null
+                }
+                @Suppress("UNREACHABLE_CODE")
+                null
+            }
+        } catch (error: Exception) {
+            Log.w("PlaybackManager", "Unable to read FLAC STREAMINFO: " + error.message)
+            null
         }
     }
 
