@@ -96,6 +96,9 @@ fun ReorderableTrackList(
     var dragStartIndex by remember { mutableStateOf<Int?>(null) }
     var dragCurrentTrackEntryKey by remember { mutableStateOf<Long?>(null) }
     var dragInProgress by remember { mutableStateOf(false) }
+    // Keep the locally reordered rows until the parent publishes the same order.
+    // Otherwise the old source snapshot can immediately overwrite the drag result.
+    var pendingParentOrder by remember { mutableStateOf<List<Track>?>(null) }
 
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -127,24 +130,38 @@ fun ReorderableTrackList(
     // Synchronize without allocating temporary ID lists. Also refresh Track objects
     // when their IDs/order stay the same but metadata (title, artist, art URI) changes.
     // The effect runs only when the source list changes, never on drag animation frames.
-    LaunchedEffect(tracks, dragInProgress) {
+    LaunchedEffect(tracks, dragInProgress, pendingParentOrder) {
         if (!dragInProgress && !reorderableLazyListState.isAnyItemDragging) {
-            while (currentList.size > tracks.size) {
-                currentList.removeAt(currentList.lastIndex)
-                if (entryKeys.isNotEmpty()) entryKeys.removeAt(entryKeys.lastIndex)
+            val pending = pendingParentOrder
+            if (pending != null && tracks != pending) {
+                // The callback has been sent, but Compose has not delivered the updated
+                // queue snapshot yet. Do not restore the stale source order in this gap.
+                return@LaunchedEffect
             }
 
-            for (index in tracks.indices) {
-                val track = tracks[index]
-                if (index < currentList.size) {
-                    if (currentList[index] != track) {
-                        currentList[index] = track
-                    }
+            if (pending != null) pendingParentOrder = null
+
+            // Reconcile rows and occurrence keys together. Retain keys for matching
+            // occurrences so duplicate Track IDs do not collapse into one row.
+            val oldTracks = currentList.toList()
+            val oldKeys = entryKeys.toList()
+            val used = BooleanArray(oldTracks.size)
+            val reconciledKeys = tracks.mapIndexed { index, track ->
+                val match = oldTracks.indices.firstOrNull { oldIndex ->
+                    !used[oldIndex] && oldTracks[oldIndex] == track
+                }
+                if (match != null) {
+                    used[match] = true
+                    oldKeys[match]
                 } else {
-                    currentList.add(track)
-                    entryKeys.add(nextEntryKey++)
+                    nextEntryKey++
                 }
             }
+
+            currentList.clear()
+            currentList.addAll(tracks)
+            entryKeys.clear()
+            entryKeys.addAll(reconciledKeys)
         }
     }
 
@@ -273,6 +290,10 @@ fun ReorderableTrackList(
                                     currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
                             )
                             if (from >= 0 && to >= 0 && from != to) {
+                                // 'from' is the index in the unchanged parent snapshot at
+                                // drag start; 'to' is the final index in the locally reordered
+                                // list. Keep that exact result until the parent queue catches up.
+                                pendingParentOrder = currentList.toList()
                                 onMoveTrack(from, to)
                             }
                             dragStartEntryKey = null
