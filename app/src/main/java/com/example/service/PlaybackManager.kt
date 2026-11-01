@@ -1098,69 +1098,33 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun addTrackNext(track: Track) {
-        val queue = _queue.value.toMutableList()
-        val currentTrack = _currentTrack.value
-        val currentIndex = if (currentTrack != null) queue.indexOfFirst { it.id == currentTrack.id } else -1
-        val insertIndex = if (currentIndex >= 0) currentIndex + 1 else 0
-        queue.add(insertIndex.coerceIn(0, queue.size), track)
-        _queue.value = queue
-
-        if (currentTrack != null) {
-            _queueIndex.value = queue.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
-        } else if (_queueIndex.value < 0) {
-            _queueIndex.value = -1
+        val old = _queueState.value
+        val updated = old.tracks.toMutableList()
+        val insertIndex = if (old.currentIndex in updated.indices) old.currentIndex + 1 else 0
+        updated.add(insertIndex, track)
+        val newCurrentIndex = when {
+            old.currentIndex !in old.tracks.indices -> -1
+            insertIndex <= old.currentIndex -> old.currentIndex + 1
+            else -> old.currentIndex
         }
-
-        if (_isShuffle.value) {
-            val currentQueueIndex = _queueIndex.value
-            val previousShuffleOrder = shuffleIndices.toMutableList()
-            val previousCurrentPosition = previousShuffleOrder.indexOf(currentQueueIndex)
-            val insertedQueueIndex = insertIndex.coerceIn(0, queue.lastIndex)
-            val adjustedOrder = previousShuffleOrder
-                .map { if (it >= insertedQueueIndex) it + 1 else it }
-                .filter { it in queue.indices }
-                .toMutableList()
-            adjustedOrder.remove(insertedQueueIndex)
-            val currentPosition = adjustedOrder.indexOf(currentQueueIndex)
-            if (currentQueueIndex in queue.indices) {
-                if (currentPosition >= 0) {
-                    adjustedOrder.add(currentPosition + 1, insertedQueueIndex)
-                    shufflePosition = currentPosition
-                } else {
-                    adjustedOrder.add(0, currentQueueIndex)
-                    adjustedOrder.add(1.coerceAtMost(adjustedOrder.size), insertedQueueIndex)
-                    shufflePosition = 0
-                }
-            } else {
-                adjustedOrder.add(0, insertedQueueIndex)
-                shufflePosition = -1
-            }
-            val remaining = queue.indices.filter { it !in adjustedOrder }
-            adjustedOrder.addAll(remaining.shuffled())
-            shuffleIndices = adjustedOrder
-        }
+        publishQueue(updated, newCurrentIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newCurrentIndex)
         saveCurrentState()
     }
 
     fun removeTrackFromQueue(track: Track) {
-        val currentQueue = _queue.value
-        val removeIndex = currentQueue.indexOfFirst { it.id == track.id }
+        val state = _queueState.value
+        val removeIndex = state.tracks.indexOfFirst { it.id == track.id }
         if (removeIndex < 0) return
-
-        val currentTrackId = _currentTrack.value?.id
-        val updatedQueue = currentQueue.toMutableList().apply { removeAt(removeIndex) }
-        _queue.value = updatedQueue
-
-        val newCurrentIndex = if (currentTrackId != null) {
-            updatedQueue.indexOfFirst { it.id == currentTrackId }
-        } else {
-            -1
+        val updated = state.tracks.toMutableList().apply { removeAt(removeIndex) }
+        val newCurrentIndex = when {
+            state.currentIndex !in state.tracks.indices -> -1
+            removeIndex < state.currentIndex -> state.currentIndex - 1
+            removeIndex == state.currentIndex -> -1
+            else -> state.currentIndex
         }
-        _queueIndex.value = newCurrentIndex
-
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(newCurrentIndex)
-        }
+        publishQueue(updated, newCurrentIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newCurrentIndex)
         saveCurrentState()
     }
 
