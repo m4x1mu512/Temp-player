@@ -160,8 +160,9 @@ fun LibraryScreen(
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val musicFolderSetupCompleted by viewModel.musicFolderSetupCompleted.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
-    val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
-    val currentQueueIndex by viewModel.currentQueueIndex.collectAsStateWithLifecycle()
+    val currentQueueState by viewModel.currentQueueState.collectAsStateWithLifecycle()
+    val currentQueue = currentQueueState.tracks
+    val currentQueueIndex = currentQueueState.currentIndex
     val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
