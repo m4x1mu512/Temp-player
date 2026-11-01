@@ -227,13 +227,19 @@ fun ReorderableTrackList(
                             // Pin the playing occurrence to its stable entry key for the
                             // whole drag. Index-based highlighting otherwise jumps between
                             // rows as the dragged item crosses the current track.
-                            dragCurrentTrackEntryKey = entryKeys.getOrNull(resolvedCurrentTrackIndex)
+                            // Resolve the playing row from the live list at gesture time.
+                            // The queue index can be stale after a local reorder, and a captured
+                            // resolvedCurrentTrackIndex may refer to the row that moved into that slot.
+                            val liveCurrentIndex = currentTrack?.let { playing ->
+                                currentList.indexOfFirst { it.id == playing.id }
+                            } ?: -1
+                            dragCurrentTrackEntryKey = entryKeys.getOrNull(liveCurrentIndex)
                             TrackMoveLogger.log(
                                 context,
                                 "DRAG_START",
                                 "draggedIndex=$index draggedTrackId=${currentList.getOrNull(index)?.id} draggedEntryKey=${entryKeys.getOrNull(index)} " +
                                     "currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
-                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
+                                    "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$isPlaying rows=" +
                                     currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
                             )
                         },
