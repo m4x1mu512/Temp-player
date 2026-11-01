@@ -56,6 +56,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+data class PlaybackQueueState(val tracks: List<Track> = emptyList(), val currentIndex: Int = -1)
+
 @OptIn(UnstableApi::class)
 class PlaybackManager private constructor(private val context: Context) {
 
@@ -147,11 +149,19 @@ class PlaybackManager private constructor(private val context: Context) {
         shuffleIndices = indices
     }
 
+    private val _queueState = MutableStateFlow(PlaybackQueueState())
+    val queueState: StateFlow<PlaybackQueueState> = _queueState.asStateFlow()
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
-
     private val _queueIndex = MutableStateFlow(-1)
     val queueIndex: StateFlow<Int> = _queueIndex.asStateFlow()
+
+    private fun publishQueue(tracks: List<Track>, index: Int) {
+        val snapshot = PlaybackQueueState(tracks.toList(), index.takeIf { it in tracks.indices } ?: -1)
+        _queueState.value = snapshot
+        _queue.value = snapshot.tracks
+        _queueIndex.value = snapshot.currentIndex
+    }
 
     private val _sleepTimerRemainingMillis = MutableStateFlow<Long?>(null)
     val sleepTimerRemainingMillis: StateFlow<Long?> = _sleepTimerRemainingMillis.asStateFlow()
@@ -1190,30 +1200,21 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
-        val current = _queue.value.toMutableList()
-        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
-
-        // The active queue occurrence is identified by its index, not Track.id:
-        // the same media file can appear more than once in the queue.
-        val previousCurrentIndex = _queueIndex.value
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
-        _queue.value = current
-
-        val adjustedCurrentIndex = when {
-            previousCurrentIndex !in current.indices -> previousCurrentIndex
-            previousCurrentIndex == fromIndex -> toIndex
-            fromIndex < previousCurrentIndex && toIndex >= previousCurrentIndex -> previousCurrentIndex - 1
-            fromIndex > previousCurrentIndex && toIndex <= previousCurrentIndex -> previousCurrentIndex + 1
-            else -> previousCurrentIndex
+        val oldTracks = _queue.value
+        if (fromIndex !in oldTracks.indices || toIndex !in oldTracks.indices || fromIndex == toIndex) return
+        val updated = oldTracks.toMutableList()
+        val moved = updated.removeAt(fromIndex)
+        updated.add(toIndex, moved)
+        val oldIndex = _queueIndex.value
+        val newIndex = when {
+            oldIndex !in oldTracks.indices -> -1
+            oldIndex == fromIndex -> toIndex
+            fromIndex < oldIndex && toIndex >= oldIndex -> oldIndex - 1
+            fromIndex > oldIndex && toIndex <= oldIndex -> oldIndex + 1
+            else -> oldIndex
         }
-        if (adjustedCurrentIndex in current.indices) {
-            _queueIndex.value = adjustedCurrentIndex
-        }
-
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(_queueIndex.value)
-        }
+        publishQueue(updated, newIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newIndex)
         saveCurrentState()
     }
 
