@@ -317,6 +317,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Playback States from Manager
     val currentTrack: StateFlow<Track?> = playbackManager.currentTrack
     val trackAudioSpecs: StateFlow<AudioTrackSpecs?> = playbackManager.trackAudioSpecs
+    val currentQueueState: StateFlow<com.example.service.PlaybackQueueState> = playbackManager.queueState
     val currentQueue: StateFlow<List<Track>> = playbackManager.queue
     val currentQueueIndex: StateFlow<Int> = playbackManager.queueIndex
     val isPlaying: StateFlow<Boolean> = playbackManager.isPlaying
