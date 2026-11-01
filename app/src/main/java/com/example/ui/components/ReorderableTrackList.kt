@@ -151,8 +151,16 @@ fun ReorderableTrackList(
     // Some lists (for example playlists containing the same track more than once)
     // do not have a playback-queue index. In that case, highlight only the first matching
     // occurrence instead of marking every row with the same media ID as currently playing.
+    // A queue can contain the same media ID more than once. Prefer the occurrence
+    // nearest the queue's current index instead of always selecting the first matching ID.
     val firstMatchingCurrentTrackIndex = if (currentTrack != null) {
-        currentList.indexOfFirst { it.id == currentTrack.id }
+        val matchingIndices = currentList.indices.filter { currentList[it].id == currentTrack.id }
+        when {
+            matchingIndices.isEmpty() -> -1
+            currentTrackIndex in currentList.indices ->
+                matchingIndices.minByOrNull { kotlin.math.abs(it - currentTrackIndex!!) } ?: -1
+            else -> matchingIndices.first()
+        }
     } else {
         -1
     }
@@ -231,7 +239,15 @@ fun ReorderableTrackList(
                             // The queue index can be stale after a local reorder, and a captured
                             // resolvedCurrentTrackIndex may refer to the row that moved into that slot.
                             val liveCurrentIndex = currentTrack?.let { playing ->
-                                currentList.indexOfFirst { it.id == playing.id }
+                                val matchingIndices = currentList.indices.filter { currentList[it].id == playing.id }
+                                when {
+                                    matchingIndices.isEmpty() -> -1
+                                    currentTrackIndex != null && currentTrackIndex in currentList.indices ->
+                                        matchingIndices.minByOrNull {
+                                            kotlin.math.abs(it - currentTrackIndex)
+                                        } ?: -1
+                                    else -> matchingIndices.first()
+                                }
                             } ?: -1
                             dragCurrentTrackEntryKey = entryKeys.getOrNull(liveCurrentIndex)
                             TrackMoveLogger.log(
