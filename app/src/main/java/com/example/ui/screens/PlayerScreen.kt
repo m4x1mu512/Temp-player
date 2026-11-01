@@ -298,7 +298,7 @@ fun PlayerScreen(
                 format = ext,
                 sampleRateHz = 44100,
                 bitrateKbps = calcBitrate,
-                bitDepth = 16,
+                bitDepth = if (ext == "FLAC") 0 else 16,
                 channelCount = 2,
                 isLossless = ext in listOf("FLAC", "WAV", "ALAC", "AIFF")
             )
