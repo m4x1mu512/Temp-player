@@ -64,6 +64,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import com.example.TrackMoveLogger
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -138,6 +140,19 @@ fun SettingsScreen(
                 )
             } catch (_: Exception) { }
             viewModel.addMusicFolder(uri.toString())
+        }
+    }
+
+    val movementLogExporter = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val exported = TrackMoveLogger.exportTo(context, uri)
+            Toast.makeText(
+                context,
+                if (exported) "Логи перемещения сохранены" else "Не удалось сохранить логи",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -952,6 +967,41 @@ fun SettingsScreen(
                         subtitle = "Сохранить файл app_logs.txt для выявления багов и падений",
                         onClick = { CrashLogger.exportLogs(context) },
                         testTag = "settings_export_logs_button"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Track movement diagnostics
+            SettingsSectionHeader(title = "Логи перемещения", icon = Icons.Default.BugReport)
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_track_movement_logs_card")
+            ) {
+                Column {
+                    SettingsActionItem(
+                        icon = Icons.Default.Description,
+                        title = "Скачать логи перемещения",
+                        subtitle = "Сохранить track_movement_logs.txt для диагностики подсветки и перестановки треков",
+                        onClick = { movementLogExporter.launch("track_movement_logs.txt") },
+                        testTag = "settings_export_track_movement_logs"
+                    )
+                    SettingsActionItem(
+                        icon = Icons.Default.Delete,
+                        title = "Очистить логи перемещения",
+                        subtitle = "Размер текущего файла: ${(TrackMoveLogger.sizeBytes(context) / 1024L)} КБ",
+                        onClick = {
+                            TrackMoveLogger.clear(context)
+                            Toast.makeText(context, "Логи перемещения очищены", Toast.LENGTH_SHORT).show()
+                        },
+                        testTag = "settings_clear_track_movement_logs"
                     )
                 }
             }
