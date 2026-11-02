@@ -1201,6 +1201,11 @@ fun ExpandablePlayerSheet(
                                                 modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
+                                                color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                                    Color.Black
+                                                } else {
+                                                    colorScheme.onSurfaceColor
+                                                },
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -1370,6 +1375,11 @@ fun ExpandablePlayerSheet(
                                                 modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.headlineSmall,
                                                 fontWeight = FontWeight.Bold,
+                                                color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                                    Color.Black
+                                                } else {
+                                                    colorScheme.onSurfaceColor
+                                                },
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
