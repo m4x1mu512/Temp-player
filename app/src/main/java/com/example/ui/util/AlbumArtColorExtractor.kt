@@ -226,7 +226,7 @@ fun generateAlbumGradientStops(
     // Keep exactly the same hue and saturation treatment in both themes.
     // Dark theme only lowers brightness slightly, rather than switching to
     // an unrelated deep/near-black palette.
-    val darkening = if (isLightTheme) 0f else 0.09f
+    val darkening = if (isLightTheme) 0f else 0.19f
     val top = tunedColor(
         tones.vibrant,
         saturationScale = 0.48f,
