@@ -174,8 +174,13 @@ fun ExpandablePlayerSheet(
     backdrop: com.kyant.backdrop.backdrops.LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
-    // Capture the app theme before the player applies its own album-derived color scheme.
-    val appUsesLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    // Use the selected application theme, not the album-derived player palette.
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val appUsesLightTheme = when (themeMode) {
+        com.example.data.model.ThemeMode.LIGHT -> true
+        com.example.data.model.ThemeMode.DARK -> false
+        com.example.data.model.ThemeMode.SYSTEM -> !androidx.compose.foundation.isSystemInDarkTheme()
+    }
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
