@@ -400,7 +400,7 @@ fun SettingsScreen(
                             selected = miniPlayerBgMode == MiniPlayerBgMode.LIGHT,
                             onClick = {
                                 viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.LIGHT)
-                                viewModel.setMiniPlayerCustomColor(0xFFFFFFFFL)
+                                viewModel.setMiniPlayerCustomColor(0L)
                             },
                             label = { Text("Светлый") },
                             leadingIcon = {
@@ -429,7 +429,7 @@ fun SettingsScreen(
                             selected = miniPlayerBgMode == MiniPlayerBgMode.DARK,
                             onClick = {
                                 viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.DARK)
-                                viewModel.setMiniPlayerCustomColor(0xFF17171AL)
+                                viewModel.setMiniPlayerCustomColor(0L)
                             },
                             label = { Text("Тёмный") },
                             leadingIcon = {
