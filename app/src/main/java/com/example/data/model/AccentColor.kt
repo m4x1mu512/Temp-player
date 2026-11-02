@@ -55,6 +55,19 @@ enum class AccentColor(
         lightTertiary = Color(0xFFFF6B00),
         darkTertiary = Color(0xFFFF9100)
     ),
+    RED(
+        id = "red",
+        displayName = "Красный",
+        previewColor = Color(0xFFFF3030),
+        lightPrimary = Color(0xFFD50000),
+        lightOnPrimary = Color(0xFFFFFFFF),
+        darkPrimary = Color(0xFFFF3030),
+        darkOnPrimary = Color(0xFF3B0000),
+        lightSecondary = Color(0xFFB71C1C),
+        darkSecondary = Color(0xFFFF6B6B),
+        lightTertiary = Color(0xFFFF8A80),
+        darkTertiary = Color(0xFFFFB3AD)
+    ),
     NEON_PINK(
         id = "pink",
         displayName = "Розовый",
