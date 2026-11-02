@@ -909,6 +909,7 @@ fun ExpandablePlayerSheet(
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = when {
+                                    appUsesLightTheme && colorScheme.isDark -> Color.White
                                     miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
                                     useWhiteAlbumModeControls -> Color.White
                                     else -> colorScheme.onSurfaceColor
