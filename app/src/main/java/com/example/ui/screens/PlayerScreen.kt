@@ -144,7 +144,9 @@ import kotlinx.coroutines.flow.StateFlow
 import coil.compose.AsyncImage
 import com.example.R
 import com.example.data.model.AudioTrackSpecs
+import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.RepeatMode
+import com.example.data.model.ThemeMode
 import com.example.data.model.Track
 import com.example.ui.components.AddToPlaylistDialog
 import com.example.ui.components.AudioVisualizerView
@@ -173,6 +175,13 @@ fun PlayerScreen(
 ) {
     BackHandler {
         onNavigateBack()
+    }
+
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val appUsesLightTheme = when (themeMode) {
+        ThemeMode.LIGHT -> true
+        ThemeMode.DARK -> false
+        ThemeMode.SYSTEM -> !androidx.compose.foundation.isSystemInDarkTheme()
     }
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
@@ -607,6 +616,11 @@ fun PlayerScreen(
                                     text = track.title,
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
+                                    color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                        Color.Black
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -986,6 +1000,11 @@ fun PlayerScreen(
                             text = track.title,
                             style = if (isCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
+                            color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                Color.Black
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
                             textAlign = TextAlign.Center,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
