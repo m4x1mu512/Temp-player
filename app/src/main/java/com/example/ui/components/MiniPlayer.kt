@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -171,6 +172,10 @@ fun MiniPlayer(
         val configuration = LocalConfiguration.current
         val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val isCompactWidth = configuration.screenWidthDp < 360
+        // Read the app theme before applying the mini-player's own color palette.
+        val appUsesDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+        val useWhiteAlbumModeText =
+            bgMode == MiniPlayerBgMode.ALBUM_ART && appUsesDarkTheme
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
             albumArtUri = currentTrack.albumArtUri,
@@ -323,7 +328,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = colorScheme.onSurfaceColor,
+                                    color = if (useWhiteAlbumModeText) Color.White else colorScheme.onSurfaceColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -332,7 +337,7 @@ fun MiniPlayer(
                                     Text(
                                         text = currentTrack.artist,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = colorScheme.accentColor,
+                                        color = if (useWhiteAlbumModeText) Color.White else colorScheme.accentColor,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
