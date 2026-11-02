@@ -174,8 +174,10 @@ fun MiniPlayer(
         val isCompactWidth = configuration.screenWidthDp < 360
         // Read the app theme before applying the mini-player's own color palette.
         val appUsesDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+        val appUsesLightTheme = !appUsesDarkTheme
         val useWhiteAlbumModeText =
             bgMode == MiniPlayerBgMode.ALBUM_ART && appUsesDarkTheme
+        val useBlackMiniPlayerText = appUsesLightTheme
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
             albumArtUri = currentTrack.albumArtUri,
@@ -328,7 +330,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (useWhiteAlbumModeText) Color.White else colorScheme.onSurfaceColor,
+                                    color = when { useBlackMiniPlayerText -> Color.Black; useWhiteAlbumModeText -> Color.White; else -> colorScheme.onSurfaceColor },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -337,7 +339,7 @@ fun MiniPlayer(
                                     Text(
                                         text = currentTrack.artist,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = if (useWhiteAlbumModeText) Color.White else colorScheme.accentColor,
+                                        color = when { useBlackMiniPlayerText -> Color.Black; useWhiteAlbumModeText -> Color.White; else -> colorScheme.accentColor },
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
