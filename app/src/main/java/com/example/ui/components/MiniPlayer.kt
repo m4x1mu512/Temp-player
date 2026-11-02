@@ -67,7 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -84,6 +84,8 @@ import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Track
+import com.example.data.model.ThemeMode
+import com.example.data.local.SettingsDataStore
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
 import com.example.ui.util.KEY_PLAYER_CONTAINER
@@ -173,7 +175,12 @@ fun MiniPlayer(
         val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val isCompactWidth = configuration.screenWidthDp < 360
         // Read the app theme before applying the mini-player's own color palette.
-        val appUsesDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+        val selectedThemeMode = SettingsDataStore.getInitialThemeMode(LocalContext.current)
+        val appUsesDarkTheme = when (selectedThemeMode) {
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        }
         val appUsesLightTheme = !appUsesDarkTheme
         val useWhiteAlbumModeText = appUsesDarkTheme
         val useBlackMiniPlayerText = appUsesLightTheme
