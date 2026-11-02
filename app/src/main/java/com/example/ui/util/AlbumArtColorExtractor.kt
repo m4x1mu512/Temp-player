@@ -223,28 +223,32 @@ fun generateAlbumGradientStops(
         return Color(android.graphics.Color.HSVToColor(hsv))
     }
 
+    // Keep exactly the same hue and saturation treatment in both themes.
+    // Dark theme only lowers brightness slightly, rather than switching to
+    // an unrelated deep/near-black palette.
+    val darkening = if (isLightTheme) 0f else 0.09f
     val top = tunedColor(
         tones.vibrant,
-        saturationScale = if (isLightTheme) 0.48f else 0.72f,
-        value = if (isLightTheme) 0.96f else 0.28f,
+        saturationScale = 0.48f,
+        value = 0.96f - darkening,
         hueShift = -5f
     )
     val middle = tunedColor(
         tones.dominant,
-        saturationScale = if (isLightTheme) 0.38f else 0.62f,
-        value = if (isLightTheme) 0.91f else 0.19f,
+        saturationScale = 0.38f,
+        value = 0.91f - darkening,
         hueShift = 8f
     )
     val bottom = tunedColor(
         tones.muted,
-        saturationScale = if (isLightTheme) 0.30f else 0.48f,
-        value = if (isLightTheme) 0.985f else 0.105f,
+        saturationScale = 0.30f,
+        value = 0.985f - darkening,
         hueShift = -9f
     )
     val accent = tunedColor(
         tones.accent,
-        saturationScale = if (isLightTheme) 0.72f else 0.88f,
-        value = if (isLightTheme) 0.48f else 0.78f
+        saturationScale = 0.72f,
+        value = 0.48f - darkening
     )
 
     return AlbumGradientStops(top = top, middle = middle, bottom = bottom, accent = accent)
@@ -315,11 +319,13 @@ fun rememberPlayerColors(
                     bottom = stops.bottom,
                     accent = stops.accent,
                     isGradient = true,
-                    isDark = !isLightAppTheme,
-                    onSurface = if (isLightAppTheme) Color(0xFF20212A) else Color(0xFFF5F4FA),
-                    onSurfaceVariant = if (isLightAppTheme) Color(0xFF555563) else Color(0xFFC0BECC),
-                    onAccent = if (isLightAppTheme) Color.White else Color(0xFF15131B),
-                    trackColor = if (isLightAppTheme) Color(0x33232630) else Color(0x38FFFFFF)
+                    // These album-derived backgrounds remain light/pastel in both
+                    // app themes, so keep dark controls for reliable contrast.
+                    isDark = false,
+                    onSurface = Color(0xFF20212A),
+                    onSurfaceVariant = Color(0xFF555563),
+                    onAccent = Color.White,
+                    trackColor = Color(0x33232630)
                 )
             }
             MiniPlayerBgMode.LIGHT -> {
