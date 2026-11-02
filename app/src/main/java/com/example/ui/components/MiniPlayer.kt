@@ -175,8 +175,7 @@ fun MiniPlayer(
         // Read the app theme before applying the mini-player's own color palette.
         val appUsesDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
         val appUsesLightTheme = !appUsesDarkTheme
-        val useWhiteAlbumModeText =
-            bgMode == MiniPlayerBgMode.ALBUM_ART && appUsesDarkTheme
+        val useWhiteAlbumModeText = appUsesDarkTheme
         val useBlackMiniPlayerText = appUsesLightTheme
         val colorScheme = rememberMiniPlayerColors(
             bgMode = bgMode,
