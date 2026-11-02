@@ -913,13 +913,19 @@ fun ExpandablePlayerSheet(
                                 text = track.title,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = when {
-                                    // In dark app theme, album-art backgrounds always use a black track title.
-                                    miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
-                                    appUsesLightTheme && colorScheme.isDark -> Color.White
-                                    !appUsesLightTheme && !colorScheme.isDark -> Color.Black
-                                    useWhiteAlbumModeControls -> Color.White
-                                    else -> colorScheme.onSurfaceColor
+                                color = if (!isExpanded) {
+                                    // The collapsed bar follows the selected application theme,
+                                    // independently of the album-art palette.
+                                    if (appUsesLightTheme) Color.Black else Color.White
+                                } else {
+                                    when {
+                                        // In dark app theme, album-art backgrounds use a black title.
+                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
+                                        appUsesLightTheme && colorScheme.isDark -> Color.White
+                                        !appUsesLightTheme && !colorScheme.isDark -> Color.Black
+                                        useWhiteAlbumModeControls -> Color.White
+                                        else -> colorScheme.onSurfaceColor
+                                    }
                                 },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -928,7 +934,11 @@ fun ExpandablePlayerSheet(
                             Text(
                                 text = track.artist,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = colorScheme.accentColor,
+                                color = if (!isExpanded) {
+                                    if (appUsesLightTheme) Color.Black else Color.White
+                                } else {
+                                    colorScheme.accentColor
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
