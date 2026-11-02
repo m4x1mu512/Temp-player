@@ -139,6 +139,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.R
+import com.example.data.model.AccentColor
 import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.RepeatMode
 import com.example.data.model.Track
@@ -257,6 +258,7 @@ fun ExpandablePlayerSheet(
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
+    val selectedAccentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
 
     val audioSpecs = trackAudioSpecs ?: remember(track.path, track.uriString, track.size, track.duration) {
@@ -290,16 +292,68 @@ fun ExpandablePlayerSheet(
     val useWhiteAlbumModeControls =
         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && colorScheme.isDark
 
-    val playerMaterialColorScheme = remember(colorScheme) {
+    // In monochrome player modes, map the selected background swatch to the
+    // corresponding accent from the app's Accent Background setting. A zero
+    // custom color means that no monochrome swatch was explicitly selected.
+    val selectedMonochromeAccent = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT -> when (miniPlayerCustomColor) {
+            0xFFF0F9D8L -> AccentColor.TURQUOISE
+            0xFFF0E2FFL -> AccentColor.PURPLE
+            0xFFFFF5C2L -> AccentColor.CYBER_YELLOW
+            0xFFFFDADAL -> AccentColor.RED
+            0xFFFFE0EFL -> AccentColor.NEON_PINK
+            0xFFD9FFE7L -> AccentColor.MATRIX_GREEN
+            0xFFFFE5D1L -> AccentColor.NEON_ORANGE
+            0xFFD9F5FCL -> AccentColor.ELECTRIC_BLUE
+            0xFFE6E6E6L -> AccentColor.BLACK
+            0xFFFFFFFFL -> AccentColor.WHITE
+            else -> null
+        }
+        MiniPlayerBgMode.DARK -> when (miniPlayerCustomColor) {
+            0xFF52652AL -> AccentColor.TURQUOISE
+            0xFF563A70L -> AccentColor.PURPLE
+            0xFF665500L -> AccentColor.CYBER_YELLOW
+            0xFF701818L -> AccentColor.RED
+            0xFF70103BL -> AccentColor.NEON_PINK
+            0xFF07552AL -> AccentColor.MATRIX_GREEN
+            0xFF703000L -> AccentColor.NEON_ORANGE
+            0xFF06465AL -> AccentColor.ELECTRIC_BLUE
+            0xFF242424L -> AccentColor.BLACK
+            0xFF555555L -> AccentColor.WHITE
+            else -> null
+        }
+        else -> null
+    }
+
+    val playerControlsAccentColor = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
+            selectedMonochromeAccent?.let {
+                if (appUsesLightTheme) it.lightPrimary else it.darkPrimary
+            } ?: if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) Color.Black else Color.White
+        else -> colorScheme.accentColor
+    }
+    val playerControlsOnAccentColor = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
+            selectedMonochromeAccent?.let {
+                if (appUsesLightTheme) it.lightOnPrimary else it.darkOnPrimary
+            } ?: if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) Color.White else Color.Black
+        else -> colorScheme.onAccentColor
+    }
+
+    val playerMaterialColorScheme = remember(
+        colorScheme,
+        playerControlsAccentColor,
+        playerControlsOnAccentColor
+    ) {
         if (colorScheme.isDark) {
             darkColorScheme(
                 surface = colorScheme.backgroundColor,
                 onSurface = colorScheme.onSurfaceColor,
                 onSurfaceVariant = colorScheme.onSurfaceVariantColor,
-                primary = colorScheme.accentColor,
-                onPrimary = colorScheme.onAccentColor,
-                primaryContainer = colorScheme.accentColor.copy(alpha = 0.25f),
-                onPrimaryContainer = colorScheme.accentColor,
+                primary = playerControlsAccentColor,
+                onPrimary = playerControlsOnAccentColor,
+                primaryContainer = playerControlsAccentColor.copy(alpha = 0.25f),
+                onPrimaryContainer = playerControlsAccentColor,
                 background = Color.Transparent,
                 onBackground = colorScheme.onSurfaceColor,
                 surfaceVariant = colorScheme.progressTrackColor,
@@ -310,10 +364,10 @@ fun ExpandablePlayerSheet(
                 surface = colorScheme.backgroundColor,
                 onSurface = colorScheme.onSurfaceColor,
                 onSurfaceVariant = colorScheme.onSurfaceVariantColor,
-                primary = colorScheme.accentColor,
-                onPrimary = colorScheme.onAccentColor,
-                primaryContainer = colorScheme.accentColor.copy(alpha = 0.15f),
-                onPrimaryContainer = colorScheme.accentColor,
+                primary = playerControlsAccentColor,
+                onPrimary = playerControlsOnAccentColor,
+                primaryContainer = playerControlsAccentColor.copy(alpha = 0.15f),
+                onPrimaryContainer = playerControlsAccentColor,
                 background = Color.Transparent,
                 onBackground = colorScheme.onSurfaceColor,
                 surfaceVariant = colorScheme.progressTrackColor,
@@ -1002,8 +1056,8 @@ fun ExpandablePlayerSheet(
                             FilledIconButton(
                                 onClick = { viewModel.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = colorScheme.accentColor,
-                                    contentColor = colorScheme.onAccentColor
+                                    containerColor = playerControlsAccentColor,
+                                    contentColor = playerControlsOnAccentColor
                                 ),
                                 modifier = Modifier
                                     .size(44.dp)
