@@ -329,7 +329,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    color = when { useBlackMiniPlayerText -> Color.Black; useWhiteAlbumModeText -> Color.White; else -> colorScheme.onSurfaceColor },
+                                    color = if (appUsesLightTheme) Color.Black else Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -338,7 +338,7 @@ fun MiniPlayer(
                                     Text(
                                         text = currentTrack.artist,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = when { useBlackMiniPlayerText -> Color.Black; useWhiteAlbumModeText -> Color.White; else -> colorScheme.accentColor },
+                                        color = if (appUsesLightTheme) Color.Black else Color.White,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -521,7 +521,7 @@ fun MiniPlayer(
                                     text = currentTrack.title,
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = colorScheme.onSurfaceColor,
+                                    color = if (appUsesLightTheme) Color.Black else Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -529,7 +529,7 @@ fun MiniPlayer(
                                 Text(
                                     text = currentTrack.artist,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = colorScheme.accentColor,
+                                    color = if (appUsesLightTheme) Color.Black else Color.White,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
