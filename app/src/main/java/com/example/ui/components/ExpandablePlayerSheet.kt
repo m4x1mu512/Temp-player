@@ -909,9 +909,10 @@ fun ExpandablePlayerSheet(
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = when {
+                                    // In dark app theme, album-art backgrounds always use a black track title.
+                                    miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
                                     appUsesLightTheme && colorScheme.isDark -> Color.White
                                     !appUsesLightTheme && !colorScheme.isDark -> Color.Black
-                                    miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
                                     useWhiteAlbumModeControls -> Color.White
                                     else -> colorScheme.onSurfaceColor
                                 },
