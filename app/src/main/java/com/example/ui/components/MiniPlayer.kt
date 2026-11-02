@@ -174,8 +174,15 @@ fun MiniPlayer(
         val configuration = LocalConfiguration.current
         val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val isCompactWidth = configuration.screenWidthDp < 360
-        // Read the app theme before applying the mini-player's own color palette.
-        val selectedThemeMode = SettingsDataStore.getInitialThemeMode(LocalContext.current)
+        // Observe the selected app theme so text colors update immediately when the
+        // user changes "Тема оформления" without restarting the player.
+        val appContext = LocalContext.current
+        val initialThemeMode = remember(appContext) {
+            SettingsDataStore.getInitialThemeMode(appContext)
+        }
+        val selectedThemeMode by remember(appContext) {
+            SettingsDataStore(appContext).themeModeFlow
+        }.collectAsStateWithLifecycle(initialValue = initialThemeMode)
         val appUsesDarkTheme = when (selectedThemeMode) {
             ThemeMode.LIGHT -> false
             ThemeMode.DARK -> true
