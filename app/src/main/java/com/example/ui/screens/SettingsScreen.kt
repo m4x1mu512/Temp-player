@@ -513,12 +513,16 @@ fun SettingsScreen(
 
                                 val swatches = when (miniPlayerBgMode) {
                                     MiniPlayerBgMode.LIGHT -> listOf(
-                                        0xFFFFFFFFL to "Белоснежный",
-                                        0xFFF5F5F7L to "Холодный серый",
-                                        0xFFFAF6F0L to "Тёплый крем",
-                                        0xFFEBF4F6L to "Ледяной голубой",
-                                        0xFFEBF5EAL to "Мятная свежесть",
-                                        0xFFF4EDF8L to "Светлая лаванда"
+                                        0xFFF0F9D8L to "Лаймовый",
+                                        0xFFF0E2FFL to "Фиолетовый",
+                                        0xFFFFF5C2L to "Жёлтый",
+                                        0xFFFFDADAL to "Красный",
+                                        0xFFFFE0EFL to "Розовый",
+                                        0xFFD9FFE7L to "Зелёный",
+                                        0xFFFFE5D1L to "Оранжевый",
+                                        0xFFD9F5FCL to "Синий",
+                                        0xFFE6E6E6L to "Чёрный",
+                                        0xFFFFFFFFL to "Белый"
                                     )
                                     MiniPlayerBgMode.DARK -> listOf(
                                         0xFF17171AL to "Глубокий оникс",
