@@ -525,12 +525,16 @@ fun SettingsScreen(
                                         0xFFFFFFFFL to "Белый"
                                     )
                                     MiniPlayerBgMode.DARK -> listOf(
-                                        0xFF17171AL to "Глубокий оникс",
-                                        0xFF1F2026L to "Графитовый",
-                                        0xFF141D2CL to "Ночной синий",
-                                        0xFF0E221BL to "Тёмный изумруд",
-                                        0xFF27131BL to "Винный бордо",
-                                        0xFF20132DL to "Тёмный аметист"
+                                        0xFF52652AL to "Лаймовый",
+                                        0xFF563A70L to "Фиолетовый",
+                                        0xFF665500L to "Жёлтый",
+                                        0xFF701818L to "Красный",
+                                        0xFF70103BL to "Розовый",
+                                        0xFF07552AL to "Зелёный",
+                                        0xFF703000L to "Оранжевый",
+                                        0xFF06465AL to "Синий",
+                                        0xFF242424L to "Чёрный",
+                                        0xFF555555L to "Белый"
                                     )
                                     else -> emptyList()
                                 }
