@@ -908,7 +908,11 @@ fun ExpandablePlayerSheet(
                                 text = track.title,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (useWhiteAlbumModeControls) Color.White else colorScheme.onSurfaceColor,
+                                color = when {
+                                    miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
+                                    useWhiteAlbumModeControls -> Color.White
+                                    else -> colorScheme.onSurfaceColor
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
