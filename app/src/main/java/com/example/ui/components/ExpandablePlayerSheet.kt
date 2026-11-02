@@ -280,8 +280,10 @@ fun ExpandablePlayerSheet(
         trackKey = "${track.id}_${track.title}_${track.albumArtUriString}"
     )
 
+    // Match control contrast to the generated album-art palette: light-theme
+    // pastel gradients use dark controls, while dark-theme gradients use light controls.
     val useWhiteAlbumModeControls =
-        appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && colorScheme.isDark
 
     val playerMaterialColorScheme = remember(colorScheme) {
         if (colorScheme.isDark) {
