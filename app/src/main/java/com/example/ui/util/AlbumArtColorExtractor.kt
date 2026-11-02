@@ -63,8 +63,11 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     val width = bitmap.width
     val height = bitmap.height
     if (width == 0 || height == 0) {
-        val fallback = Color(0xFF151A11)
-        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFFC5F45B))
+        val fallback = Color(0xFF777777)
+        return ExtractedAlbumCoverTones(
+            Color(0xFFB8B8B8), Color(0xFF333333), fallback,
+            Color(0xFF777777), Color(0xFF9A9A9A)
+        )
     }
 
     // Analyze a small, software bitmap: Palette is inexpensive and the result is cached
@@ -78,35 +81,60 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     // Prefer colors with enough chroma and usable luminance; extreme black/white
     // swatches remain available as fallbacks but don't dominate the gradient.
 
-    val fallbackVibrant = android.graphics.Color.parseColor("#6B7D3A")
-    val fallbackDarkVibrant = android.graphics.Color.parseColor("#20271A")
-    val fallbackMuted = android.graphics.Color.parseColor("#293020")
-    val fallbackDominant = android.graphics.Color.parseColor("#11150D")
+    // Neutral fallbacks are intentional: never inject the app's lime accent into
+    // an album-art background when the cover itself contains no chromatic colors.
+    val fallbackVibrant = android.graphics.Color.parseColor("#AFAFAF")
+    val fallbackDarkVibrant = android.graphics.Color.parseColor("#303030")
+    val fallbackMuted = android.graphics.Color.parseColor("#777777")
+    val fallbackDominant = android.graphics.Color.parseColor("#555555")
 
-    fun isAestheticSwatch(swatch: Palette.Swatch?): Boolean {
-        if (swatch == null) return false
-        val hsv = FloatArray(3)
-        android.graphics.Color.colorToHSV(swatch.rgb, hsv)
-        return hsv[1] in 0.18f..0.88f && hsv[2] in 0.16f..0.94f
+    fun hsv(swatch: Palette.Swatch): FloatArray = FloatArray(3).also {
+        android.graphics.Color.colorToHSV(swatch.rgb, it)
     }
 
     val swatches = palette.swatches
-    val aestheticSwatches = swatches.filter { isAestheticSwatch(it) }
-    val vibrantRgb = (palette.vibrantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: palette.lightVibrantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: aestheticSwatches.maxByOrNull { it.population * (0.6f + it.hsl[1]) }
-        )?.rgb ?: fallbackVibrant
-    val darkVibrantRgb = (palette.darkVibrantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: palette.darkMutedSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: aestheticSwatches.minByOrNull { it.hsl[2] })?.rgb ?: fallbackDarkVibrant
-    val mutedRgb = (palette.mutedSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: palette.lightMutedSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: aestheticSwatches.minByOrNull { kotlin.math.abs(it.hsl[1] - 0.42f) })?.rgb ?: fallbackMuted
-    val dominantRgb = (palette.dominantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: aestheticSwatches.maxByOrNull { it.population })?.rgb ?: fallbackDominant
-    val accentRgb = (palette.vibrantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: palette.lightVibrantSwatch?.takeIf { isAestheticSwatch(it) }
-        ?: aestheticSwatches.maxByOrNull { it.hsl[1] })?.rgb ?: fallbackVibrant
+    val chromaticSwatches = swatches.filter { swatch ->
+        val h = hsv(swatch)
+        h[1] >= 0.18f && h[1] <= 0.88f && h[2] in 0.12f..0.96f
+    }
+    val isGrayscaleCover = chromaticSwatches.isEmpty()
+
+    val vibrantRgb: Int
+    val darkVibrantRgb: Int
+    val mutedRgb: Int
+    val dominantRgb: Int
+    val accentRgb: Int
+
+    if (isGrayscaleCover) {
+        // Black-and-white artwork (like monochrome photography) should produce
+        // a sophisticated neutral gradient, not synthetic green/purple colors.
+        val neutralSwatches = swatches.ifEmpty { emptyList() }
+        val darkest = neutralSwatches.minByOrNull { hsv(it)[2] }?.rgb ?: fallbackDarkVibrant
+        val lightest = neutralSwatches.maxByOrNull { hsv(it)[2] }?.rgb ?: fallbackVibrant
+        val dominant = neutralSwatches.maxByOrNull { it.population }?.rgb ?: fallbackDominant
+        val middle = neutralSwatches.minByOrNull { kotlin.math.abs(hsv(it)[2] - 0.48f) }?.rgb ?: fallbackMuted
+        vibrantRgb = lightest
+        darkVibrantRgb = darkest
+        mutedRgb = middle
+        dominantRgb = dominant
+        accentRgb = middle
+    } else {
+        val bestByPopulation = chromaticSwatches.maxByOrNull { it.population }
+        val vibrant = palette.vibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.lightVibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.maxByOrNull { it.population * (0.6f + hsv(it)[1]) }
+        val dark = palette.darkVibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.darkMutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.minByOrNull { hsv(it)[2] }
+        val muted = palette.mutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.lightMutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.minByOrNull { kotlin.math.abs(hsv(it)[1] - 0.42f) }
+        vibrantRgb = vibrant?.rgb ?: fallbackVibrant
+        darkVibrantRgb = dark?.rgb ?: fallbackDarkVibrant
+        mutedRgb = muted?.rgb ?: fallbackMuted
+        dominantRgb = bestByPopulation?.rgb ?: fallbackDominant
+        accentRgb = (vibrant ?: bestByPopulation)?.rgb ?: fallbackVibrant
+    }
 
     return ExtractedAlbumCoverTones(
         vibrant = Color(vibrantRgb),
@@ -189,7 +217,8 @@ fun generateAlbumGradientStops(
         android.graphics.Color.colorToHSV(source.toArgb(), hsv)
         hsv[0] = (hsv[0] + hueShift + 360f) % 360f
         // Avoid muddy greys and neon saturation while retaining the cover's color identity.
-        hsv[1] = (hsv[1] * saturationScale).coerceIn(0.18f, if (isLightTheme) 0.52f else 0.72f)
+        // Preserve true neutral tones for monochrome covers; only cap overly vivid colors.
+        hsv[1] = (hsv[1] * saturationScale).coerceIn(0f, if (isLightTheme) 0.52f else 0.72f)
         hsv[2] = value
         return Color(android.graphics.Color.HSVToColor(hsv))
     }
