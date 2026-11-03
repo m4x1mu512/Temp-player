@@ -1614,8 +1614,8 @@ fun ExpandablePlayerSheet(
                                     FilledIconButton(
                                         onClick = { viewModel.togglePlayPause() },
                                         colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                            containerColor = if (useWhiteAccentOnLightPlayer) Color(0xFFE5E5EB) else MaterialTheme.colorScheme.primary,
+                                            contentColor = if (useWhiteAccentOnLightPlayer) Color(0xFF555660) else MaterialTheme.colorScheme.onPrimary
                                         ),
                                         modifier = Modifier
                                             .size(66.dp)
