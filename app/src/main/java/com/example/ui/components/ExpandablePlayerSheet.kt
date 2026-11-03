@@ -325,6 +325,13 @@ fun ExpandablePlayerSheet(
         else -> null
     }
 
+    // White monochrome swatch on a light player background needs neutral controls
+    // so the played progress and active toggles remain visible on white.
+    val useWhiteAccentOnLightPlayer =
+        miniPlayerBgMode == MiniPlayerBgMode.LIGHT &&
+            miniPlayerCustomColor == 0xFFFFFFFFL &&
+            selectedMonochromeAccent == AccentColor.WHITE
+
     val playerControlsAccentColor = when (miniPlayerBgMode) {
         MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
             selectedMonochromeAccent?.let {
@@ -1294,6 +1301,7 @@ fun ExpandablePlayerSheet(
                                         duration = duration,
                                         isPlaying = isPlaying,
                                         onSeek = { viewModel.seekTo(it) },
+                                        playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
                                         inactiveTrackColor = when (miniPlayerBgMode) {
                                             // Use explicit opaque shades: alpha blending made the difference
                                             // barely visible against the player background.
@@ -1478,6 +1486,7 @@ fun ExpandablePlayerSheet(
                                     duration = duration,
                                     isPlaying = isPlaying,
                                     onSeek = { viewModel.seekTo(it) },
+                                    playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
                                     inactiveTrackColor = when (miniPlayerBgMode) {
                                         // Use explicit opaque shades: alpha blending made the difference
                                         // barely visible against the player background.
@@ -1496,8 +1505,16 @@ fun ExpandablePlayerSheet(
                                     FilledTonalIconButton(
                                         onClick = { viewModel.toggleShuffle() },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = if (isShuffle) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            contentColor = if (isShuffle) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = when {
+                                                useWhiteAccentOnLightPlayer && isShuffle -> Color(0xFFE5E5EB)
+                                                isShuffle -> MaterialTheme.colorScheme.primaryContainer
+                                                else -> Color.Transparent
+                                            },
+                                            contentColor = when {
+                                                useWhiteAccentOnLightPlayer && isShuffle -> Color(0xFF555660)
+                                                isShuffle -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
                                         ),
                                         modifier = Modifier.testTag("player_shuffle_button")
                                     ) {
@@ -1537,8 +1554,16 @@ fun ExpandablePlayerSheet(
                                     FilledTonalIconButton(
                                         onClick = { viewModel.toggleRepeat() },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            contentColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = when {
+                                                useWhiteAccentOnLightPlayer && repeatMode != RepeatMode.OFF -> Color(0xFFE5E5EB)
+                                                repeatMode != RepeatMode.OFF -> MaterialTheme.colorScheme.primaryContainer
+                                                else -> Color.Transparent
+                                            },
+                                            contentColor = when {
+                                                useWhiteAccentOnLightPlayer && repeatMode != RepeatMode.OFF -> Color(0xFF555660)
+                                                repeatMode != RepeatMode.OFF -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
                                         ),
                                         modifier = Modifier.testTag("player_repeat_button")
                                     ) {
@@ -1734,6 +1759,7 @@ private fun SheetProgressSection(
     duration: Long,
     isPlaying: Boolean,
     onSeek: (Long) -> Unit,
+    playedTrackColor: Color? = null,
     inactiveTrackColor: Color,
     modifier: Modifier = Modifier
 ) {
@@ -1775,7 +1801,7 @@ private fun SheetProgressSection(
         val currentFloat = if (isUserScrubbing) scrubPosition else smoothAnimatedPos.value
         val sliderVal = if (duration > 0) currentFloat.coerceIn(0f, duration.toFloat()) else 0f
 
-        val accentColor = MaterialTheme.colorScheme.primary
+        val accentColor = playedTrackColor ?: MaterialTheme.colorScheme.primary
 
         GlowProgressSlider(
             value = sliderVal,
