@@ -38,6 +38,18 @@ class SettingsDataStore(private val context: Context) {
         private const val KEY_CACHED_LAST_POSITION = "cached_last_position"
         private const val KEY_CACHED_SORT_ORDER = "cached_sort_order"
 
+        private const val MAX_MIGRATION_READ_BYTES = 512 * 1024
+        private const val VALUE_SCAN_WINDOW = 64
+
+        /**
+         * Legacy migration path for installs that predate the SharedPreferences cache.
+         *
+         * The DataStore file is protobuf, so a plain substring scan over the whole file is
+         * wrong: "DARK" also occurs as the MiniPlayerBgMode/ReverbPreset value stored in the
+         * same file, which handed light-theme users a dark startup flash and then cached that
+         * wrong answer. Locate the value only in the bytes that directly follow the
+         * "theme_mode" key instead.
+         */
         fun getInitialThemeMode(context: Context): ThemeMode {
             val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
             val name = prefs.getString(KEY_CACHED_THEME_MODE, null)
@@ -49,16 +61,20 @@ class SettingsDataStore(private val context: Context) {
                 }
             }
 
-            // Fallback for existing installations: scan DataStore preferences file synchronously
             try {
                 val dataStoreFile = File(context.filesDir, "datastore/temp_settings.preferences_pb")
-                if (dataStoreFile.exists()) {
+                if (dataStoreFile.exists() && dataStoreFile.length() in 1..MAX_MIGRATION_READ_BYTES) {
                     val content = dataStoreFile.readBytes().toString(Charsets.ISO_8859_1)
-                    if (content.contains("theme_mode")) {
+                    val keyIndex = content.indexOf("theme_mode")
+                    if (keyIndex >= 0) {
+                        // A protobuf string entry stores the value right after its key, so the
+                        // enum name can only appear in the few bytes that follow it.
+                        val end = minOf(content.length, keyIndex + "theme_mode".length + VALUE_SCAN_WINDOW)
+                        val valueRegion = content.substring(keyIndex, end)
                         val detected = when {
-                            content.contains("DARK") -> ThemeMode.DARK
-                            content.contains("LIGHT") -> ThemeMode.LIGHT
-                            content.contains("SYSTEM") -> ThemeMode.SYSTEM
+                            valueRegion.contains("DARK") -> ThemeMode.DARK
+                            valueRegion.contains("LIGHT") -> ThemeMode.LIGHT
+                            valueRegion.contains("SYSTEM") -> ThemeMode.SYSTEM
                             else -> null
                         }
                         if (detected != null) {
@@ -168,21 +184,17 @@ class SettingsDataStore(private val context: Context) {
     fun getInitialCustomAllTracksOrder(): List<Long> {
         val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, null) ?: ""
-        if (raw.isNotBlank()) {
-            return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
-        }
-        val queueRaw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, null) ?: ""
-        return if (queueRaw.isBlank()) emptyList() else queueRaw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
     }
 
+    /**
+     * Reads the saved queue only. Falling back to the library's manual order here made an
+     * intentionally empty queue restore the whole library as the playback queue on next start.
+     */
     fun getInitialQueueTrackIds(): List<Long> {
         val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, null) ?: ""
-        if (raw.isNotBlank()) {
-            return raw.split(",").mapNotNull { it.trim().toLongOrNull() }
-        }
-        val customRaw = prefs.getString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, null) ?: ""
-        return if (customRaw.isBlank()) emptyList() else customRaw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
     }
 
     fun getInitialFavoritesOrder(): List<Long> {
@@ -261,18 +273,21 @@ class SettingsDataStore(private val context: Context) {
         emit(initial)
     }
 
+    /**
+     * Persists only the library's manual order. It must not touch the queue keys: this is
+     * called whenever the user reorders the library, and overwriting the saved queue here
+     * replaced the playback queue with the whole library the next time the app started.
+     */
     suspend fun saveCustomAllTracksOrder(trackIds: List<Long>) {
         val str = trackIds.joinToString(",")
         try {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, str)
-                .putString(KEY_CACHED_QUEUE_TRACK_IDS, str)
                 .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = str
-            preferences[KEY_QUEUE_TRACK_IDS] = str
         }
     }
 
@@ -508,6 +523,11 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    /**
+     * Saves the playback session only. The queue and the library's manual order are separate
+     * lists: writing the queue into the custom-order keys here meant that simply listening to
+     * music replaced the user's hand-arranged library order (this runs on every track change).
+     */
     suspend fun savePlaybackState(
         trackId: Long,
         position: Long,
@@ -519,9 +539,7 @@ class SettingsDataStore(private val context: Context) {
             editor.putLong(KEY_CACHED_LAST_TRACK_ID, trackId)
             editor.putLong(KEY_CACHED_LAST_POSITION, position)
             if (queueIds != null) {
-                val qStr = queueIds.joinToString(",")
-                editor.putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
-                editor.putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
+                editor.putString(KEY_CACHED_QUEUE_TRACK_IDS, queueIds.joinToString(","))
             }
             if (queueIndex != null) {
                 editor.putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
@@ -534,9 +552,7 @@ class SettingsDataStore(private val context: Context) {
             preferences[KEY_LAST_TRACK_ID] = trackId
             preferences[KEY_LAST_POSITION] = position
             if (queueIds != null) {
-                val qStr = queueIds.joinToString(",")
-                preferences[KEY_QUEUE_TRACK_IDS] = qStr
-                preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = qStr
+                preferences[KEY_QUEUE_TRACK_IDS] = queueIds.joinToString(",")
             }
             if (queueIndex != null) {
                 preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
@@ -550,13 +566,11 @@ class SettingsDataStore(private val context: Context) {
             context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_CACHED_QUEUE_TRACK_IDS, qStr)
-                .putString(KEY_CACHED_CUSTOM_ALL_TRACKS_ORDER, qStr)
                 .putInt(KEY_CACHED_LAST_QUEUE_INDEX, queueIndex)
                 .apply()
         } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences[KEY_QUEUE_TRACK_IDS] = qStr
-            preferences[KEY_CUSTOM_ALL_TRACKS_ORDER] = qStr
             preferences[KEY_LAST_QUEUE_INDEX] = queueIndex
         }
     }
@@ -693,7 +707,18 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    /**
+     * Clears both stores. The SharedPreferences cache feeds the synchronous startup reads and
+     * the fallbacks in themeModeFlow/accentColorFlow, so clearing DataStore alone let the old
+     * theme, accent, queue and sort order survive a "reset settings".
+     */
     suspend fun resetSettings() {
+        try {
+            context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+        } catch (_: Exception) {}
         context.dataStore.edit { preferences ->
             preferences.clear()
         }

@@ -64,6 +64,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import com.example.TrackMoveLogger
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -138,6 +140,19 @@ fun SettingsScreen(
                 )
             } catch (_: Exception) { }
             viewModel.addMusicFolder(uri.toString())
+        }
+    }
+
+    val movementLogExporter = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val exported = TrackMoveLogger.exportTo(context, uri)
+            Toast.makeText(
+                context,
+                if (exported) "Логи перемещения сохранены" else "Не удалось сохранить логи",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -311,7 +326,11 @@ fun SettingsScreen(
                                         Icon(
                                             imageVector = Icons.Default.Check,
                                             contentDescription = "Выбрано",
-                                            tint = if (accent == AccentColor.CYBER_YELLOW || accent == AccentColor.MATRIX_GREEN) Color.Black else Color.White,
+                                            tint = when (accent) {
+                                                AccentColor.CYBER_YELLOW, AccentColor.MATRIX_GREEN, AccentColor.WHITE -> Color.Black
+                                                AccentColor.BLACK -> Color.White
+                                                else -> Color.White
+                                            },
                                             modifier = Modifier.size(22.dp)
                                         )
                                     }
@@ -381,7 +400,7 @@ fun SettingsScreen(
                             selected = miniPlayerBgMode == MiniPlayerBgMode.LIGHT,
                             onClick = {
                                 viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.LIGHT)
-                                viewModel.setMiniPlayerCustomColor(0xFFFFFFFFL)
+                                viewModel.setMiniPlayerCustomColor(0L)
                             },
                             label = { Text("Светлый") },
                             leadingIcon = {
@@ -410,7 +429,7 @@ fun SettingsScreen(
                             selected = miniPlayerBgMode == MiniPlayerBgMode.DARK,
                             onClick = {
                                 viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.DARK)
-                                viewModel.setMiniPlayerCustomColor(0xFF17171AL)
+                                viewModel.setMiniPlayerCustomColor(0L)
                             },
                             label = { Text("Тёмный") },
                             leadingIcon = {
@@ -494,26 +513,36 @@ fun SettingsScreen(
 
                                 val swatches = when (miniPlayerBgMode) {
                                     MiniPlayerBgMode.LIGHT -> listOf(
-                                        0xFFFFFFFFL to "Белоснежный",
-                                        0xFFF5F5F7L to "Холодный серый",
-                                        0xFFFAF6F0L to "Тёплый крем",
-                                        0xFFEBF4F6L to "Ледяной голубой",
-                                        0xFFEBF5EAL to "Мятная свежесть",
-                                        0xFFF4EDF8L to "Светлая лаванда"
+                                        0xFFF0F9D8L to "Лаймовый",
+                                        0xFFF0E2FFL to "Фиолетовый",
+                                        0xFFFFF5C2L to "Жёлтый",
+                                        0xFFFFDADAL to "Красный",
+                                        0xFFFFE0EFL to "Розовый",
+                                        0xFFD9FFE7L to "Зелёный",
+                                        0xFFFFE5D1L to "Оранжевый",
+                                        0xFFD9F5FCL to "Синий",
+                                        0xFFE6E6E6L to "Чёрный",
+                                        0xFFFFFFFFL to "Белый"
                                     )
                                     MiniPlayerBgMode.DARK -> listOf(
-                                        0xFF17171AL to "Глубокий оникс",
-                                        0xFF1F2026L to "Графитовый",
-                                        0xFF141D2CL to "Ночной синий",
-                                        0xFF0E221BL to "Тёмный изумруд",
-                                        0xFF27131BL to "Винный бордо",
-                                        0xFF20132DL to "Тёмный аметист"
+                                        0xFF52652AL to "Лаймовый",
+                                        0xFF563A70L to "Фиолетовый",
+                                        0xFF665500L to "Жёлтый",
+                                        0xFF701818L to "Красный",
+                                        0xFF70103BL to "Розовый",
+                                        0xFF07552AL to "Зелёный",
+                                        0xFF703000L to "Оранжевый",
+                                        0xFF06465AL to "Синий",
+                                        0xFF242424L to "Чёрный",
+                                        0xFF555555L to "Белый"
                                     )
                                     else -> emptyList()
                                 }
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -948,6 +977,41 @@ fun SettingsScreen(
                         subtitle = "Сохранить файл app_logs.txt для выявления багов и падений",
                         onClick = { CrashLogger.exportLogs(context) },
                         testTag = "settings_export_logs_button"
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Track movement diagnostics
+            SettingsSectionHeader(title = "Логи перемещения", icon = Icons.Default.BugReport)
+
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_track_movement_logs_card")
+            ) {
+                Column {
+                    SettingsActionItem(
+                        icon = Icons.Default.Description,
+                        title = "Скачать логи перемещения",
+                        subtitle = "Сохранить track_movement_logs.txt для диагностики подсветки и перестановки треков",
+                        onClick = { movementLogExporter.launch("track_movement_logs.txt") },
+                        testTag = "settings_export_track_movement_logs"
+                    )
+                    SettingsActionItem(
+                        icon = Icons.Default.Delete,
+                        title = "Очистить логи перемещения",
+                        subtitle = "Размер текущего файла: ${(TrackMoveLogger.sizeBytes(context) / 1024L)} КБ",
+                        onClick = {
+                            TrackMoveLogger.clear(context)
+                            Toast.makeText(context, "Логи перемещения очищены", Toast.LENGTH_SHORT).show()
+                        },
+                        testTag = "settings_clear_track_movement_logs"
                     )
                 }
             }

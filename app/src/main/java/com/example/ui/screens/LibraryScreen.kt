@@ -115,6 +115,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -159,8 +160,9 @@ fun LibraryScreen(
     val musicFolders by viewModel.musicFolders.collectAsStateWithLifecycle()
     val musicFolderSetupCompleted by viewModel.musicFolderSetupCompleted.collectAsStateWithLifecycle()
     val allTracksOrdered by viewModel.allTracksOrdered.collectAsStateWithLifecycle()
-    val currentQueue by viewModel.currentQueue.collectAsStateWithLifecycle()
-    val currentQueueIndex by viewModel.currentQueueIndex.collectAsStateWithLifecycle()
+    val currentQueueState by viewModel.currentQueueState.collectAsStateWithLifecycle()
+    val currentQueue = currentQueueState.tracks
+    val currentQueueIndex = currentQueueState.currentIndex
     val openQueueEvent by viewModel.openQueueEvent.collectAsStateWithLifecycle()
     val favoriteIds by viewModel.favoriteIds.collectAsStateWithLifecycle()
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
@@ -400,6 +402,7 @@ fun LibraryScreen(
         modifier = modifier.testTag("library_screen"),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
+            val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
             val glassShape = RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp)
             Column(
                 modifier = Modifier
@@ -407,10 +410,17 @@ fun LibraryScreen(
                     .clip(glassShape)
                     .background(
                         brush = Brush.verticalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
-                                MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
-                            )
+                            colors = if (isLightTheme) {
+                                listOf(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f)
+                                )
+                            } else {
+                                listOf(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.91f)
+                                )
+                            }
                         ),
                         shape = glassShape
                     )

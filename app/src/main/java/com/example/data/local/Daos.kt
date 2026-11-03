@@ -19,6 +19,9 @@ interface TrackDao {
     @Query("SELECT * FROM tracks")
     fun getAllTracksDirect(): List<TrackEntity>
 
+    @Query("SELECT id FROM tracks")
+    suspend fun getAllTrackIds(): List<Long>
+
     @Query("SELECT * FROM tracks WHERE id = :id LIMIT 1")
     suspend fun getTrackById(id: Long): TrackEntity?
 

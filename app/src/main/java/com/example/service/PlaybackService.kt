@@ -13,18 +13,11 @@ import android.media.AudioManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.OptIn
-import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.audio.AudioOffloadSupport
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
-import androidx.media3.exoplayer.audio.TeeAudioProcessor
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -70,38 +63,6 @@ class PlaybackService : MediaSessionService() {
     companion object {
         private const val TAG = "TempPlayer"
         const val NOTIFICATION_CHANNEL_ID = "temp_playback_channel"
-    }
-
-    @OptIn(UnstableApi::class)
-    private fun buildExoPlayer(): ExoPlayer {
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(C.USAGE_MEDIA)
-            .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-            .build()
-
-        val renderersFactory = object : DefaultRenderersFactory(this) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean
-            ): AudioSink {
-                return DefaultAudioSink.Builder(context)
-                    .setEnableFloatOutput(enableFloatOutput)
-                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioOffloadSupportProvider { _, _ -> AudioOffloadSupport.DEFAULT_UNSUPPORTED }
-                    .setAudioProcessors(playbackManager.createPlayerAudioProcessors())
-                    .build()
-            }
-        }
-
-        val mediaSourceFactory = DefaultMediaSourceFactory(this, PlaybackManager.createExtractorsFactory())
-
-        return ExoPlayer.Builder(this, renderersFactory)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .setAudioAttributes(audioAttributes, false) // Controlled at service level for simultaneous crossfade
-            .setHandleAudioBecomingNoisy(false)
-            .setWakeMode(C.WAKE_MODE_LOCAL)
-            .build()
     }
 
     private fun requestSystemAudioFocus(): Boolean {
@@ -250,7 +211,7 @@ class PlaybackService : MediaSessionService() {
         // Only the first player is built here. The second one exists solely for crossfading
         // and PlaybackManager creates it a few seconds into playback, so a cold start no
         // longer constructs two full ExoPlayer instances before the first frame.
-        val p1 = buildExoPlayer()
+        val p1 = playbackManager.buildPlayer()
         player1 = p1
 
         playbackManager.attachPlayers(p1)

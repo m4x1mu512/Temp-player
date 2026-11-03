@@ -16,15 +16,27 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object CrashLogger {
 
     private const val TAG = "CrashLogger"
     private const val CRASH_LOG_FILE_NAME = "crash.log"
     private const val FULL_EXPORT_LOG_FILE_NAME = "app_logs.txt"
+    private const val LOGCAT_TIMEOUT_MS = 10_000L
 
     private var defaultHandler: Thread.UncaughtExceptionHandler? = null
     private var isInitialized = false
+
+    /**
+     * Background scope for log export (logcat dump, report writing) so the UI thread is never
+     * blocked — a hanging `logcat` process used to cause ANR.
+     */
+    private val exportScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /**
      * Инициализирует обработчик необработанных исключений.
@@ -154,6 +166,7 @@ object CrashLogger {
 
     /**
      * Считывает последние строки из logcat для текущего процесса.
+     * Имеет таймаут: зависание logcat без него вызывало ANR.
      */
     private fun getRecentLogcat(): String {
         return try {
@@ -171,20 +184,25 @@ object CrashLogger {
                 if (lineCount >= maxLines) break
             }
             reader.close()
-            process.destroy()
+            if (process.waitFor(LOGCAT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                // Process exited normally
+            } else {
+                process.destroyForcibly()
+                return "Logcat не ответил в течение $LOGCAT_TIMEOUT_MS мс — процесс был прерван"
+            }
             if (log.isNotEmpty()) log.toString() else "Logcat пуст или недоступен"
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            "Logcat был прерван: ${e.message}"
         } catch (e: Exception) {
             "Не удалось получить logcat: ${e.message}"
         }
     }
 
     /**
-     * Генерирует комплексный файл отчёта app_logs.txt, включающий:
-     * - Информацию об устройстве и версии
-     * - Историю крашей (если были)
-     * - Последние логи текущего сеанса приложения из logcat
+     * Generates the full diagnostic report file. Called from the background in [exportLogs].
      */
-    fun generateFullLogReport(context: Context): File {
+    private fun generateFullLogReport(context: Context): File {
         val exportFile = getExportLogFile(context)
         val timestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
         val crashLog = readCrashLog(context)
@@ -223,30 +241,37 @@ object CrashLogger {
 
     /**
      * Выгружает файл логов (.txt) через стандартный системный диалог Android (ACTION_SEND).
-     * Позволяет сохранить файл на диск, отправить в мессенджер, по почте или скопировать.
+     * Выполняется в фоновом потоке: logcat-процесс и запись файла не блокируют UI.
      */
     fun exportLogs(context: Context) {
-        try {
-            val logFile = generateFullLogReport(context)
-            val authority = "${context.packageName}.fileprovider"
-            val contentUri = FileProvider.getUriForFile(context, authority, logFile)
+        exportScope.launch(Dispatchers.IO) {
+            try {
+                val logFile = generateFullLogReport(context)
+                // Switch back to main thread for the UI call (startActivity)
+                withContext(Dispatchers.Main) {
+                    val authority = "${context.packageName}.fileprovider"
+                    val contentUri = FileProvider.getUriForFile(context, authority, logFile)
 
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                putExtra(Intent.EXTRA_SUBJECT, "Логи приложения ${context.packageName} - app_logs.txt")
-                putExtra(Intent.EXTRA_TEXT, "Диагностический файл логов приложения во вложении (app_logs.txt).")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                        putExtra(Intent.EXTRA_SUBJECT, "Логи приложения ${context.packageName} - app_logs.txt")
+                        putExtra(Intent.EXTRA_TEXT, "Диагностический файл логов приложения во вложении (app_logs.txt).")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+
+                    val chooser = Intent.createChooser(sendIntent, "Выгрузить логи приложения").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+
+                    context.startActivity(chooser)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Log.e(TAG, "Ошибка выгрузки логов", e)
+                    Toast.makeText(context, "Не удалось выгрузить логи: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
-
-            val chooser = Intent.createChooser(sendIntent, "Выгрузить логи приложения").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            context.startActivity(chooser)
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка выгрузки логов", e)
-            Toast.makeText(context, "Не удалось выгрузить логи: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

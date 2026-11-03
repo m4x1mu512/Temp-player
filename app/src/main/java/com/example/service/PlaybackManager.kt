@@ -55,6 +55,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.DataInputStream
+
+data class PlaybackQueueState(val tracks: List<Track> = emptyList(), val currentIndex: Int = -1)
 
 @OptIn(UnstableApi::class)
 class PlaybackManager private constructor(private val context: Context) {
@@ -147,11 +150,19 @@ class PlaybackManager private constructor(private val context: Context) {
         shuffleIndices = indices
     }
 
+    private val _queueState = MutableStateFlow(PlaybackQueueState())
+    val queueState: StateFlow<PlaybackQueueState> = _queueState.asStateFlow()
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
-
     private val _queueIndex = MutableStateFlow(-1)
     val queueIndex: StateFlow<Int> = _queueIndex.asStateFlow()
+
+    private fun publishQueue(tracks: List<Track>, index: Int) {
+        val snapshot = PlaybackQueueState(tracks.toList(), index.takeIf { it in tracks.indices } ?: -1)
+        _queueState.value = snapshot
+        _queue.value = snapshot.tracks
+        _queueIndex.value = snapshot.currentIndex
+    }
 
     private val _sleepTimerRemainingMillis = MutableStateFlow<Long?>(null)
     val sleepTimerRemainingMillis: StateFlow<Long?> = _sleepTimerRemainingMillis.asStateFlow()
@@ -245,16 +256,11 @@ class PlaybackManager private constructor(private val context: Context) {
             serviceScope.launch {
                 try {
                     val currentSpecs = _trackAudioSpecs.value
-            val bitDepth = when (encoding) {
-                C.ENCODING_PCM_24BIT -> 24
-                C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
-                else -> 16
-            }
+            // Visualizer encoding describes decoded PCM, not the source file.
             if (currentSpecs != null) {
                 _trackAudioSpecs.value = currentSpecs.copy(
                     sampleRateHz = if (sampleRate > 0) sampleRate else currentSpecs.sampleRateHz,
-                    channelCount = if (channels > 0) channels else currentSpecs.channelCount,
-                    bitDepth = if (bitDepth > 0) bitDepth else currentSpecs.bitDepth
+                    channelCount = if (channels > 0) channels else currentSpecs.channelCount
                 )
             }
         } catch (t: Throwable) {
@@ -535,7 +541,17 @@ class PlaybackManager private constructor(private val context: Context) {
         _isPlaying.value = false
     }
 
-    private fun createSecondaryPlayer(isPlayerB: Boolean): ExoPlayer {
+    /**
+     * The single place where an ExoPlayer is constructed. PlaybackService used to keep its own
+     * copy of this builder for player A while this class built player B, so any change (audio
+     * attributes, extractor flags, processor chain) had to be applied twice and the two
+     * instances could silently drift apart.
+     *
+     * Audio focus is never handled by the player itself: the service owns it so that the two
+     * crossfading players do not compete for it. Listeners are attached by the caller.
+     */
+    @OptIn(UnstableApi::class)
+    fun buildPlayer(): ExoPlayer {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -558,25 +574,19 @@ class PlaybackManager private constructor(private val context: Context) {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(context, createExtractorsFactory())
 
-        val player = ExoPlayer.Builder(context, renderersFactory)
+        return ExoPlayer.Builder(context, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
-            .setAudioAttributes(audioAttributes, false) // Note: false to not compete for audio focus
+            .setAudioAttributes(audioAttributes, false)
             .setHandleAudioBecomingNoisy(false)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
-        if (isPlayerB) {
-            player.addListener(playerBListener)
-        } else {
-            player.addListener(playerAListener)
-        }
-        return player
     }
 
     private fun getOrCreateSecondaryPlayer(): ExoPlayer {
         val existing = secondaryPlayer
         if (existing != null) return existing
         val isForPlayerB = (activePlayerIndex == 0)
-        val newPlayer = createSecondaryPlayer(isPlayerB = isForPlayerB)
+        val newPlayer = buildPlayer()
         // attachPlayers() normally wires the listener; a lazily created player must get it
         // here, otherwise its state changes and end-of-track would never be handled.
         if (isForPlayerB) {
@@ -659,29 +669,14 @@ class PlaybackManager private constructor(private val context: Context) {
         try {
             crossfadeController.cancelCrossfade()
 
-            if (newQueue != null && newQueue.isNotEmpty()) {
-                _queue.value = newQueue
-                _queueIndex.value = if (startIndex >= 0) startIndex else newQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-                if (_isShuffle.value) {
-                    rebuildShuffleOrder(_queueIndex.value)
-                }
-            } else if (!_queue.value.any { it.id == track.id }) {
-                _queue.value = listOf(track)
-                _queueIndex.value = 0
-                if (_isShuffle.value) {
-                    rebuildShuffleOrder(0)
-                }
-            } else {
-                _queueIndex.value = _queue.value.indexOfFirst { it.id == track.id }
-                if (_isShuffle.value) {
-                    val pos = shuffleIndices.indexOf(_queueIndex.value)
-                    if (pos >= 0) {
-                        shufflePosition = pos
-                    } else {
-                        rebuildShuffleOrder(_queueIndex.value)
-                    }
-                }
+            val previousQueue = _queueState.value
+            val selectedQueue = if (!newQueue.isNullOrEmpty()) newQueue else if (previousQueue.tracks.any { it.id == track.id }) previousQueue.tracks else listOf(track)
+            val selectedIndex = when {
+                !newQueue.isNullOrEmpty() && startIndex in selectedQueue.indices && selectedQueue[startIndex].id == track.id -> startIndex
+                else -> selectedQueue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
             }
+            publishQueue(selectedQueue, selectedIndex)
+            if (_isShuffle.value) rebuildShuffleOrder(selectedIndex)
 
             _currentTrack.value = track
             _duration.value = if (track.duration > 0) track.duration else {
@@ -965,7 +960,7 @@ class PlaybackManager private constructor(private val context: Context) {
             val updatedQueue = q.map { track ->
                 if (track.id == updatedTrack.id) updatedTrack else track
             }
-            _queue.value = updatedQueue
+            publishQueue(updatedQueue, _queueIndex.value)
         }
     }
 
@@ -1026,7 +1021,7 @@ class PlaybackManager private constructor(private val context: Context) {
         // Switch active index to incomingPlayer
         activePlayerIndex = if (activePlayerIndex == 0) 1 else 0
         _currentTrack.value = nextTrack
-        _queueIndex.value = nextIdx
+        publishQueue(_queue.value, nextIdx)
         if (_isShuffle.value && shuffleIndices.isNotEmpty()) {
             val pos = shuffleIndices.indexOf(nextIdx)
             if (pos >= 0) {
@@ -1088,112 +1083,68 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     fun addTrackNext(track: Track) {
-        val queue = _queue.value.toMutableList()
-        val currentTrack = _currentTrack.value
-        val currentIndex = if (currentTrack != null) queue.indexOfFirst { it.id == currentTrack.id } else -1
-        val insertIndex = if (currentIndex >= 0) currentIndex + 1 else 0
-        queue.add(insertIndex.coerceIn(0, queue.size), track)
-        _queue.value = queue
-
-        if (currentTrack != null) {
-            _queueIndex.value = queue.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
-        } else if (_queueIndex.value < 0) {
-            _queueIndex.value = -1
+        val old = _queueState.value
+        val updated = old.tracks.toMutableList()
+        val insertIndex = if (old.currentIndex in updated.indices) old.currentIndex + 1 else 0
+        updated.add(insertIndex, track)
+        val newCurrentIndex = when {
+            old.currentIndex !in old.tracks.indices -> -1
+            insertIndex <= old.currentIndex -> old.currentIndex + 1
+            else -> old.currentIndex
         }
-
-        if (_isShuffle.value) {
-            val currentQueueIndex = _queueIndex.value
-            val previousShuffleOrder = shuffleIndices.toMutableList()
-            val previousCurrentPosition = previousShuffleOrder.indexOf(currentQueueIndex)
-            val insertedQueueIndex = insertIndex.coerceIn(0, queue.lastIndex)
-            val adjustedOrder = previousShuffleOrder
-                .map { if (it >= insertedQueueIndex) it + 1 else it }
-                .filter { it in queue.indices }
-                .toMutableList()
-            adjustedOrder.remove(insertedQueueIndex)
-            val currentPosition = adjustedOrder.indexOf(currentQueueIndex)
-            if (currentQueueIndex in queue.indices) {
-                if (currentPosition >= 0) {
-                    adjustedOrder.add(currentPosition + 1, insertedQueueIndex)
-                    shufflePosition = currentPosition
-                } else {
-                    adjustedOrder.add(0, currentQueueIndex)
-                    adjustedOrder.add(1.coerceAtMost(adjustedOrder.size), insertedQueueIndex)
-                    shufflePosition = 0
-                }
-            } else {
-                adjustedOrder.add(0, insertedQueueIndex)
-                shufflePosition = -1
-            }
-            val remaining = queue.indices.filter { it !in adjustedOrder }
-            adjustedOrder.addAll(remaining.shuffled())
-            shuffleIndices = adjustedOrder
-        }
+        publishQueue(updated, newCurrentIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newCurrentIndex)
         saveCurrentState()
     }
 
     fun removeTrackFromQueue(track: Track) {
-        val currentQueue = _queue.value
-        val removeIndex = currentQueue.indexOfFirst { it.id == track.id }
+        val state = _queueState.value
+        val removeIndex = state.tracks.indexOfFirst { it.id == track.id }
         if (removeIndex < 0) return
-
-        val currentTrackId = _currentTrack.value?.id
-        val updatedQueue = currentQueue.toMutableList().apply { removeAt(removeIndex) }
-        _queue.value = updatedQueue
-
-        val newCurrentIndex = if (currentTrackId != null) {
-            updatedQueue.indexOfFirst { it.id == currentTrackId }
-        } else {
-            -1
+        val updated = state.tracks.toMutableList().apply { removeAt(removeIndex) }
+        val newCurrentIndex = when {
+            state.currentIndex !in state.tracks.indices -> -1
+            removeIndex < state.currentIndex -> state.currentIndex - 1
+            removeIndex == state.currentIndex -> -1
+            else -> state.currentIndex
         }
-        _queueIndex.value = newCurrentIndex
-
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(newCurrentIndex)
-        }
+        publishQueue(updated, newCurrentIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newCurrentIndex)
         saveCurrentState()
     }
 
     fun setQueue(newQueue: List<Track>) {
-        _queue.value = newQueue
-        val currentPlaying = _currentTrack.value
-        if (currentPlaying != null) {
-            val idx = newQueue.indexOfFirst { it.id == currentPlaying.id }
-            if (idx >= 0) {
-                _queueIndex.value = idx
-            }
+        val old = _queueState.value
+        val activeTrackId = _currentTrack.value?.id
+        val oldActive = old.tracks.getOrNull(old.currentIndex)
+        val newIndex = when {
+            oldActive == null || oldActive.id != activeTrackId ->
+                activeTrackId?.let { id -> newQueue.indexOfFirst { it.id == id } } ?: -1
+            newQueue.getOrNull(old.currentIndex)?.id == oldActive.id -> old.currentIndex
+            else -> newQueue.indices.filter { newQueue[it].id == oldActive.id }
+                .minByOrNull { kotlin.math.abs(it - old.currentIndex) } ?: -1
         }
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(_queueIndex.value)
-        }
+        publishQueue(newQueue, newIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newIndex)
         saveCurrentState()
     }
 
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
-        val current = _queue.value.toMutableList()
-        if (fromIndex !in current.indices || toIndex !in current.indices || fromIndex == toIndex) return
-
-        // The active queue occurrence is identified by its index, not Track.id:
-        // the same media file can appear more than once in the queue.
-        val previousCurrentIndex = _queueIndex.value
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
-        _queue.value = current
-
-        val adjustedCurrentIndex = when {
-            previousCurrentIndex !in current.indices -> previousCurrentIndex
-            previousCurrentIndex == fromIndex -> toIndex
-            fromIndex < previousCurrentIndex && toIndex >= previousCurrentIndex -> previousCurrentIndex - 1
-            fromIndex > previousCurrentIndex && toIndex <= previousCurrentIndex -> previousCurrentIndex + 1
-            else -> previousCurrentIndex
+        val oldTracks = _queue.value
+        if (fromIndex !in oldTracks.indices || toIndex !in oldTracks.indices || fromIndex == toIndex) return
+        val updated = oldTracks.toMutableList()
+        val moved = updated.removeAt(fromIndex)
+        updated.add(toIndex, moved)
+        val oldIndex = _queueIndex.value
+        val newIndex = when {
+            oldIndex !in oldTracks.indices -> -1
+            oldIndex == fromIndex -> toIndex
+            fromIndex < oldIndex && toIndex >= oldIndex -> oldIndex - 1
+            fromIndex > oldIndex && toIndex <= oldIndex -> oldIndex + 1
+            else -> oldIndex
         }
-        if (adjustedCurrentIndex in current.indices) {
-            _queueIndex.value = adjustedCurrentIndex
-        }
-
-        if (_isShuffle.value) {
-            rebuildShuffleOrder(_queueIndex.value)
-        }
+        publishQueue(updated, newIndex)
+        if (_isShuffle.value) rebuildShuffleOrder(newIndex)
         saveCurrentState()
     }
 
@@ -1629,7 +1580,6 @@ class PlaybackManager private constructor(private val context: Context) {
             }
 
             if (restoredQueue.isNotEmpty()) {
-                _queue.value = restoredQueue
                 val targetIndex = if (savedQueueIndex in restoredQueue.indices) {
                     savedQueueIndex
                 } else if (lastTrackId > 0) {
@@ -1637,7 +1587,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 } else {
                     0
                 }
-                _queueIndex.value = targetIndex
+                publishQueue(restoredQueue, targetIndex)
 
                 val trackToRestore = if (lastTrackId > 0) {
                     restoredQueue.find { it.id == lastTrackId } ?: restoredQueue.getOrNull(targetIndex)
@@ -1668,9 +1618,8 @@ class PlaybackManager private constructor(private val context: Context) {
                     .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
                 val track = allTracks.find { it.id == lastTrackId }
                 if (track != null && _currentTrack.value == null) {
-                    _queue.value = allTracks
                     val idx = allTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-                    _queueIndex.value = idx
+                    publishQueue(allTracks, idx)
                     _currentTrack.value = track
                     _duration.value = track.duration
                     _playbackPosition.value = lastPos
@@ -1745,21 +1694,14 @@ class PlaybackManager private constructor(private val context: Context) {
         var channels = if ((audioFormat?.channelCount ?: 0) > 0) audioFormat!!.channelCount else visualizerController.getCurrentChannelCount()
         if (channels <= 0) channels = currentSpecs.channelCount
 
-        val encoding = visualizerController.getCurrentEncoding()
-        val bitDepth = when (encoding) {
-            C.ENCODING_PCM_24BIT -> 24
-            C.ENCODING_PCM_32BIT, C.ENCODING_PCM_FLOAT -> 32
-            else -> currentSpecs.bitDepth
-        }
-
-        val format = detectFormat(track, audioFormat?.sampleMimeType)
+         val format = detectFormat(track, audioFormat?.sampleMimeType)
         val isLossless = format in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
 
         _trackAudioSpecs.value = AudioTrackSpecs(
             format = format,
             sampleRateHz = sampleRate,
             bitrateKbps = bitrateKbps,
-            bitDepth = bitDepth,
+            bitDepth = currentSpecs.bitDepth,
             channelCount = channels,
             isLossless = isLossless
         )
@@ -1801,7 +1743,8 @@ class PlaybackManager private constructor(private val context: Context) {
         }
 
         val sampleRate = if (isLossless && (format == "FLAC" || format == "WAV")) 48000 else 44100
-        val bitDepth = if (isLossless && calcBitrate > 2000) 24 else 16
+        // FLAC bit depth is read from STREAMINFO; bitrate is not a reliable indicator.
+        val bitDepth = if (format == "FLAC") 0 else 16
 
         return AudioTrackSpecs(
             format = format,
@@ -1822,6 +1765,8 @@ class PlaybackManager private constructor(private val context: Context) {
             var bitrate = initial.bitrateKbps
             var detectedFormat = initial.format
             var isLossless = initial.isLossless
+            var bitDepth = initial.bitDepth
+            var channelCount = initial.channelCount
 
             try {
                 val mmr = MediaMetadataRetriever()
@@ -1851,12 +1796,21 @@ class PlaybackManager private constructor(private val context: Context) {
 
                 mmr.release()
             } catch (e: Exception) {
-                // Fallback to initial
+                // Keep the initial values if platform metadata is unavailable.
+            }
+
+            // Read original encoded characteristics, independently of the decoded PCM output.
+            if (detectedFormat == "FLAC") {
+                readFlacStreamInfo(track)?.let { info ->
+                    sampleRate = info.sampleRateHz
+                    bitDepth = info.bitDepth
+                    channelCount = info.channelCount
+                }
             }
 
             val playerFormat = withContext(Dispatchers.Main) { player?.audioFormat }
             if (playerFormat != null) {
-                if (playerFormat.sampleRate > 0) sampleRate = playerFormat.sampleRate
+                if (playerFormat.sampleRate > 0 && detectedFormat != "FLAC") sampleRate = playerFormat.sampleRate
                 if (playerFormat.bitrate > 0) bitrate = playerFormat.bitrate / 1000
                 if (!playerFormat.sampleMimeType.isNullOrBlank()) {
                     detectedFormat = detectFormat(track, playerFormat.sampleMimeType)
@@ -1864,14 +1818,70 @@ class PlaybackManager private constructor(private val context: Context) {
                 }
             }
 
+            if (_currentTrack.value?.id != track.id) return@launch
+
             _trackAudioSpecs.value = AudioTrackSpecs(
                 format = detectedFormat,
                 sampleRateHz = sampleRate,
                 bitrateKbps = bitrate,
-                bitDepth = if (isLossless && (sampleRate > 48000 || bitrate > 2000)) 24 else 16,
-                channelCount = playerFormat?.channelCount ?: 2,
+                bitDepth = bitDepth,
+                channelCount = if (channelCount > 0) channelCount else (playerFormat?.channelCount ?: 2),
                 isLossless = isLossless
             )
+        }
+    }
+
+    private data class FlacStreamInfo(val sampleRateHz: Int, val channelCount: Int, val bitDepth: Int)
+
+    /** Reads the FLAC STREAMINFO block (original sample rate, channels and bits per sample). */
+    private fun readFlacStreamInfo(track: Track): FlacStreamInfo? {
+        return try {
+            val input = if (track.path.isNotBlank() && File(track.path).isFile) {
+                File(track.path).inputStream()
+            } else {
+                context.contentResolver.openInputStream(track.uri) ?: return null
+            }
+            input.use { raw ->
+                val data = DataInputStream(raw)
+                if (data.readInt() != 0x664C6143) return null // fLaC
+
+                while (true) {
+                    val header = data.read()
+                    if (header < 0) return null
+                    val isLast = (header and 0x80) != 0
+                    val blockType = header and 0x7F
+                    val blockLength = (data.readUnsignedByte() shl 16) or
+                        (data.readUnsignedByte() shl 8) or data.readUnsignedByte()
+
+                    if (blockType == 0) {
+                        if (blockLength != 34) return null
+                        val info = ByteArray(34)
+                        data.readFully(info)
+                        var packed = 0L
+                        for (index in 10..17) packed = (packed shl 8) or (info[index].toLong() and 0xFFL)
+                        val rate = (packed ushr 44).toInt()
+                        val channels = ((packed ushr 41) and 0x7L).toInt() + 1
+                        val depth = ((packed ushr 36) and 0x1FL).toInt() + 1
+                        if (rate <= 0 || channels !in 1..8 || depth !in 4..32) return null
+                        return FlacStreamInfo(rate, channels, depth)
+                    }
+
+                    var remaining = blockLength
+                    while (remaining > 0) {
+                        val skipped = data.skip(remaining.toLong()).toInt()
+                        if (skipped <= 0) {
+                            if (data.read() < 0) return null
+                            remaining--
+                        } else remaining -= skipped
+                    }
+                    if (isLast) return null
+                }
+                @Suppress("UNREACHABLE_CODE")
+                null
+            }
+        } catch (error: Exception) {
+            Log.w("PlaybackManager", "Unable to read FLAC STREAMINFO: " + error.message)
+            null
         }
     }
 

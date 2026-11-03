@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -138,6 +139,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.R
+import com.example.data.model.AccentColor
 import com.example.data.model.AudioTrackSpecs
 import com.example.data.model.RepeatMode
 import com.example.data.model.Track
@@ -173,8 +175,13 @@ fun ExpandablePlayerSheet(
     backdrop: com.kyant.backdrop.backdrops.LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
-    // Capture the app theme before the player applies its own album-derived color scheme.
-    val appUsesLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    // Use the selected application theme, not the album-derived player palette.
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val appUsesLightTheme = when (themeMode) {
+        com.example.data.model.ThemeMode.LIGHT -> true
+        com.example.data.model.ThemeMode.DARK -> false
+        com.example.data.model.ThemeMode.SYSTEM -> !androidx.compose.foundation.isSystemInDarkTheme()
+    }
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
@@ -251,6 +258,7 @@ fun ExpandablePlayerSheet(
 
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
+    val selectedAccentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
 
     val audioSpecs = trackAudioSpecs ?: remember(track.path, track.uriString, track.size, track.duration) {
@@ -266,7 +274,7 @@ fun ExpandablePlayerSheet(
             format = ext,
             sampleRateHz = 44100,
             bitrateKbps = calcBitrate,
-            bitDepth = 16,
+            bitDepth = if (ext == "FLAC") 0 else 16,
             channelCount = 2,
             isLossless = ext in listOf("FLAC", "WAV", "ALAC", "AIFF")
         )
@@ -279,19 +287,80 @@ fun ExpandablePlayerSheet(
         trackKey = "${track.id}_${track.title}_${track.albumArtUriString}"
     )
 
+    // Match control contrast to the generated album-art palette: light-theme
+    // pastel gradients use dark controls, while dark-theme gradients use light controls.
     val useWhiteAlbumModeControls =
-        appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && colorScheme.isDark
 
-    val playerMaterialColorScheme = remember(colorScheme) {
+    // In monochrome player modes, map the selected background swatch to the
+    // corresponding accent from the app's Accent Background setting. A zero
+    // custom color means that no monochrome swatch was explicitly selected.
+    val selectedMonochromeAccent = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT -> when (miniPlayerCustomColor) {
+            0xFFF0F9D8L -> AccentColor.TURQUOISE
+            0xFFF0E2FFL -> AccentColor.PURPLE
+            0xFFFFF5C2L -> AccentColor.CYBER_YELLOW
+            0xFFFFDADAL -> AccentColor.RED
+            0xFFFFE0EFL -> AccentColor.NEON_PINK
+            0xFFD9FFE7L -> AccentColor.MATRIX_GREEN
+            0xFFFFE5D1L -> AccentColor.NEON_ORANGE
+            0xFFD9F5FCL -> AccentColor.ELECTRIC_BLUE
+            0xFFE6E6E6L -> AccentColor.BLACK
+            0xFFFFFFFFL -> AccentColor.WHITE
+            else -> null
+        }
+        MiniPlayerBgMode.DARK -> when (miniPlayerCustomColor) {
+            0xFF52652AL -> AccentColor.TURQUOISE
+            0xFF563A70L -> AccentColor.PURPLE
+            0xFF665500L -> AccentColor.CYBER_YELLOW
+            0xFF701818L -> AccentColor.RED
+            0xFF70103BL -> AccentColor.NEON_PINK
+            0xFF07552AL -> AccentColor.MATRIX_GREEN
+            0xFF703000L -> AccentColor.NEON_ORANGE
+            0xFF06465AL -> AccentColor.ELECTRIC_BLUE
+            0xFF242424L -> AccentColor.BLACK
+            0xFF555555L -> AccentColor.WHITE
+            else -> null
+        }
+        else -> null
+    }
+
+    // White monochrome swatch on a light player background needs neutral controls
+    // so the played progress and active toggles remain visible on white.
+    val useWhiteAccentOnLightPlayer =
+        miniPlayerBgMode == MiniPlayerBgMode.LIGHT &&
+            miniPlayerCustomColor == 0xFFFFFFFFL &&
+            selectedMonochromeAccent == AccentColor.WHITE
+
+    val playerControlsAccentColor = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
+            selectedMonochromeAccent?.let {
+                if (appUsesLightTheme) it.lightPrimary else it.darkPrimary
+            } ?: if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) Color.Black else Color.White
+        else -> colorScheme.accentColor
+    }
+    val playerControlsOnAccentColor = when (miniPlayerBgMode) {
+        MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
+            selectedMonochromeAccent?.let {
+                if (appUsesLightTheme) it.lightOnPrimary else it.darkOnPrimary
+            } ?: if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) Color.White else Color.Black
+        else -> colorScheme.onAccentColor
+    }
+
+    val playerMaterialColorScheme = remember(
+        colorScheme,
+        playerControlsAccentColor,
+        playerControlsOnAccentColor
+    ) {
         if (colorScheme.isDark) {
             darkColorScheme(
                 surface = colorScheme.backgroundColor,
                 onSurface = colorScheme.onSurfaceColor,
                 onSurfaceVariant = colorScheme.onSurfaceVariantColor,
-                primary = colorScheme.accentColor,
-                onPrimary = colorScheme.onAccentColor,
-                primaryContainer = colorScheme.accentColor.copy(alpha = 0.25f),
-                onPrimaryContainer = colorScheme.accentColor,
+                primary = playerControlsAccentColor,
+                onPrimary = playerControlsOnAccentColor,
+                primaryContainer = playerControlsAccentColor.copy(alpha = 0.25f),
+                onPrimaryContainer = playerControlsAccentColor,
                 background = Color.Transparent,
                 onBackground = colorScheme.onSurfaceColor,
                 surfaceVariant = colorScheme.progressTrackColor,
@@ -302,10 +371,10 @@ fun ExpandablePlayerSheet(
                 surface = colorScheme.backgroundColor,
                 onSurface = colorScheme.onSurfaceColor,
                 onSurfaceVariant = colorScheme.onSurfaceVariantColor,
-                primary = colorScheme.accentColor,
-                onPrimary = colorScheme.onAccentColor,
-                primaryContainer = colorScheme.accentColor.copy(alpha = 0.15f),
-                onPrimaryContainer = colorScheme.accentColor,
+                primary = playerControlsAccentColor,
+                onPrimary = playerControlsOnAccentColor,
+                primaryContainer = playerControlsAccentColor.copy(alpha = 0.15f),
+                onPrimaryContainer = playerControlsAccentColor,
                 background = Color.Transparent,
                 onBackground = colorScheme.onSurfaceColor,
                 surfaceVariant = colorScheme.progressTrackColor,
@@ -905,7 +974,20 @@ fun ExpandablePlayerSheet(
                                 text = track.title,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = if (useWhiteAlbumModeControls) Color.White else colorScheme.onSurfaceColor,
+                                color = if (!isExpanded) {
+                                    // The collapsed bar follows the selected application theme,
+                                    // independently of the album-art palette.
+                                    if (appUsesLightTheme) Color.Black else Color.White
+                                } else {
+                                    when {
+                                        // In dark app theme, album-art backgrounds use a black title.
+                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART && !appUsesLightTheme -> Color.Black
+                                        appUsesLightTheme && colorScheme.isDark -> Color.White
+                                        !appUsesLightTheme && !colorScheme.isDark -> Color.Black
+                                        useWhiteAlbumModeControls -> Color.White
+                                        else -> colorScheme.onSurfaceColor
+                                    }
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -913,7 +995,11 @@ fun ExpandablePlayerSheet(
                             Text(
                                 text = track.artist,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = colorScheme.accentColor,
+                                color = if (!isExpanded) {
+                                    if (appUsesLightTheme) Color.Black else Color.White
+                                } else {
+                                    colorScheme.accentColor
+                                },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -977,8 +1063,8 @@ fun ExpandablePlayerSheet(
                             FilledIconButton(
                                 onClick = { viewModel.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = colorScheme.accentColor,
-                                    contentColor = colorScheme.onAccentColor
+                                    containerColor = playerControlsAccentColor,
+                                    contentColor = playerControlsOnAccentColor
                                 ),
                                 modifier = Modifier
                                     .size(44.dp)
@@ -1173,14 +1259,21 @@ fun ExpandablePlayerSheet(
                                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                                             Text(
                                                 text = currentT.title,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
+                                                color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                                    Color.Black
+                                                } else {
+                                                    colorScheme.onSurfaceColor
+                                                },
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = currentT.artist,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 color = MaterialTheme.colorScheme.primary,
                                                 textAlign = TextAlign.Center,
@@ -1190,6 +1283,7 @@ fun ExpandablePlayerSheet(
                                             if (currentT.album.isNotBlank() && currentT.album != "Неизвестный альбом") {
                                                 Text(
                                                     text = currentT.album,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center,
@@ -1206,7 +1300,15 @@ fun ExpandablePlayerSheet(
                                         positionFlow = positionFlow,
                                         duration = duration,
                                         isPlaying = isPlaying,
-                                        onSeek = { viewModel.seekTo(it) }
+                                        onSeek = { viewModel.seekTo(it) },
+                                        playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
+                                        inactiveTrackColor = when (miniPlayerBgMode) {
+                                            // Use explicit opaque shades: alpha blending made the difference
+                                            // barely visible against the player background.
+                                            MiniPlayerBgMode.LIGHT -> Color(0xFFB7B7C2)
+                                            MiniPlayerBgMode.DARK -> Color(0xFF555660)
+                                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                        }
                                     )
 
                                     // Primary Playback Controls
@@ -1339,8 +1441,14 @@ fun ExpandablePlayerSheet(
                                         ) {
                                             Text(
                                                 text = currentT.title,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.headlineSmall,
                                                 fontWeight = FontWeight.Bold,
+                                                color = if (!appUsesLightTheme && miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART) {
+                                                    Color.Black
+                                                } else {
+                                                    colorScheme.onSurfaceColor
+                                                },
                                                 textAlign = TextAlign.Center,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -1348,6 +1456,7 @@ fun ExpandablePlayerSheet(
                                             Spacer(modifier = Modifier.height(3.dp))
                                             Text(
                                                 text = currentT.artist,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
@@ -1358,6 +1467,7 @@ fun ExpandablePlayerSheet(
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     text = currentT.album,
+                                                modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1000),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center,
@@ -1375,7 +1485,15 @@ fun ExpandablePlayerSheet(
                                     positionFlow = positionFlow,
                                     duration = duration,
                                     isPlaying = isPlaying,
-                                    onSeek = { viewModel.seekTo(it) }
+                                    onSeek = { viewModel.seekTo(it) },
+                                    playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
+                                    inactiveTrackColor = when (miniPlayerBgMode) {
+                                        // Use explicit opaque shades: alpha blending made the difference
+                                        // barely visible against the player background.
+                                        MiniPlayerBgMode.LIGHT -> Color(0xFFB7B7C2)
+                                        MiniPlayerBgMode.DARK -> Color(0xFF555660)
+                                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                    }
                                 )
 
                                 // Secondary Controls (Shuffle, Favorite, Add to Playlist, Repeat, Queue)
@@ -1387,8 +1505,16 @@ fun ExpandablePlayerSheet(
                                     FilledTonalIconButton(
                                         onClick = { viewModel.toggleShuffle() },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = if (isShuffle) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            contentColor = if (isShuffle) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = when {
+                                                useWhiteAccentOnLightPlayer && isShuffle -> Color(0xFFE5E5EB)
+                                                isShuffle -> MaterialTheme.colorScheme.primaryContainer
+                                                else -> Color.Transparent
+                                            },
+                                            contentColor = when {
+                                                useWhiteAccentOnLightPlayer && isShuffle -> Color(0xFF555660)
+                                                isShuffle -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
                                         ),
                                         modifier = Modifier.testTag("player_shuffle_button")
                                     ) {
@@ -1428,8 +1554,16 @@ fun ExpandablePlayerSheet(
                                     FilledTonalIconButton(
                                         onClick = { viewModel.toggleRepeat() },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            contentColor = if (repeatMode != RepeatMode.OFF) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                            containerColor = when {
+                                                useWhiteAccentOnLightPlayer && repeatMode != RepeatMode.OFF -> Color(0xFFE5E5EB)
+                                                repeatMode != RepeatMode.OFF -> MaterialTheme.colorScheme.primaryContainer
+                                                else -> Color.Transparent
+                                            },
+                                            contentColor = when {
+                                                useWhiteAccentOnLightPlayer && repeatMode != RepeatMode.OFF -> Color(0xFF555660)
+                                                repeatMode != RepeatMode.OFF -> MaterialTheme.colorScheme.onPrimaryContainer
+                                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
                                         ),
                                         modifier = Modifier.testTag("player_repeat_button")
                                     ) {
@@ -1480,8 +1614,8 @@ fun ExpandablePlayerSheet(
                                     FilledIconButton(
                                         onClick = { viewModel.togglePlayPause() },
                                         colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary
+                                            containerColor = if (useWhiteAccentOnLightPlayer) Color(0xFFE5E5EB) else MaterialTheme.colorScheme.primary,
+                                            contentColor = if (useWhiteAccentOnLightPlayer) Color(0xFF555660) else MaterialTheme.colorScheme.onPrimary
                                         ),
                                         modifier = Modifier
                                             .size(66.dp)
@@ -1625,6 +1759,8 @@ private fun SheetProgressSection(
     duration: Long,
     isPlaying: Boolean,
     onSeek: (Long) -> Unit,
+    playedTrackColor: Color? = null,
+    inactiveTrackColor: Color,
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
@@ -1665,7 +1801,7 @@ private fun SheetProgressSection(
         val currentFloat = if (isUserScrubbing) scrubPosition else smoothAnimatedPos.value
         val sliderVal = if (duration > 0) currentFloat.coerceIn(0f, duration.toFloat()) else 0f
 
-        val accentColor = MaterialTheme.colorScheme.primary
+        val accentColor = playedTrackColor ?: MaterialTheme.colorScheme.primary
 
         GlowProgressSlider(
             value = sliderVal,
@@ -1679,7 +1815,7 @@ private fun SheetProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+            inactiveTrackColor = inactiveTrackColor,
             trackHeight = 4.dp,
             thumbRadius = 5.dp,
             glowRadius = 14.dp,

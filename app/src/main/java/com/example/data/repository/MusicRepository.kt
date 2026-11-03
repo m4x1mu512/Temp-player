@@ -385,11 +385,11 @@ class MusicRepository(
                 // "too many SQL variables" for libraries above 999 tracks on Android 8-11, aborting
                 // the scan. Compute the stale ids and delete them in chunks instead.
                 val validIds = scannedTracks.mapTo(HashSet(scannedTracks.size)) { it.id }
-                val staleIds = trackDao.getAllTracksDirect()
-                    .asSequence()
-                    .map { it.id }
+                // Only the ids are needed here. Loading every full TrackEntity inside the write
+                // transaction copied the whole library (10k+ objects with their strings) into
+                // memory on a large scan and held the database write lock for the whole pass.
+                val staleIds = trackDao.getAllTrackIds()
                     .filterNot(validIds::contains)
-                    .toList()
                 staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
                     trackDao.deleteTracksByIds(chunk)
                 }

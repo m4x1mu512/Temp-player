@@ -63,44 +63,78 @@ fun extractCoverTonesFromBitmap(bitmap: Bitmap): ExtractedAlbumCoverTones {
     val width = bitmap.width
     val height = bitmap.height
     if (width == 0 || height == 0) {
-        val fallback = Color(0xFF151A11)
-        return ExtractedAlbumCoverTones(fallback, fallback, fallback, fallback, Color(0xFFC5F45B))
+        val fallback = Color(0xFF777777)
+        return ExtractedAlbumCoverTones(
+            Color(0xFFB8B8B8), Color(0xFF333333), fallback,
+            Color(0xFF777777), Color(0xFF9A9A9A)
+        )
     }
 
+    // Analyze a small, software bitmap: Palette is inexpensive and the result is cached
+    // by Coil + rememberPlayerColors for the current track.
     val palette = Palette.from(bitmap)
-        .maximumColorCount(24)
+        .maximumColorCount(32)
+        .resizeBitmapArea(16_384)
+        .clearFilters()
         .generate()
 
-    val fallbackVibrant = android.graphics.Color.parseColor("#6B7D3A")
-    val fallbackDarkVibrant = android.graphics.Color.parseColor("#20271A")
-    val fallbackMuted = android.graphics.Color.parseColor("#293020")
-    val fallbackDominant = android.graphics.Color.parseColor("#11150D")
+    // Prefer colors with enough chroma and usable luminance; extreme black/white
+    // swatches remain available as fallbacks but don't dominate the gradient.
 
-    // 1. Vibrant Color
-    val vibrantRgb = palette.getVibrantColor(
-        palette.getLightVibrantColor(
-            palette.getDominantColor(fallbackVibrant)
-        )
-    )
+    // Neutral fallbacks are intentional: never inject the app's lime accent into
+    // an album-art background when the cover itself contains no chromatic colors.
+    val fallbackVibrant = android.graphics.Color.parseColor("#AFAFAF")
+    val fallbackDarkVibrant = android.graphics.Color.parseColor("#303030")
+    val fallbackMuted = android.graphics.Color.parseColor("#777777")
+    val fallbackDominant = android.graphics.Color.parseColor("#555555")
 
-    // 2. Dark Vibrant Color
-    val darkVibrantRgb = palette.getDarkVibrantColor(
-        palette.getDarkMutedColor(fallbackDarkVibrant)
-    )
+    fun hsv(swatch: Palette.Swatch): FloatArray = FloatArray(3).also {
+        android.graphics.Color.colorToHSV(swatch.rgb, it)
+    }
 
-    // 3. Muted Color
-    val mutedRgb = palette.getMutedColor(
-        palette.getLightMutedColor(fallbackMuted)
-    )
+    val swatches = palette.swatches
+    val chromaticSwatches = swatches.filter { swatch ->
+        val h = hsv(swatch)
+        h[1] >= 0.18f && h[1] <= 0.88f && h[2] in 0.12f..0.96f
+    }
+    val isGrayscaleCover = chromaticSwatches.isEmpty()
 
-    // Dominant Color
-    val dominantRgb = palette.getDominantColor(fallbackDominant)
+    val vibrantRgb: Int
+    val darkVibrantRgb: Int
+    val mutedRgb: Int
+    val dominantRgb: Int
+    val accentRgb: Int
 
-    // Vibrant accent swatch
-    val accentRgb = palette.vibrantSwatch?.rgb
-        ?: palette.lightVibrantSwatch?.rgb
-        ?: palette.dominantSwatch?.rgb
-        ?: fallbackVibrant
+    if (isGrayscaleCover) {
+        // Black-and-white artwork (like monochrome photography) should produce
+        // a sophisticated neutral gradient, not synthetic green/purple colors.
+        val neutralSwatches = swatches.ifEmpty { emptyList() }
+        val darkest = neutralSwatches.minByOrNull { hsv(it)[2] }?.rgb ?: fallbackDarkVibrant
+        val lightest = neutralSwatches.maxByOrNull { hsv(it)[2] }?.rgb ?: fallbackVibrant
+        val dominant = neutralSwatches.maxByOrNull { it.population }?.rgb ?: fallbackDominant
+        val middle = neutralSwatches.minByOrNull { kotlin.math.abs(hsv(it)[2] - 0.48f) }?.rgb ?: fallbackMuted
+        vibrantRgb = lightest
+        darkVibrantRgb = darkest
+        mutedRgb = middle
+        dominantRgb = dominant
+        accentRgb = middle
+    } else {
+        val bestByPopulation = chromaticSwatches.maxByOrNull { it.population }
+        val vibrant = palette.vibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.lightVibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.maxByOrNull { it.population * (0.6f + hsv(it)[1]) }
+        val dark = palette.darkVibrantSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.darkMutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.minByOrNull { hsv(it)[2] }
+        val muted = palette.mutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: palette.lightMutedSwatch?.takeIf { it in chromaticSwatches }
+            ?: chromaticSwatches.minByOrNull { kotlin.math.abs(hsv(it)[1] - 0.42f) }
+        vibrantRgb = vibrant?.rgb ?: fallbackVibrant
+        darkVibrantRgb = dark?.rgb ?: fallbackDarkVibrant
+        mutedRgb = muted?.rgb ?: fallbackMuted
+        dominantRgb = bestByPopulation?.rgb ?: fallbackDominant
+        accentRgb = (vibrant ?: bestByPopulation)?.rgb ?: fallbackVibrant
+    }
 
     return ExtractedAlbumCoverTones(
         vibrant = Color(vibrantRgb),
@@ -174,42 +208,51 @@ data class AlbumGradientStops(
     val accent: Color
 )
 
-fun generateAlbumGradientStops(tones: ExtractedAlbumCoverTones): AlbumGradientStops {
-    val hsv = FloatArray(3)
+fun generateAlbumGradientStops(
+    tones: ExtractedAlbumCoverTones,
+    isLightTheme: Boolean = false
+): AlbumGradientStops {
+    fun tunedColor(source: Color, saturationScale: Float, value: Float, hueShift: Float = 0f): Color {
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(source.toArgb(), hsv)
+        hsv[0] = (hsv[0] + hueShift + 360f) % 360f
+        // Avoid muddy greys and neon saturation while retaining the cover's color identity.
+        // Preserve true neutral tones for monochrome covers; only cap overly vivid colors.
+        hsv[1] = (hsv[1] * saturationScale).coerceIn(0f, if (isLightTheme) 0.52f else 0.72f)
+        hsv[2] = value
+        return Color(android.graphics.Color.HSVToColor(hsv))
+    }
 
-    // 1. Top stop (derived from VibrantColor with controlled value for contrast with white text)
-    android.graphics.Color.colorToHSV(tones.vibrant.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.80f).coerceIn(0.35f, 0.85f)
-    hsv[2] = 0.36f // Atmospheric luminance for rich album color wash
-    val topStop = Color(android.graphics.Color.HSVToColor(hsv))
-
-    // 2. Middle stop (derived from DarkVibrantColor)
-    android.graphics.Color.colorToHSV(tones.darkVibrant.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.70f).coerceIn(0.25f, 0.75f)
-    hsv[2] = 0.22f
-    val middleStop = Color(android.graphics.Color.HSVToColor(hsv))
-
-    // 3. Bottom stop (derived from MutedColor)
-    android.graphics.Color.colorToHSV(tones.muted.toArgb(), hsv)
-    hsv[1] = (hsv[1] * 0.50f).coerceIn(0.15f, 0.60f)
-    hsv[2] = 0.11f // Deep sleek background base
-    val bottomStop = Color(android.graphics.Color.HSVToColor(hsv))
-
-    // 4. Accent color (high saturation for thumb glow and playback controls)
-    val accentHsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(tones.accent.toArgb(), accentHsv)
-    accentHsv[1] = (accentHsv[1] * 1.5f).coerceIn(0.70f, 0.98f)
-    accentHsv[2] = 0.95f
-    val accentColor = Color(android.graphics.Color.HSVToColor(accentHsv))
-
-    return AlbumGradientStops(
-        top = topStop,
-        middle = middleStop,
-        bottom = bottomStop,
-        accent = accentColor
+    // Keep exactly the same hue and saturation treatment in both themes.
+    // Dark theme only lowers brightness slightly, rather than switching to
+    // an unrelated deep/near-black palette.
+    val darkening = if (isLightTheme) 0f else 0.29f
+    val top = tunedColor(
+        tones.vibrant,
+        saturationScale = 0.48f,
+        value = 0.96f - darkening,
+        hueShift = -5f
     )
-}
+    val middle = tunedColor(
+        tones.dominant,
+        saturationScale = 0.38f,
+        value = 0.91f - darkening,
+        hueShift = 8f
+    )
+    val bottom = tunedColor(
+        tones.muted,
+        saturationScale = 0.30f,
+        value = 0.985f - darkening,
+        hueShift = -9f
+    )
+    val accent = tunedColor(
+        tones.accent,
+        saturationScale = 0.72f,
+        value = 0.48f - darkening
+    )
 
+    return AlbumGradientStops(top = top, middle = middle, bottom = bottom, accent = accent)
+}
 /**
  * Returns dynamic styling for both full-screen PlayerScreen and MiniPlayer.
  * In ALBUM_ART mode, builds smooth gradient brushes from the cover's color tones.
@@ -239,21 +282,31 @@ fun rememberPlayerColors(
         }
     }
 
-    // Default neutral dark gradient stops when album art is loading or unavailable
-    val defaultDarkGradient = remember {
-        AlbumGradientStops(
-            top = Color(0xFF252D1B),
-            middle = Color(0xFF191F13),
-            bottom = Color(0xFF0C0F0A),
-            accent = systemPrimary
-        )
+    // Resolve explicit light/dark/system themes from the active Material surface.
+    // This also follows Android's system theme when the app theme is set to System.
+    val isLightAppTheme = systemSurface.luminance() > 0.5f
+
+    val defaultGradient = remember(isLightAppTheme, systemPrimary) {
+        if (isLightAppTheme) {
+            AlbumGradientStops(
+                top = Color(0xFFF0EAF5),
+                middle = Color(0xFFF8EEE7),
+                bottom = Color(0xFFEAF1F4),
+                accent = systemPrimary
+            )
+        } else {
+            AlbumGradientStops(
+                top = Color(0xFF252330),
+                middle = Color(0xFF191A25),
+                bottom = Color(0xFF0D1018),
+                accent = systemPrimary
+            )
+        }
     }
 
-    // Palette-to-gradient conversion uses HSV operations and temporary arrays.
-    // Recompute it only when the extracted album tones change, not on every
-    // recomposition caused by the animated color stops below.
-    val albumArtStops = remember(extractedTones, defaultDarkGradient) {
-        extractedTones?.let(::generateAlbumGradientStops) ?: defaultDarkGradient
+    // Convert the extracted palette only when artwork or the active theme changes.
+    val albumArtStops = remember(extractedTones, defaultGradient, isLightAppTheme) {
+        extractedTones?.let { generateAlbumGradientStops(it, isLightAppTheme) } ?: defaultGradient
     }
 
     val (targetTop, targetMiddle, targetBottom, targetAccent, isGradient, isDark, onSurface, onSurfaceVariant, onAccent, trackColor) =
@@ -266,11 +319,13 @@ fun rememberPlayerColors(
                     bottom = stops.bottom,
                     accent = stops.accent,
                     isGradient = true,
-                    isDark = true,
-                    onSurface = Color(0xFFF3F7EC),
-                    onSurfaceVariant = Color(0xFFB8C2A9),
-                    onAccent = Color(0xFF1A230C),
-                    trackColor = Color(0x38FFFFFF)
+                    // These album-derived backgrounds remain light/pastel in both
+                    // app themes, so keep dark controls for reliable contrast.
+                    isDark = false,
+                    onSurface = Color(0xFF20212A),
+                    onSurfaceVariant = Color(0xFF555563),
+                    onAccent = Color.White,
+                    trackColor = Color(0x33232630)
                 )
             }
             MiniPlayerBgMode.LIGHT -> {
@@ -279,7 +334,7 @@ fun rememberPlayerColors(
                     top = base,
                     middle = base,
                     bottom = base,
-                    accent = Color(0xFF2656D6),
+                    accent = if (customColorLong != 0L) base else Color.Black,
                     isGradient = false,
                     isDark = false,
                     onSurface = Color(0xFF18191E),
@@ -294,7 +349,7 @@ fun rememberPlayerColors(
                     top = base,
                     middle = base,
                     bottom = base,
-                    accent = Color(0xFF6B9BFA),
+                    accent = if (customColorLong != 0L) base else Color.White,
                     isGradient = false,
                     isDark = true,
                     onSurface = Color(0xFFF3F3F7),
@@ -378,7 +433,6 @@ fun rememberPlayerColors(
     // In a light app theme, keep the album-art palette but lift the mini-player
     // colors so the collapsed/expanded mini-player does not look unnecessarily dark.
     // The full-screen player keeps its original album-art gradient.
-    val isLightAppTheme = systemSurface.luminance() > 0.5f
     fun liftForLightTheme(color: Color): Color {
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(color.toArgb(), hsv)
