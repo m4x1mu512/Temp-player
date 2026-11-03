@@ -1294,10 +1294,10 @@ fun ExpandablePlayerSheet(
                                         duration = duration,
                                         isPlaying = isPlaying,
                                         onSeek = { viewModel.seekTo(it) },
-                                        inactiveTrackColor = if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) {
-                                            colorScheme.progressTrackColor.copy(alpha = 0.62f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                        inactiveTrackColor = when (miniPlayerBgMode) {
+                                            MiniPlayerBgMode.LIGHT -> colorScheme.progressTrackColor.copy(alpha = 0.62f)
+                                            MiniPlayerBgMode.DARK -> colorScheme.progressTrackColor.copy(alpha = 0.58f)
+                                            else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
                                         }
                                     )
 
@@ -1476,10 +1476,10 @@ fun ExpandablePlayerSheet(
                                     duration = duration,
                                     isPlaying = isPlaying,
                                     onSeek = { viewModel.seekTo(it) },
-                                    inactiveTrackColor = if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) {
-                                        colorScheme.progressTrackColor.copy(alpha = 0.62f)
-                                    } else {
-                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                    inactiveTrackColor = when (miniPlayerBgMode) {
+                                        MiniPlayerBgMode.LIGHT -> colorScheme.progressTrackColor.copy(alpha = 0.62f)
+                                        MiniPlayerBgMode.DARK -> colorScheme.progressTrackColor.copy(alpha = 0.58f)
+                                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
                                     }
                                 )
 
