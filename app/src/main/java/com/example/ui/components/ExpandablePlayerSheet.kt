@@ -1293,7 +1293,12 @@ fun ExpandablePlayerSheet(
                                         positionFlow = positionFlow,
                                         duration = duration,
                                         isPlaying = isPlaying,
-                                        onSeek = { viewModel.seekTo(it) }
+                                        onSeek = { viewModel.seekTo(it) },
+                                        inactiveTrackColor = if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) {
+                                            colorScheme.progressTrackColor.copy(alpha = 0.62f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                        }
                                     )
 
                                     // Primary Playback Controls
@@ -1470,7 +1475,12 @@ fun ExpandablePlayerSheet(
                                     positionFlow = positionFlow,
                                     duration = duration,
                                     isPlaying = isPlaying,
-                                    onSeek = { viewModel.seekTo(it) }
+                                    onSeek = { viewModel.seekTo(it) },
+                                    inactiveTrackColor = if (miniPlayerBgMode == MiniPlayerBgMode.LIGHT) {
+                                        colorScheme.progressTrackColor.copy(alpha = 0.62f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
+                                    }
                                 )
 
                                 // Secondary Controls (Shuffle, Favorite, Add to Playlist, Repeat, Queue)
@@ -1720,6 +1730,7 @@ private fun SheetProgressSection(
     duration: Long,
     isPlaying: Boolean,
     onSeek: (Long) -> Unit,
+    inactiveTrackColor: Color,
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
@@ -1774,7 +1785,7 @@ private fun SheetProgressSection(
             },
             valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
             accentColor = accentColor,
-            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f),
+            inactiveTrackColor = inactiveTrackColor,
             trackHeight = 4.dp,
             thumbRadius = 5.dp,
             glowRadius = 14.dp,
