@@ -1295,8 +1295,10 @@ fun ExpandablePlayerSheet(
                                         isPlaying = isPlaying,
                                         onSeek = { viewModel.seekTo(it) },
                                         inactiveTrackColor = when (miniPlayerBgMode) {
-                                            MiniPlayerBgMode.LIGHT -> colorScheme.progressTrackColor.copy(alpha = 0.62f)
-                                            MiniPlayerBgMode.DARK -> colorScheme.progressTrackColor.copy(alpha = 0.58f)
+                                            // Use explicit opaque shades: alpha blending made the difference
+                                            // barely visible against the player background.
+                                            MiniPlayerBgMode.LIGHT -> Color(0xFFB7B7C2)
+                                            MiniPlayerBgMode.DARK -> Color(0xFF555660)
                                             else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
                                         }
                                     )
@@ -1477,8 +1479,10 @@ fun ExpandablePlayerSheet(
                                     isPlaying = isPlaying,
                                     onSeek = { viewModel.seekTo(it) },
                                     inactiveTrackColor = when (miniPlayerBgMode) {
-                                        MiniPlayerBgMode.LIGHT -> colorScheme.progressTrackColor.copy(alpha = 0.62f)
-                                        MiniPlayerBgMode.DARK -> colorScheme.progressTrackColor.copy(alpha = 0.58f)
+                                        // Use explicit opaque shades: alpha blending made the difference
+                                        // barely visible against the player background.
+                                        MiniPlayerBgMode.LIGHT -> Color(0xFFB7B7C2)
+                                        MiniPlayerBgMode.DARK -> Color(0xFF555660)
                                         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.36f)
                                     }
                                 )
