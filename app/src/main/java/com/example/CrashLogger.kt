@@ -169,33 +169,58 @@ object CrashLogger {
      * Имеет таймаут: зависание logcat без него вызывало ANR.
      */
     private fun getRecentLogcat(): String {
+        var process: Process? = null
+        var readerThread: Thread? = null
+        val log = StringBuilder()
+        val readFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
+
         return try {
             val pid = android.os.Process.myPid()
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time", "--pid=$pid"))
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val log = StringBuilder()
-            var line: String?
-            var lineCount = 0
-            val maxLines = 1500
-
-            while (reader.readLine().also { line = it } != null) {
-                log.appendLine(line)
-                lineCount++
-                if (lineCount >= maxLines) break
+            process = Runtime.getRuntime().exec(
+                arrayOf("logcat", "-d", "-v", "time", "--pid=$pid")
+            )
+            process.errorStream.close()
+            readerThread = Thread({
+                try {
+                    BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                        var count = 0
+                        while (count < 1500) {
+                            val line = reader.readLine() ?: break
+                            synchronized(log) { log.appendLine(line) }
+                            count++
+                        }
+                    }
+                } catch (error: Throwable) {
+                    readFailure.set(error)
+                }
+            }, "CrashLogger-logcat-reader").apply {
+                isDaemon = true
+                start()
             }
-            reader.close()
-            if (process.waitFor(LOGCAT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                // Process exited normally
-            } else {
+
+            if (!process.waitFor(LOGCAT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
                 process.destroyForcibly()
+                process.inputStream.close()
+                readerThread.join(500)
                 return "Logcat не ответил в течение $LOGCAT_TIMEOUT_MS мс — процесс был прерван"
             }
-            if (log.isNotEmpty()) log.toString() else "Logcat пуст или недоступен"
+            readerThread.join(500)
+            synchronized(log) {
+                if (log.isNotEmpty()) log.toString()
+                else readFailure.get()?.let { "Не удалось прочитать logcat: ${it.message}" }
+                    ?: "Logcat пуст или недоступен"
+            }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             "Logcat был прерван: ${e.message}"
         } catch (e: Exception) {
             "Не удалось получить logcat: ${e.message}"
+        } finally {
+            try { process?.inputStream?.close() } catch (_: Exception) {}
+            try { process?.errorStream?.close() } catch (_: Exception) {}
+            try { process?.outputStream?.close() } catch (_: Exception) {}
+            if (process?.isAlive == true) process.destroyForcibly()
+            if (readerThread?.isAlive == true) readerThread.interrupt()
         }
     }
 
@@ -280,7 +305,37 @@ object CrashLogger {
      * с использованием FileProvider.
      */
     fun shareCrashLog(context: Context) {
-        exportLogs(context)
+        exportScope.launch(Dispatchers.IO) {
+            try {
+                val crashFile = getCrashLogFile(context)
+                if (!crashFile.exists() || crashFile.length() == 0L) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Файл crash.log пока пуст", Toast.LENGTH_LONG).show()
+                    }
+                    return@launch
+                }
+                withContext(Dispatchers.Main) {
+                    val authority = "${context.packageName}.fileprovider"
+                    val contentUri = FileProvider.getUriForFile(context, authority, crashFile)
+                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                        putExtra(Intent.EXTRA_SUBJECT, "Лог ошибок приложения ${context.packageName} - crash.log")
+                        putExtra(Intent.EXTRA_TEXT, "Файл с зарегистрированными сбоями приложения (crash.log).")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val chooser = Intent.createChooser(sendIntent, "Отправить лог ошибок").apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(chooser)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Log.e(TAG, "Ошибка отправки crash.log", e)
+                    Toast.makeText(context, "Не удалось отправить crash.log: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 }
 
@@ -288,5 +343,5 @@ object CrashLogger {
  * Удобная функция верхнего уровня для отправки/выгрузки логов из любого места.
  */
 fun shareCrashLog(context: Context) {
-    CrashLogger.exportLogs(context)
+    CrashLogger.shareCrashLog(context)
 }
