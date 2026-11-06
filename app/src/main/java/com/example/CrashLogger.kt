@@ -176,13 +176,14 @@ object CrashLogger {
 
         return try {
             val pid = android.os.Process.myPid()
-            process = Runtime.getRuntime().exec(
+            val runningProcess = Runtime.getRuntime().exec(
                 arrayOf("logcat", "-d", "-v", "time", "--pid=$pid")
             )
-            process.errorStream.close()
+            process = runningProcess
+            runningProcess.errorStream.close()
             readerThread = Thread({
                 try {
-                    BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
+                    BufferedReader(InputStreamReader(runningProcess.inputStream)).use { reader ->
                         var count = 0
                         while (count < 1500) {
                             val line = reader.readLine() ?: break
@@ -198,9 +199,9 @@ object CrashLogger {
                 start()
             }
 
-            if (!process.waitFor(LOGCAT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly()
-                process.inputStream.close()
+            if (!runningProcess.waitFor(LOGCAT_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                runningProcess.destroyForcibly()
+                runningProcess.inputStream.close()
                 readerThread.join(500)
                 return "Logcat не ответил в течение $LOGCAT_TIMEOUT_MS мс — процесс был прерван"
             }
