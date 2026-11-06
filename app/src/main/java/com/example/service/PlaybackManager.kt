@@ -1738,9 +1738,9 @@ class PlaybackManager private constructor(private val context: Context) {
         if (track.size > 0 && track.duration > 0) {
             calcBitrate = ((track.size * 8L) / track.duration).toInt()
         }
-        if (calcBitrate !in 32..9216) {
-            calcBitrate = if (isLossless) (if (format == "WAV") 1411 else 850) else 320
-        }
+        // Do not invent a bitrate from the codec name: variable-bitrate and
+        // lossless files can differ substantially. Zero means "unknown" in the UI.
+        if (calcBitrate !in 32..9216) calcBitrate = 0
 
         val sampleRate = if (isLossless && (format == "FLAC" || format == "WAV")) 48000 else 44100
         // FLAC bit depth is read from STREAMINFO; bitrate is not a reliable indicator.
@@ -1768,24 +1768,20 @@ class PlaybackManager private constructor(private val context: Context) {
             var bitDepth = initial.bitDepth
             var channelCount = initial.channelCount
 
+            val mmr = MediaMetadataRetriever()
             try {
-                val mmr = MediaMetadataRetriever()
-                if (track.path.isNotBlank() && File(track.path).exists()) {
+                if (track.path.isNotBlank() && File(track.path).isFile) {
                     mmr.setDataSource(track.path)
                 } else {
                     mmr.setDataSource(context, track.uri)
                 }
 
                 val mmrBitrate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)?.toIntOrNull()
-                if (mmrBitrate != null && mmrBitrate > 0) {
-                    bitrate = mmrBitrate / 1000
-                }
+                if (mmrBitrate != null && mmrBitrate > 0) bitrate = mmrBitrate / 1000
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val mmrSampleRate = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)?.toIntOrNull()
-                    if (mmrSampleRate != null && mmrSampleRate > 0) {
-                        sampleRate = mmrSampleRate
-                    }
+                    if (mmrSampleRate != null && mmrSampleRate > 0) sampleRate = mmrSampleRate
                 }
 
                 val mime = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
@@ -1793,10 +1789,10 @@ class PlaybackManager private constructor(private val context: Context) {
                     detectedFormat = detectFormat(track, mime)
                     isLossless = detectedFormat in listOf("FLAC", "WAV", "ALAC", "AIFF", "DSD")
                 }
-
-                mmr.release()
             } catch (e: Exception) {
-                // Keep the initial values if platform metadata is unavailable.
+                // Keep initial values if platform metadata is unavailable.
+            } finally {
+                try { mmr.release() } catch (_: Exception) {}
             }
 
             // Read original encoded characteristics, independently of the decoded PCM output.
@@ -1845,13 +1841,18 @@ class PlaybackManager private constructor(private val context: Context) {
                 val data = DataInputStream(raw)
                 if (data.readInt() != 0x664C6143) return null // fLaC
 
+                var blockCount = 0
                 while (true) {
+                    // A FLAC metadata chain is finite. Reject malformed headers and cap
+                    // the number/size of blocks so corrupt files cannot cause unbounded work.
+                    if (++blockCount > 128) return null
                     val header = data.read()
                     if (header < 0) return null
                     val isLast = (header and 0x80) != 0
                     val blockType = header and 0x7F
                     val blockLength = (data.readUnsignedByte() shl 16) or
                         (data.readUnsignedByte() shl 8) or data.readUnsignedByte()
+                    if (blockLength > 16 * 1024 * 1024) return null
 
                     if (blockType == 0) {
                         if (blockLength != 34) return null
@@ -1868,11 +1869,14 @@ class PlaybackManager private constructor(private val context: Context) {
 
                     var remaining = blockLength
                     while (remaining > 0) {
-                        val skipped = data.skip(remaining.toLong()).toInt()
-                        if (skipped <= 0) {
+                        val skipped = data.skip(remaining.toLong()).coerceAtMost(remaining.toLong()).toInt()
+                        if (skipped > 0) {
+                            remaining -= skipped
+                        } else {
+                            // skip() is allowed to return zero; consume one byte or stop at EOF.
                             if (data.read() < 0) return null
                             remaining--
-                        } else remaining -= skipped
+                        }
                     }
                     if (isLast) return null
                 }
