@@ -1670,7 +1670,7 @@ class PlaybackManager private constructor(private val context: Context) {
         if (queueChanged) lastSavedQueueIds = ids
 
         val trackId = track?.id ?: -1L
-        val queueIndex = if (idx >= 0) idx else null
+        val queueIndex = idx
         // Never write on the main thread: this runs on every track change and periodically
         // during playback, and the disk flush used to land inside the frame budget.
         serviceScope.launch(Dispatchers.IO) {
