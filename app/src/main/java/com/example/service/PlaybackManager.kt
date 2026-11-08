@@ -1537,15 +1537,9 @@ class PlaybackManager private constructor(private val context: Context) {
         try {
             if (_queue.value.isNotEmpty() || _currentTrack.value != null) return
 
-            val savedQueueIds = settingsDataStore.getInitialQueueTrackIds().ifEmpty {
-                settingsDataStore.getInitialCustomAllTracksOrder().ifEmpty {
-                    try {
-                        settingsDataStore.queueTrackIdsFlow.first()
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
-                }
-            }
+            // null means no queue snapshot exists (legacy install); emptyList() means the
+            // user explicitly saved an empty queue. Never substitute the library for the latter.
+            val savedQueueIds = settingsDataStore.getSavedQueueTrackIds()
             val savedQueueIndex = if (settingsDataStore.getInitialLastQueueIndex() >= 0) {
                 settingsDataStore.getInitialLastQueueIndex()
             } else {
@@ -1566,12 +1560,12 @@ class PlaybackManager private constructor(private val context: Context) {
             }
             val lastPos = settingsDataStore.getInitialLastPosition().coerceAtLeast(0L)
 
-            val restoredQueue = if (savedQueueIds.isNotEmpty()) {
+            val restoredQueue = if (!savedQueueIds.isNullOrEmpty()) {
                 if (!availableTracks.isNullOrEmpty()) {
-                    val map = availableTracks.associateBy { it.id }
-                    savedQueueIds.mapNotNull { map[it] }.ifEmpty {
-                        repository.getTracksByIds(savedQueueIds)
-                    }
+                    val tracksById = availableTracks.associateBy { it.id }
+                    val resolved = savedQueueIds.mapNotNull { tracksById[it] }
+                    if (resolved.size == savedQueueIds.size) resolved
+                    else repository.getTracksByIds(savedQueueIds)
                 } else {
                     repository.getTracksByIds(savedQueueIds)
                 }
@@ -1580,63 +1574,71 @@ class PlaybackManager private constructor(private val context: Context) {
             }
 
             if (restoredQueue.isNotEmpty()) {
-                val targetIndex = if (savedQueueIndex in restoredQueue.indices) {
-                    savedQueueIndex
-                } else if (lastTrackId > 0) {
-                    restoredQueue.indexOfFirst { it.id == lastTrackId }.coerceAtLeast(0)
+                // Prefer the saved index only when it points at the saved current track.
+                // For duplicate IDs, this preserves the exact occurrence. If the index is stale,
+                // choose the matching occurrence nearest to it rather than the first duplicate.
+                val matchingIndices = if (lastTrackId > 0L) {
+                    restoredQueue.indices.filter { restoredQueue[it].id == lastTrackId }
                 } else {
-                    0
+                    emptyList()
                 }
+                val targetIndex = when {
+                    savedQueueIndex in restoredQueue.indices &&
+                        (lastTrackId <= 0L || restoredQueue[savedQueueIndex].id == lastTrackId) ->
+                        savedQueueIndex
+                    matchingIndices.isNotEmpty() && savedQueueIndex >= 0 ->
+                        matchingIndices.minByOrNull { kotlin.math.abs(it - savedQueueIndex) }!!
+                    matchingIndices.isNotEmpty() -> matchingIndices.first()
+                    savedQueueIndex in restoredQueue.indices -> savedQueueIndex
+                    else -> 0
+                }
+
+                // Current track and queue index are derived from the same exact queue slot.
+                val trackToRestore = restoredQueue[targetIndex]
                 publishQueue(restoredQueue, targetIndex)
-
-                val trackToRestore = if (lastTrackId > 0) {
-                    restoredQueue.find { it.id == lastTrackId } ?: restoredQueue.getOrNull(targetIndex)
-                } else {
-                    restoredQueue.getOrNull(targetIndex)
-                }
-
-                if (trackToRestore != null && _currentTrack.value == null) {
-                    _currentTrack.value = trackToRestore
-                    _duration.value = trackToRestore.duration
-                    _playbackPosition.value = lastPos
-                    updateAudioSpecsForTrack(trackToRestore, activePlayer)
-                    val player = activePlayer
-                    if (player != null) {
-                        executePlay(player, trackToRestore, startPaused = true)
-                        if (lastPos > 0) {
-                            player.seekTo(lastPos)
-                        }
-                    } else {
-                        pendingPlayTrack = PendingPlay(trackToRestore, startPaused = true)
-                    }
-                }
-            } else if (lastTrackId > 0) {
-                // If no saved queue IDs, fallback to finding last track in allTracks
-                // The DAO no longer sorts in SQL, so restore the alphabetical queue order
-                // that this fallback used to get for free.
+                restoreTrackAtPosition(trackToRestore, lastPos)
+            } else if (savedQueueIds == null && lastTrackId > 0L) {
+                // Legacy data without a saved queue snapshot: retain the old alphabetical
+                // library fallback. A deliberately empty saved snapshot never enters this path.
                 val allTracks = repository.allTracks.first()
                     .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
-                val track = allTracks.find { it.id == lastTrackId }
-                if (track != null && _currentTrack.value == null) {
-                    val idx = allTracks.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-                    publishQueue(allTracks, idx)
-                    _currentTrack.value = track
-                    _duration.value = track.duration
-                    _playbackPosition.value = lastPos
-                    updateAudioSpecsForTrack(track, activePlayer)
-                    val player = activePlayer
-                    if (player != null) {
-                        executePlay(player, track, startPaused = true)
-                        if (lastPos > 0) {
-                            player.seekTo(lastPos)
-                        }
-                    } else {
-                        pendingPlayTrack = PendingPlay(track, startPaused = true)
-                    }
+                val matchingIndices = allTracks.indices.filter { allTracks[it].id == lastTrackId }
+                if (matchingIndices.isNotEmpty()) {
+                    val targetIndex = matchingIndices.first()
+                    val track = allTracks[targetIndex]
+                    publishQueue(allTracks, targetIndex)
+                    restoreTrackAtPosition(track, lastPos)
+                } else {
+                    restoreStandaloneTrack(lastTrackId, lastPos)
                 }
+            } else if (savedQueueIds != null && savedQueueIds.isEmpty() && lastTrackId > 0L) {
+                // The queue was intentionally empty. Restore the last track for the player
+                // without populating the queue with the entire media library.
+                restoreStandaloneTrack(lastTrackId, lastPos)
             }
         } catch (e: Exception) {
             Log.e("PlaybackManager", "Error restoring saved queue: ${e.message}", e)
+        }
+    }
+
+    private suspend fun restoreStandaloneTrack(trackId: Long, positionMs: Long) {
+        val track = repository.getTracksByIds(listOf(trackId)).firstOrNull() ?: return
+        publishQueue(emptyList(), -1)
+        restoreTrackAtPosition(track, positionMs)
+    }
+
+    private fun restoreTrackAtPosition(track: Track, positionMs: Long) {
+        if (_currentTrack.value != null) return
+        _currentTrack.value = track
+        _duration.value = track.duration
+        _playbackPosition.value = positionMs
+        updateAudioSpecsForTrack(track, activePlayer)
+        val player = activePlayer
+        if (player != null) {
+            executePlay(player, track, startPaused = true)
+            if (positionMs > 0L) player.seekTo(positionMs)
+        } else {
+            pendingPlayTrack = PendingPlay(track, startPaused = true)
         }
     }
 
@@ -1661,7 +1663,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val idx = _queueIndex.value
         if (track == null && q.isEmpty()) return
 
-        val ids = if (q.isNotEmpty()) q.map { it.id } else null
+        val ids = q.map { it.id }
         // Serialising the whole queue id list is only needed when the queue actually changed;
         // it used to be rebuilt and written to disk every few seconds during playback.
         val queueChanged = ids != lastSavedQueueIds
