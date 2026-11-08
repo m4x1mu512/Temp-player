@@ -20,6 +20,7 @@ import com.example.data.model.ThemeMode
 import com.example.data.model.VisualizerMode
 import java.io.File
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 
@@ -194,6 +195,23 @@ class SettingsDataStore(private val context: Context) {
     fun getInitialQueueTrackIds(): List<Long> {
         val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, null) ?: ""
+        return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+    }
+
+    /**
+     * Returns null only when no queue snapshot has ever been saved. An empty list is a
+     * deliberately saved empty queue and must not be confused with missing legacy data.
+     */
+    suspend fun getSavedQueueTrackIds(): List<Long>? {
+        val stored = context.dataStore.data.first()
+        if (stored.contains(KEY_QUEUE_TRACK_IDS)) {
+            val raw = stored[KEY_QUEUE_TRACK_IDS].orEmpty()
+            return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
+        }
+
+        val prefs = context.getSharedPreferences(PREFS_CACHE_NAME, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_CACHED_QUEUE_TRACK_IDS)) return null
+        val raw = prefs.getString(KEY_CACHED_QUEUE_TRACK_IDS, "").orEmpty()
         return if (raw.isBlank()) emptyList() else raw.split(",").mapNotNull { it.trim().toLongOrNull() }
     }
 
