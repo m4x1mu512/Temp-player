@@ -1922,7 +1922,9 @@ private fun LiquidGlassExpandedPlayer(
                         positionFlow = positionFlow,
                         duration = duration,
                         isPlaying = isPlaying,
-                        onSeek = onSeek
+                        onSeek = onSeek,
+                        playedTrackColor = Color.White,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.28f)
                     )
                 }
 
