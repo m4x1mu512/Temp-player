@@ -112,6 +112,7 @@ fun SettingsScreen(
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
+    val liquidGlassPlayerEnabled by viewModel.liquidGlassPlayerEnabled.collectAsStateWithLifecycle()
     val replayGainEnabled by viewModel.replayGainEnabled.collectAsStateWithLifecycle()
     val crossfadeEnabled by viewModel.crossfadeEnabled.collectAsStateWithLifecycle()
     val crossfadeDuration by viewModel.crossfadeDurationSeconds.collectAsStateWithLifecycle()
@@ -617,6 +618,46 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            // Liquid Glass expanded-player theme
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .testTag("settings_liquid_glass_player_card")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                        Text(
+                            text = "Оформление Liquid Glass",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Большая обложка на всю ширину, размытый фон и стеклянная панель управления в развернутом плеере",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = liquidGlassPlayerEnabled,
+                        onCheckedChange = { viewModel.setLiquidGlassPlayerEnabled(it) },
+                        modifier = Modifier.testTag("liquid_glass_player_switch")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Screen Auto-Rotate Card
             Card(
