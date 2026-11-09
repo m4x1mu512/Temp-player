@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import android.Manifest
-import android.os.Build
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -124,7 +123,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -1383,7 +1381,6 @@ private fun LiquidGlassPlayerContent(
     modifier: Modifier = Modifier
 ) {
     val backdrop = rememberLayerBackdrop()
-    val backgroundBlur = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 34.dp else 0.dp
 
     BoxWithConstraints(modifier = modifier.background(Color.Black)) {
         val artworkHeight = if (maxWidth > maxHeight) {
@@ -1401,9 +1398,7 @@ private fun LiquidGlassPlayerContent(
                 model = track.albumArtUri ?: R.drawable.ic_default_art,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier)
+                modifier = Modifier.fillMaxSize()
             )
             Box(
                 modifier = Modifier
@@ -1419,6 +1414,19 @@ private fun LiquidGlassPlayerContent(
                     )
             )
         }
+
+        // Blur the captured artwork as a full-screen backdrop. The Backdrop library
+        // supplies the compatibility path for older Android versions as well.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { RectangleShape },
+                    effects = { backdropBlur(38.dp.toPx()) },
+                    onDrawSurface = { drawRect(Color.Black.copy(alpha = 0.18f)) }
+                )
+        )
 
         Column(
             modifier = Modifier
@@ -1479,16 +1487,28 @@ private fun LiquidGlassPlayerContent(
 
                 Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
 
-                PlayerProgressSection(
-                    trackId = track.id,
-                    positionFlow = positionFlow,
-                    duration = duration,
-                    isPlaying = isPlaying,
-                    isCompact = isCompact,
-                    onSeek = onSeek,
-                    sliderTestTag = "liquid_glass_progress_slider",
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .drawBackdrop(
+                            backdrop = backdrop,
+                            shape = { RoundedCornerShape(50) },
+                            effects = { backdropBlur(9.dp.toPx()) },
+                            onDrawSurface = { drawRect(Color.White.copy(alpha = 0.10f)) }
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    PlayerProgressSection(
+                        trackId = track.id,
+                        positionFlow = positionFlow,
+                        duration = duration,
+                        isPlaying = isPlaying,
+                        isCompact = isCompact,
+                        onSeek = onSeek,
+                        sliderTestTag = "liquid_glass_progress_slider",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
