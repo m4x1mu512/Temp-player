@@ -1798,6 +1798,17 @@ private fun LiquidGlassExpandedPlayer(
     BoxWithConstraints(
         modifier = modifier
             .background(Color.Black)
+            // Bleed the solid player backdrop a couple of physical pixels beyond
+            // the Compose bounds. This covers hairline seams at the window edges
+            // without scaling or clipping the album artwork or glass card.
+            .drawBehind {
+                val bleed = 2.dp.toPx()
+                drawRect(
+                    color = Color.Black,
+                    topLeft = Offset(-bleed, -bleed),
+                    size = Size(size.width + bleed * 2f, size.height + bleed * 2f)
+                )
+            }
             .testTag("liquid_glass_expanded_player")
     ) {
         val coverHeight = minOf(maxWidth, maxHeight * 0.56f)
