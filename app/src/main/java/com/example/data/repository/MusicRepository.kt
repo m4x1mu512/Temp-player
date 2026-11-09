@@ -139,10 +139,28 @@ class MusicRepository(
     suspend fun scanLocalMusic(folderUris: List<String>): Int = withContext(Dispatchers.IO) {
         if (folderUris.isEmpty()) return@withContext 0
 
+        // Keep both SAF-relative locations and legacy filesystem paths. On Android 10+
+        // MediaStore's RELATIVE_PATH + VOLUME_NAME is more reliable than DATA, whose path
+        // representation can differ between storage providers and Android versions.
+        val selectedFolderRelativePaths = folderUris.mapNotNull { rawUri ->
+            try {
+                val documentId = DocumentsContract.getTreeDocumentId(Uri.parse(rawUri))
+                val separator = documentId.indexOf(':')
+                if (separator < 0) return@mapNotNull null
+                val volume = documentId.substring(0, separator)
+                val mediaStoreVolume = if (volume.equals("primary", ignoreCase = true)) {
+                    MediaStore.VOLUME_EXTERNAL_PRIMARY
+                } else {
+                    volume
+                }
+                mediaStoreVolume to documentId.substring(separator + 1).trim('/')
+            } catch (_: Exception) {
+                null
+            }
+        }
         val selectedFolderPaths = folderUris.mapNotNull { rawUri ->
             try {
-                val treeUri = Uri.parse(rawUri)
-                val documentId = DocumentsContract.getTreeDocumentId(treeUri)
+                val documentId = DocumentsContract.getTreeDocumentId(Uri.parse(rawUri))
                 val separator = documentId.indexOf(':')
                 if (separator < 0) return@mapNotNull null
                 val volume = documentId.substring(0, separator)
@@ -157,7 +175,7 @@ class MusicRepository(
                 null
             }
         }
-        if (selectedFolderPaths.isEmpty()) return@withContext 0
+        if (selectedFolderRelativePaths.isEmpty()) return@withContext 0
 
         val scannedTracks = mutableListOf<TrackEntity>()
         val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -166,21 +184,27 @@ class MusicRepository(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
 
-        val projection = arrayOf(
-            MediaStore.Audio.Media._ID,
-            MediaStore.Audio.Media.TITLE,
-            MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.ALBUM,
-            MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.SIZE,
-            MediaStore.Audio.Media.DATE_ADDED,
-            MediaStore.Audio.Media.DISPLAY_NAME,
-            MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.YEAR
-        )
+        val projection = buildList {
+            add(MediaStore.Audio.Media._ID)
+            add(MediaStore.Audio.Media.TITLE)
+            add(MediaStore.Audio.Media.ARTIST)
+            add(MediaStore.Audio.Media.ALBUM)
+            add(MediaStore.Audio.Media.DURATION)
+            add(MediaStore.Audio.Media.SIZE)
+            add(MediaStore.Audio.Media.DATE_ADDED)
+            add(MediaStore.Audio.Media.DISPLAY_NAME)
+            add(MediaStore.Audio.Media.ALBUM_ID)
+            add(MediaStore.Audio.Media.DATA)
+            add(MediaStore.Audio.Media.YEAR)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                add(MediaStore.MediaColumns.RELATIVE_PATH)
+                add(MediaStore.MediaColumns.VOLUME_NAME)
+            }
+        }.toTypedArray()
 
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        // Audio.Media already limits the result to audio files. IS_MUSIC is not reliable
+        // for newly downloaded files and can be unset even for valid music tracks.
+        val selection: String? = null
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
         val existingTracksMap = try {
@@ -190,13 +214,14 @@ class MusicRepository(
         }
 
         try {
-            context.contentResolver.query(
+            val queryCursor = context.contentResolver.query(
                 collection,
                 projection,
                 selection,
                 null,
                 sortOrder
-            )?.use { cursor ->
+            ) ?: throw IllegalStateException("Android не вернул список аудиофайлов")
+            queryCursor.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val titleCol = cursor.getColumnIndex(MediaStore.Audio.Media.TITLE)
                 val artistCol = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)
@@ -208,17 +233,39 @@ class MusicRepository(
                 val albumIdCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
                 val dataCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
                 val yearCol = cursor.getColumnIndex(MediaStore.Audio.Media.YEAR)
+                val relativePathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.RELATIVE_PATH)
+                } else -1
+                val volumeNameCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    cursor.getColumnIndex(MediaStore.MediaColumns.VOLUME_NAME)
+                } else -1
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
                     val rawTitle = if (titleCol != -1) cursor.getString(titleCol) else null
                     val displayName = if (displayNameCol != -1) cursor.getString(displayNameCol) else null
                     val path = if (dataCol != -1) cursor.getString(dataCol) ?: "" else ""
-                    if (path.isBlank() || selectedFolderPaths.none { folder ->
+                    val relativePath = if (relativePathCol != -1) {
+                        cursor.getString(relativePathCol)?.trim('/') ?: ""
+                    } else ""
+                    val volumeName = if (volumeNameCol != -1) {
+                        cursor.getString(volumeNameCol) ?: ""
+                    } else ""
+                    val belongsToSelectedFolder = if (
+                        relativePathCol != -1 && volumeNameCol != -1 && volumeName.isNotBlank()
+                    ) {
+                        selectedFolderRelativePaths.any { (selectedVolume, selectedPath) ->
+                            volumeName.equals(selectedVolume, ignoreCase = true) &&
+                                (selectedPath.isBlank() ||
+                                    relativePath == selectedPath ||
+                                    relativePath.startsWith("$selectedPath/"))
+                        }
+                    } else {
+                        path.isNotBlank() && selectedFolderPaths.any { folder ->
                             path == folder || path.startsWith(folder.trimEnd('/') + "/")
-                        }) {
-                        continue
+                        }
                     }
+                    if (!belongsToSelectedFolder) continue
 
                     // Fallback to file display name if title is missing
                     val title = when {
@@ -371,7 +418,7 @@ class MusicRepository(
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            throw IllegalStateException("Ошибка чтения аудиофайлов из медиатеки Android", e)
         }
 
         if (scannedTracks.isNotEmpty()) {
