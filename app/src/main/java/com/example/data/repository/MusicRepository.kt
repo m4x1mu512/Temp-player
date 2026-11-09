@@ -317,7 +317,11 @@ class MusicRepository(
 
                     var genre = ""
 
-                    val existingRow = existingTracksMap[id]
+                    // Reuse a SAF-discovered row ID when MediaStore later indexes the
+                    // same physical file; this preserves playlist and favourite references.
+                    val existingRow = existingTracksMap[id] ?: existingTracksMap.values.firstOrNull {
+                        path.isNotBlank() && it.path == path
+                    }
                     // Reading tags with MediaMetadataRetriever costs 10-50 ms per file, and
                     // the condition below used to be true for every single track on every
                     // scan (genre is always empty here), so rescanning a few thousand files
@@ -396,7 +400,7 @@ class MusicRepository(
                     } else {
                         scannedTracks.add(
                             TrackEntity(
-                                id = id,
+                                id = existingRow?.id ?: id,
                                 title = title,
                                 artist = artist,
                                 album = album,
