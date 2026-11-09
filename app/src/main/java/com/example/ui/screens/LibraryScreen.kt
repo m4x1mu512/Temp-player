@@ -485,12 +485,14 @@ fun LibraryScreen(
                         DropdownMenu(
                             expanded = moreMenuExpanded,
                             onDismissRequest = { moreMenuExpanded = false },
+                            modifier = Modifier.width(280.dp),
                             shape = RoundedCornerShape(24.dp),
                             containerColor = MaterialTheme.colorScheme.surface,
                             tonalElevation = 0.dp,
                             shadowElevation = 8.dp
                         ) {
                             DropdownMenuItem(
+                                modifier = Modifier.height(60.dp),
                                 text = { Text("Эквалайзер") },
                                 leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
@@ -499,6 +501,7 @@ fun LibraryScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                modifier = Modifier.height(60.dp),
                                 text = { Text("Таймер сна") },
                                 leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
@@ -507,6 +510,7 @@ fun LibraryScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                modifier = Modifier.height(60.dp),
                                 text = { Text("Сканировать") },
                                 leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
@@ -521,9 +525,10 @@ fun LibraryScreen(
                                     moreMenuExpanded = false
                                     viewModel.clearQueue()
                                 },
-                                modifier = Modifier.testTag("clear_playback_queue")
+                                modifier = Modifier.height(60.dp).testTag("clear_playback_queue")
                             )
                             DropdownMenuItem(
+                                modifier = Modifier.height(60.dp),
                                 text = { Text("Сортировка") },
                                 leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
@@ -532,6 +537,7 @@ fun LibraryScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                modifier = Modifier.height(60.dp),
                                 text = { Text("Настройки") },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
