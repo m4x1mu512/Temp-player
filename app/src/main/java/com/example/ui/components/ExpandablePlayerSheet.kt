@@ -1863,6 +1863,12 @@ private fun LiquidGlassExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(coverHeight)
+                    // Slightly overscan the artwork to hide hairline seams at its
+                    // top and bottom edges without changing the glass control card.
+                    .graphicsLayer {
+                        scaleX = 1.002f
+                        scaleY = 1.006f
+                    }
                     .testTag("liquid_glass_album_art")
             )
 
