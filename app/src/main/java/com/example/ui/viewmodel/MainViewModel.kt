@@ -231,8 +231,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             tracks.filter {
                 it.title.contains(q, ignoreCase = true) ||
                         it.artist.contains(q, ignoreCase = true) ||
-                        it.album.contains(q, ignoreCase = true) ||
-                        it.folderName.contains(q, ignoreCase = true)
+                        it.album.contains(q, ignoreCase = true)
             }
         }
         sortTrackList(filtered, sort)
