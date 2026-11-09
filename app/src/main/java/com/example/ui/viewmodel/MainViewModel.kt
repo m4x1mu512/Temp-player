@@ -717,6 +717,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.removeTrackFromQueue(track)
     }
 
+    fun clearQueue() {
+        playbackManager.clearQueue()
+    }
+
     fun moveQueueTrack(fromIndex: Int, toIndex: Int) {
         // Queue ordering belongs to the active playback queue only. Do not persist it
         // as the library's "All tracks" order: the library and queue are independent lists.
