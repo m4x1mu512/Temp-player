@@ -406,6 +406,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = true
     )
 
+    val liquidGlassPlayerEnabled: StateFlow<Boolean> = settingsDataStore.liquidGlassPlayerEnabledFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
     val replayGainEnabled: StateFlow<Boolean> = playbackManager.isReplayGainEnabled
     val crossfadeEnabled: StateFlow<Boolean> = playbackManager.isCrossfadeEnabled
     val crossfadeDurationSeconds: StateFlow<Int> = playbackManager.crossfadeDurationSeconds
@@ -957,6 +963,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun setAutoRotate(enabled: Boolean) {
         viewModelScope.launch {
             settingsDataStore.setAutoRotate(enabled)
+        }
+    }
+
+    fun setLiquidGlassPlayerEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.setLiquidGlassPlayerEnabled(enabled)
         }
     }
 
