@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.os.Build
 import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -8,6 +9,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.core.content.ContextCompat
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur as backdropBlur
 import com.example.ui.theme.FavoriteRed
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -119,6 +124,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.border
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
@@ -199,6 +205,7 @@ fun PlayerScreen(
     val sleepTimerMode by viewModel.sleepTimerMode.collectAsStateWithLifecycle()
     val sleepTimerRemaining by viewModel.sleepTimerRemainingMillis.collectAsStateWithLifecycle()
     val autoRotate by viewModel.autoRotate.collectAsStateWithLifecycle()
+    val liquidGlassPlayerEnabled by viewModel.liquidGlassPlayerEnabled.collectAsStateWithLifecycle()
 
     val equalizerBands by viewModel.equalizerBands.collectAsStateWithLifecycle()
     val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
@@ -502,7 +509,30 @@ fun PlayerScreen(
                 val configuration = LocalConfiguration.current
                 val isLandscape = autoRotate && (maxWidth > maxHeight || configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
 
-                if (isLandscape) {
+                if (liquidGlassPlayerEnabled) {
+                    LiquidGlassPlayerContent(
+                        track = track,
+                        isPlaying = isPlaying,
+                        isShuffle = isShuffle,
+                        repeatMode = repeatMode,
+                        isFavorite = isCurrentTrackFavorite,
+                        duration = duration,
+                        positionFlow = viewModel.playbackPosition,
+                        isCompact = isCompact,
+                        onSeek = { viewModel.seekTo(it) },
+                        onPrevious = { viewModel.previousTrack() },
+                        onPlayPause = { viewModel.togglePlayPause() },
+                        onNext = { viewModel.nextTrack() },
+                        onSeekBack = { viewModel.seekBackward10s() },
+                        onSeekForward = { viewModel.seekForward10s() },
+                        onShuffle = { viewModel.toggleShuffle() },
+                        onFavorite = { viewModel.toggleFavorite(track.id) },
+                        onAddToPlaylist = { showAddToPlaylistDialog = true },
+                        onRepeat = { viewModel.toggleRepeat() },
+                        onQueue = onNavigateToQueue,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else if (isLandscape) {
                     // Dedicated Landscape horizontal orientation layout for PlayerScreen
                     Row(
                         modifier = Modifier
