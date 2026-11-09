@@ -1097,10 +1097,12 @@ class PlaybackManager private constructor(private val context: Context) {
         saveCurrentState()
     }
 
-    fun removeTrackFromQueue(track: Track) {
+    fun removeTrackFromQueueAt(removeIndex: Int) {
         val state = _queueState.value
-        val removeIndex = state.tracks.indexOfFirst { it.id == track.id }
-        if (removeIndex < 0) return
+        if (removeIndex !in state.tracks.indices) return
+
+        // Queue entries may reference the same media Track more than once.
+        // Remove the exact tapped occurrence, not the first matching Track.id.
         val updated = state.tracks.toMutableList().apply { removeAt(removeIndex) }
         val newCurrentIndex = when {
             state.currentIndex !in state.tracks.indices -> -1
