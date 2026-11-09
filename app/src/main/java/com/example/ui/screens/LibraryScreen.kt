@@ -919,70 +919,6 @@ fun LibraryScreen(
                                         .fillMaxSize()
                                         .padding(top = 12.dp)
                                 ) {
-                                    Card(
-                                        shape = RoundedCornerShape(28.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-                                        ),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp)
-                                            .border(
-                                                BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
-                                                RoundedCornerShape(28.dp)
-                                            )
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    Brush.linearGradient(
-                                                        colors = listOf(
-                                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.12f),
-                                                            MaterialTheme.colorScheme.surface.copy(alpha = 0.10f)
-                                                        )
-                                                    )
-                                                )
-                                                .padding(start = 20.dp, top = 20.dp, end = 18.dp, bottom = 19.dp)
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(15.dp)
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(58.dp)
-                                                        .clip(RoundedCornerShape(19.dp))
-                                                        .background(MaterialTheme.colorScheme.primary),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Search,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(29.dp),
-                                                        tint = MaterialTheme.colorScheme.onPrimary
-                                                    )
-                                                }
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "Найди свою музыку",
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Spacer(modifier = Modifier.height(5.dp))
-                                                    Text(
-                                                        text = "Треки, альбомы и исполнители — в одном поиске",
-                                                        style = MaterialTheme.typography.bodyMedium,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-
                                     OutlinedTextField(
                                         value = searchQuery,
                                         onValueChange = { viewModel.onSearchQueryChanged(it) },
@@ -1058,7 +994,7 @@ fun LibraryScreen(
                                         }
                                     }
 
-                                    if (displayedTracks.isEmpty()) {
+                                    if (searchQuery.isBlank() || displayedTracks.isEmpty()) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
