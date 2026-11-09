@@ -1359,6 +1359,196 @@ fun PlayerScreen(
 }
 
 @Composable
+private fun LiquidGlassPlayerContent(
+    track: Track,
+    isPlaying: Boolean,
+    isShuffle: Boolean,
+    repeatMode: RepeatMode,
+    isFavorite: Boolean,
+    duration: Long,
+    positionFlow: StateFlow<Long>,
+    isCompact: Boolean,
+    onSeek: (Long) -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onShuffle: () -> Unit,
+    onFavorite: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onRepeat: () -> Unit,
+    onQueue: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backdrop = rememberLayerBackdrop()
+    val backgroundBlur = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 34.dp else 0.dp
+
+    BoxWithConstraints(modifier = modifier.background(Color.Black)) {
+        val artworkHeight = if (maxWidth > maxHeight) {
+            maxHeight * 0.62f
+        } else {
+            minOf(maxWidth, maxHeight * 0.70f)
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(backdrop)
+        ) {
+            AsyncImage(
+                model = track.albumArtUri ?: R.drawable.ic_default_art,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (backgroundBlur > 0.dp) Modifier.blur(backgroundBlur) else Modifier)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.30f),
+                                Color.Black.copy(alpha = 0.10f),
+                                Color.Black.copy(alpha = 0.54f)
+                            )
+                        )
+                    )
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // The cover deliberately touches both horizontal screen edges.
+            AsyncImage(
+                model = track.albumArtUri ?: R.drawable.ic_default_art,
+                contentDescription = "Обложка трека",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(artworkHeight)
+                    .testTag("liquid_glass_album_art")
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { RoundedCornerShape(30.dp) },
+                        effects = { backdropBlur(22.dp.toPx()) },
+                        onDrawSurface = { drawRect(Color.White.copy(alpha = 0.17f)) }
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.25f),
+                        shape = RoundedCornerShape(30.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = if (isCompact) 12.dp else 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = track.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = track.artist,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.78f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
+
+                PlayerProgressSection(
+                    trackId = track.id,
+                    positionFlow = positionFlow,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    isCompact = isCompact,
+                    onSeek = onSeek,
+                    sliderTestTag = "liquid_glass_progress_slider",
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onShuffle, modifier = Modifier.testTag("liquid_glass_shuffle")) {
+                        Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", tint = if (isShuffle) Color.White else Color.White.copy(alpha = 0.62f))
+                    }
+                    IconButton(onClick = onFavorite, modifier = Modifier.testTag("liquid_glass_favorite")) {
+                        Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (isFavorite) FavoriteRed else Color.White)
+                    }
+                    IconButton(onClick = onAddToPlaylist, modifier = Modifier.testTag("liquid_glass_add_playlist")) {
+                        Icon(Icons.Default.PlaylistAdd, contentDescription = "Добавить в плейлист", tint = Color.White)
+                    }
+                    IconButton(onClick = onRepeat, modifier = Modifier.testTag("liquid_glass_repeat")) {
+                        Icon(if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, contentDescription = "Повтор", tint = if (repeatMode == RepeatMode.OFF) Color.White.copy(alpha = 0.62f) else Color.White)
+                    }
+                    IconButton(onClick = onQueue, modifier = Modifier.testTag("liquid_glass_queue")) {
+                        Icon(Icons.Default.QueueMusic, contentDescription = "Очередь", tint = Color.White)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onSeekBack, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 секунд", tint = Color.White, modifier = Modifier.size(25.dp))
+                    }
+                    IconButton(onClick = onPrevious, modifier = Modifier.size(52.dp).testTag("liquid_glass_previous")) {
+                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    FilledIconButton(
+                        onClick = onPlayPause,
+                        modifier = Modifier.size(if (isCompact) 62.dp else 70.dp).shadow(12.dp, CircleShape),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = Color.White.copy(alpha = 0.88f),
+                            contentColor = Color(0xFF242424)
+                        )
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
+                            modifier = Modifier.size(38.dp)
+                        )
+                    }
+                    IconButton(onClick = onNext, modifier = Modifier.size(52.dp).testTag("liquid_glass_next")) {
+                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(34.dp))
+                    }
+                    IconButton(onClick = onSeekForward, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White, modifier = Modifier.size(25.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AudioSpecsBadge(
     specs: AudioTrackSpecs,
     track: Track,
