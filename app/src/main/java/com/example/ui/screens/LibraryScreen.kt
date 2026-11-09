@@ -515,6 +515,15 @@ fun LibraryScreen(
                                 }
                             )
                             DropdownMenuItem(
+                                text = { Text("Очистить очередь") },
+                                leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = {
+                                    moreMenuExpanded = false
+                                    viewModel.clearQueue()
+                                },
+                                modifier = Modifier.testTag("clear_playback_queue")
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Сортировка") },
                                 leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
