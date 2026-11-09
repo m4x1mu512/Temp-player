@@ -566,7 +566,10 @@ fun ExpandablePlayerSheet(
                             topStart = drawCornerRadius,
                             topEnd = drawCornerRadius
                         )
-                        clip = true
+                        // Avoid an antialiased clip edge around the fully expanded,
+                        // edge-to-edge player. Keep clipping during the sheet transition and
+                        // while collapsed so its rounded corners remain intact.
+                        clip = drawProgress < 0.999f
                         // The container spans the whole screen. Keep its shadow off while
                         // collapsed so it cannot leave vertical shadow lines below the mini-player.
                         // Restore the sheet shadow as it expands.
