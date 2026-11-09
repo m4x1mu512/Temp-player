@@ -485,10 +485,20 @@ class MusicRepository(
                                 continue
                             }
 
-                            // This fallback is intentionally limited to MP3 files for now.
-                            if (!displayName.endsWith(".mp3", ignoreCase = true) &&
-                                !mimeType.equals("audio/mpeg", ignoreCase = true)
-                            ) continue
+                            // SAF providers do not always report a reliable MIME type, so
+                            // accept audio MIME types and common audio extensions. This keeps
+                            // newly downloaded FLAC files discoverable even before MediaStore
+                            // has indexed them.
+                            val lowerName = displayName.lowercase()
+                            val isAudioFile = mimeType.startsWith("audio/", ignoreCase = true) ||
+                                lowerName.endsWith(
+                                    listOf(
+                                        ".mp3", ".flac", ".m4a", ".aac", ".ogg",
+                                        ".opus", ".wav", ".wma", ".aiff", ".aif",
+                                        ".ape", ".alac", ".wv", ".mka"
+                                    ).firstOrNull(lowerName::endsWith) ?: ""
+                                )
+                            if (!isAudioFile) continue
 
                             val documentUri = DocumentsContract.buildDocumentUriUsingTree(
                                 treeUri,
