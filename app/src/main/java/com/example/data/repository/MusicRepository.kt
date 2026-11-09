@@ -491,13 +491,11 @@ class MusicRepository(
                             // has indexed them.
                             val lowerName = displayName.lowercase()
                             val isAudioFile = mimeType.startsWith("audio/", ignoreCase = true) ||
-                                lowerName.endsWith(
-                                    listOf(
-                                        ".mp3", ".flac", ".m4a", ".aac", ".ogg",
-                                        ".opus", ".wav", ".wma", ".aiff", ".aif",
-                                        ".ape", ".alac", ".wv", ".mka"
-                                    ).firstOrNull(lowerName::endsWith) ?: ""
-                                )
+                                listOf(
+                                    ".mp3", ".flac", ".m4a", ".aac", ".ogg",
+                                    ".opus", ".wav", ".wma", ".aiff", ".aif",
+                                    ".ape", ".alac", ".wv", ".mka"
+                                ).any(lowerName::endsWith)
                             if (!isAudioFile) continue
 
                             val documentUri = DocumentsContract.buildDocumentUriUsingTree(
