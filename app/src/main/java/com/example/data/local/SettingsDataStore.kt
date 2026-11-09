@@ -148,6 +148,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MINI_PLAYER_BG_MODE = stringPreferencesKey("mini_player_bg_mode")
         private val KEY_MINI_PLAYER_CUSTOM_COLOR = longPreferencesKey("mini_player_custom_color")
         private val KEY_AUTO_ROTATE = booleanPreferencesKey("auto_rotate")
+        private val KEY_LIQUID_GLASS_PLAYER_ENABLED = booleanPreferencesKey("liquid_glass_player_enabled")
         private val KEY_REPLAY_GAIN_ENABLED = booleanPreferencesKey("replay_gain_enabled")
         private val KEY_CROSSFADE_ENABLED = booleanPreferencesKey("crossfade_enabled")
         private val KEY_CROSSFADE_DURATION_SECONDS = intPreferencesKey("crossfade_duration_seconds")
@@ -339,6 +340,10 @@ class SettingsDataStore(private val context: Context) {
 
     val autoRotateFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[KEY_AUTO_ROTATE] ?: true
+    }
+
+    val liquidGlassPlayerEnabledFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[KEY_LIQUID_GLASS_PLAYER_ENABLED] ?: false
     }
 
     val miniPlayerBgModeFlow: Flow<MiniPlayerBgMode> = context.dataStore.data.map { preferences ->
@@ -704,6 +709,12 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setAutoRotate(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[KEY_AUTO_ROTATE] = enabled
+        }
+    }
+
+    suspend fun setLiquidGlassPlayerEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[KEY_LIQUID_GLASS_PLAYER_ENABLED] = enabled
         }
     }
 
