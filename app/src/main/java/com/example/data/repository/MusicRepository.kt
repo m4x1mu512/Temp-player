@@ -421,6 +421,205 @@ class MusicRepository(
             throw IllegalStateException("Ошибка чтения аудиофайлов из медиатеки Android", e)
         }
 
+        // SAF fallback: MediaStore can lag behind newly downloaded files (especially on
+        // Android 10+ and with download providers). Walk each user-granted tree directly,
+        // so an MP3 is discoverable even before Android indexes it.
+        var safScanComplete = true
+        for (rawTreeUri in folderUris) {
+            try {
+                val treeUri = Uri.parse(rawTreeUri)
+                val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+                val pendingDocumentIds = mutableListOf(rootDocumentId)
+                val visitedDocumentIds = HashSet<String>()
+
+                while (pendingDocumentIds.isNotEmpty()) {
+                    val parentDocumentId = pendingDocumentIds.removeAt(pendingDocumentIds.lastIndex)
+                    if (!visitedDocumentIds.add(parentDocumentId)) continue
+
+                    val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                        treeUri,
+                        parentDocumentId
+                    )
+                    val childrenProjection = arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE,
+                        DocumentsContract.Document.COLUMN_SIZE,
+                        DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                    )
+                    val childrenCursor = context.contentResolver.query(
+                        childrenUri,
+                        childrenProjection,
+                        null,
+                        null,
+                        null
+                    ) ?: throw IllegalStateException("SAF не вернул содержимое выбранной папки")
+
+                    childrenCursor.use { cursor ->
+                        val documentIdCol = cursor.getColumnIndexOrThrow(
+                            DocumentsContract.Document.COLUMN_DOCUMENT_ID
+                        )
+                        val displayNameCol = cursor.getColumnIndexOrThrow(
+                            DocumentsContract.Document.COLUMN_DISPLAY_NAME
+                        )
+                        val mimeTypeCol = cursor.getColumnIndexOrThrow(
+                            DocumentsContract.Document.COLUMN_MIME_TYPE
+                        )
+                        val sizeCol = cursor.getColumnIndex(
+                            DocumentsContract.Document.COLUMN_SIZE
+                        )
+                        val modifiedCol = cursor.getColumnIndex(
+                            DocumentsContract.Document.COLUMN_LAST_MODIFIED
+                        )
+
+                        while (cursor.moveToNext()) {
+                            val documentId = cursor.getString(documentIdCol) ?: continue
+                            val displayName = cursor.getString(displayNameCol) ?: continue
+                            val mimeType = cursor.getString(mimeTypeCol) ?: ""
+                            if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                                pendingDocumentIds.add(documentId)
+                                continue
+                            }
+
+                            // This fallback is intentionally limited to MP3 files for now.
+                            if (!displayName.endsWith(".mp3", ignoreCase = true) &&
+                                !mimeType.equals("audio/mpeg", ignoreCase = true)
+                            ) continue
+
+                            val documentUri = DocumentsContract.buildDocumentUriUsingTree(
+                                treeUri,
+                                documentId
+                            )
+                            val uriString = documentUri.toString()
+                            val relativeDocumentPath = documentId.substringAfter(':', documentId)
+                            val volumeName = documentId.substringBefore(':', "primary")
+                            val absolutePath = if (volumeName.equals("primary", ignoreCase = true)) {
+                                "/storage/emulated/0/$relativeDocumentPath"
+                            } else {
+                                "/storage/$volumeName/$relativeDocumentPath"
+                            }.trimEnd('/')
+
+                            // If MediaStore already supplied this same file, do not add it twice.
+                            if (scannedTracks.any {
+                                    it.uriString == uriString ||
+                                        (absolutePath.isNotBlank() && it.path == absolutePath)
+                                }
+                            ) continue
+
+                            val existingByUri = existingTracksMap.values.firstOrNull {
+                                it.uriString == uriString
+                            }
+                            val existingByPath = existingTracksMap.values.firstOrNull {
+                                absolutePath.isNotBlank() && it.path == absolutePath
+                            }
+                            val existing = existingByUri ?: existingByPath
+                            val id = existing?.id ?: (
+                                (uriString.hashCode().toLong() and 0x3FFFFFFFFFFFFFFFL) or
+                                    (1L shl 60)
+                                )
+
+                            var title = displayName.substringBeforeLast('.')
+                            var artist = "Неизвестный исполнитель"
+                            var album = "Неизвестный альбом"
+                            var duration = 0L
+                            var genre = ""
+                            var year = ""
+                            var albumArtUri: String? = existing?.albumArtUriString
+
+                            try {
+                                MediaMetadataRetriever().use { retriever ->
+                                    retriever.setDataSource(context, documentUri)
+                                    retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_TITLE
+                                    )?.takeIf { it.isNotBlank() && it != "<unknown>" }?.let {
+                                        title = it
+                                    }
+                                    retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_ARTIST
+                                    )?.takeIf { it.isNotBlank() && it != "<unknown>" }?.let {
+                                        artist = it
+                                    }
+                                    retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_ALBUM
+                                    )?.takeIf { it.isNotBlank() && it != "<unknown>" }?.let {
+                                        album = it
+                                    }
+                                    duration = retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_DURATION
+                                    )?.toLongOrNull() ?: 0L
+                                    genre = retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_GENRE
+                                    ) ?: ""
+                                    year = retriever.extractMetadata(
+                                        MediaMetadataRetriever.METADATA_KEY_YEAR
+                                    ) ?: ""
+                                    if (albumArtUri == null) {
+                                        val pictureBytes = retriever.embeddedPicture
+                                        if (pictureBytes != null && pictureBytes.isNotEmpty()) {
+                                            val artDir = File(context.cacheDir, "album_arts").apply {
+                                                mkdirs()
+                                            }
+                                            val artFile = File(artDir, "art_$id.jpg")
+                                            artFile.writeBytes(pictureBytes)
+                                            albumArtUri = Uri.fromFile(artFile).toString()
+                                        }
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                // Metadata is optional; the file itself remains a valid library item.
+                            }
+
+                            val size = if (sizeCol != -1 && !cursor.isNull(sizeCol)) {
+                                cursor.getLong(sizeCol)
+                            } else 0L
+                            val modified = if (modifiedCol != -1 && !cursor.isNull(modifiedCol)) {
+                                cursor.getLong(modifiedCol) / 1000L
+                            } else 0L
+                            val folderName = relativeDocumentPath.substringBeforeLast(
+                                '/',
+                                "Разное"
+                            ).substringAfterLast('/').ifBlank { "Разное" }
+
+                            scannedTracks.add(
+                                if (existing?.isCustomEdited == true) {
+                                    existing.copy(
+                                        duration = if (duration > 0L) duration else existing.duration,
+                                        size = size,
+                                        dateAdded = if (modified > 0L) modified else existing.dateAdded,
+                                        folderName = folderName,
+                                        path = absolutePath,
+                                        uriString = uriString,
+                                        albumArtUriString = albumArtUri ?: existing.albumArtUriString
+                                    )
+                                } else {
+                                    TrackEntity(
+                                        id = id,
+                                        title = title,
+                                        artist = artist,
+                                        album = album,
+                                        duration = duration,
+                                        uriString = uriString,
+                                        albumArtUriString = albumArtUri,
+                                        size = size,
+                                        dateAdded = if (modified > 0L) modified else
+                                            System.currentTimeMillis() / 1000L,
+                                        folderName = folderName,
+                                        path = absolutePath,
+                                        genre = genre,
+                                        year = year,
+                                        isCustomEdited = false
+                                    )
+                                }
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Never prune the existing library if even one granted tree could not be read.
+                safScanComplete = false
+            }
+        }
+
         if (scannedTracks.isNotEmpty()) {
             // One transaction for the whole update. Without it every delete chunk invalidated
             // the tracks flow on its own, and each invalidation rebuilt the entire library
@@ -435,8 +634,11 @@ class MusicRepository(
                 // Only the ids are needed here. Loading every full TrackEntity inside the write
                 // transaction copied the whole library (10k+ objects with their strings) into
                 // memory on a large scan and held the database write lock for the whole pass.
-                val staleIds = trackDao.getAllTrackIds()
-                    .filterNot(validIds::contains)
+                val staleIds = if (safScanComplete) {
+                    trackDao.getAllTrackIds().filterNot(validIds::contains)
+                } else {
+                    emptyList()
+                }
                 staleIds.chunked(SQL_VARIABLE_LIMIT).forEach { chunk ->
                     trackDao.deleteTracksByIds(chunk)
                 }
