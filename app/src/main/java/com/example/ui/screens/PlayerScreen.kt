@@ -1386,7 +1386,7 @@ private fun LiquidGlassPlayerContent(
         val artworkHeight = if (maxWidth > maxHeight) {
             maxHeight * 0.62f
         } else {
-            minOf(maxWidth, maxHeight * 0.70f)
+            minOf(maxWidth, maxHeight * if (isCompact) 0.46f else 0.58f)
         }
 
         Box(
