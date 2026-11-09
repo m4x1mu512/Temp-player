@@ -1906,27 +1906,15 @@ private fun LiquidGlassExpandedPlayer(
 
                 Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .drawBackdrop(
-                            backdrop = artworkBackdrop,
-                            shape = { RoundedCornerShape(50) },
-                            effects = { backdropBlur(10.dp.toPx()) },
-                            onDrawSurface = { drawRect(Color.White.copy(alpha = 0.10f)) }
-                        )
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    SheetProgressSection(
-                        trackId = track.id,
-                        positionFlow = positionFlow,
-                        duration = duration,
-                        isPlaying = isPlaying,
-                        onSeek = onSeek,
-                        playedTrackColor = Color.White,
-                        inactiveTrackColor = Color.White.copy(alpha = 0.28f)
-                    )
-                }
+                SheetProgressSection(
+                    trackId = track.id,
+                    positionFlow = positionFlow,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    onSeek = onSeek,
+                    playedTrackColor = Color.White,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.28f)
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
