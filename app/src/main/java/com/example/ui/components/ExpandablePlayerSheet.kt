@@ -573,8 +573,13 @@ fun ExpandablePlayerSheet(
                         // The container spans the whole screen. Keep its shadow off while
                         // collapsed so it cannot leave vertical shadow lines below the mini-player.
                         // Restore the sheet shadow as it expands.
-                        shadowElevation = with(density) {
-                            lerp(0.dp, 12.dp, drawProgress).toPx()
+                        // A full-screen sheet must not cast a shadow against the
+                        // physical window edges; the clipped shadow was visible as a thin
+                        // outline on all four sides on some devices.
+                        shadowElevation = if (drawProgress >= 0.999f) {
+                            0f
+                        } else {
+                            with(density) { lerp(0.dp, 12.dp, drawProgress).toPx() }
                         }
                     }
                     .drawBehind {
@@ -1798,17 +1803,6 @@ private fun LiquidGlassExpandedPlayer(
     BoxWithConstraints(
         modifier = modifier
             .background(Color.Black)
-            // Bleed the solid player backdrop a couple of physical pixels beyond
-            // the Compose bounds. This covers hairline seams at the window edges
-            // without scaling or clipping the album artwork or glass card.
-            .drawBehind {
-                val bleed = 2.dp.toPx()
-                drawRect(
-                    color = Color.Black,
-                    topLeft = Offset(-bleed, -bleed),
-                    size = Size(size.width + bleed * 2f, size.height + bleed * 2f)
-                )
-            }
             .testTag("liquid_glass_expanded_player")
     ) {
         val coverHeight = minOf(maxWidth, maxHeight * 0.56f)
