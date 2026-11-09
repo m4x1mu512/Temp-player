@@ -493,7 +493,7 @@ fun LibraryScreen(
                         ) {
                             DropdownMenuItem(
                                 modifier = Modifier.height(60.dp),
-                                text = { Text("Эквалайзер") },
+                                text = { Text("Эквалайзер", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
@@ -502,7 +502,7 @@ fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 modifier = Modifier.height(60.dp),
-                                text = { Text("Таймер сна") },
+                                text = { Text("Таймер сна", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.Bedtime, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
@@ -511,7 +511,7 @@ fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 modifier = Modifier.height(60.dp),
-                                text = { Text("Сканировать") },
+                                text = { Text("Сканировать", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
@@ -519,7 +519,7 @@ fun LibraryScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Очистить очередь") },
+                                text = { Text("Очистить очередь", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.Clear, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
@@ -529,7 +529,7 @@ fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 modifier = Modifier.height(60.dp),
-                                text = { Text("Сортировка") },
+                                text = { Text("Сортировка", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.Sort, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
@@ -538,7 +538,7 @@ fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 modifier = Modifier.height(60.dp),
-                                text = { Text("Настройки") },
+                                text = { Text("Настройки", fontSize = 18.sp) },
                                 leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = {
                                     moreMenuExpanded = false
