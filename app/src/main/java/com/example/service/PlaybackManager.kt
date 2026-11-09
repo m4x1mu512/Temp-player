@@ -1113,6 +1113,12 @@ class PlaybackManager private constructor(private val context: Context) {
         saveCurrentState()
     }
 
+    fun clearQueue() {
+        publishQueue(emptyList(), -1)
+        if (_isShuffle.value) rebuildShuffleOrder(-1)
+        saveCurrentState()
+    }
+
     fun setQueue(newQueue: List<Track>) {
         val old = _queueState.value
         val activeTrackId = _currentTrack.value?.id
@@ -1661,12 +1667,13 @@ class PlaybackManager private constructor(private val context: Context) {
         val pos = _playbackPosition.value
         val q = _queue.value
         val idx = _queueIndex.value
-        if (track == null && q.isEmpty()) return
-
         val ids = q.map { it.id }
+        // An empty queue is still a meaningful state and must be persisted even when no
+        // track is currently playing (for example, after the user clears the queue).
         // Serialising the whole queue id list is only needed when the queue actually changed;
         // it used to be rebuilt and written to disk every few seconds during playback.
         val queueChanged = ids != lastSavedQueueIds
+        if (track == null && q.isEmpty() && !queueChanged) return
         if (queueChanged) lastSavedQueueIds = ids
 
         val trackId = track?.id ?: -1L
