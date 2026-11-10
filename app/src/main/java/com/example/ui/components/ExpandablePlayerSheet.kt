@@ -1840,7 +1840,11 @@ private fun LiquidGlassExpandedPlayer(
         }
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                // Extend the blur output beyond the viewport as well as its source.
+                // Otherwise the rectangular backdrop's clipped edge can leave a
+                // one-pixel bright seam exactly at the physical screen boundary.
+                .align(Alignment.Center)
+                .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
                 .drawBackdrop(
                     backdrop = artworkBackdrop,
                     shape = { androidx.compose.ui.graphics.RectangleShape },
