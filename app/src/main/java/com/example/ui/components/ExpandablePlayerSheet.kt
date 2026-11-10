@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -1820,9 +1821,14 @@ private fun LiquidGlassExpandedPlayer(
 
         // A low-cost source layer is captured once for the glass blur. The album
         // artwork itself stays sharp in the foreground.
+        // Extend the backdrop source a few dp beyond the physical screen edges.
+        // This gives the blur shader pixels to sample at the viewport boundary and
+        // prevents a bright one-pixel seam along the sides without changing the
+        // foreground artwork or the glass control card.
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .align(Alignment.Center)
+                .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
                 .layerBackdrop(artworkBackdrop)
         ) {
             AsyncImage(
