@@ -2103,26 +2103,6 @@ private fun SheetProgressSection(
 
         val accentColor = playedTrackColor ?: MaterialTheme.colorScheme.primary
 
-        GlowProgressSlider(
-            value = sliderVal,
-            onValueChange = {
-                isUserScrubbing = true
-                scrubPosition = it
-            },
-            onValueChangeFinished = {
-                onSeek(scrubPosition.toLong())
-                isUserScrubbing = false
-            },
-            valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
-            accentColor = accentColor,
-            inactiveTrackColor = inactiveTrackColor,
-            trackHeight = 4.dp,
-            thumbRadius = 5.dp,
-            glowRadius = 14.dp,
-            glowAlpha = 0.36f,
-            testTag = "player_progress_slider"
-        )
-
         val currentSeconds = (currentFloat / 1000f).toLong().coerceAtLeast(0L)
         val formattedCurrent = remember(currentSeconds) { formatTime(currentSeconds * 1000L) }
         val formattedDuration = remember(duration) { formatTime(duration) }
@@ -2131,17 +2111,40 @@ private fun SheetProgressSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = formattedCurrent,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            GlowProgressSlider(
+                value = sliderVal,
+                onValueChange = {
+                    isUserScrubbing = true
+                    scrubPosition = it
+                },
+                onValueChangeFinished = {
+                    onSeek(scrubPosition.toLong())
+                    isUserScrubbing = false
+                },
+                valueRange = 0f..(if (duration > 0) duration.toFloat() else 1f),
+                modifier = Modifier.weight(1f),
+                accentColor = accentColor,
+                inactiveTrackColor = inactiveTrackColor,
+                trackHeight = 4.dp,
+                thumbRadius = 5.dp,
+                glowRadius = 14.dp,
+                glowAlpha = 0.36f,
+                testTag = "player_progress_slider"
             )
             Text(
                 text = formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }
