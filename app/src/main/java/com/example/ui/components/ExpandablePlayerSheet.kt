@@ -1891,6 +1891,7 @@ private fun LiquidGlassExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(coverHeight)
+                    .offset(y = (-8).dp)
                     .pointerInput(track.id) {
                         var totalDragX = 0f
                         var velocityTracker = VelocityTracker()
@@ -1937,7 +1938,7 @@ private fun LiquidGlassExpandedPlayer(
                         RoundedCornerShape(30.dp)
                     )
                     .padding(horizontal = 18.dp, vertical = if (compact) 6.dp else 10.dp)
-                    .offset(y = (-10).dp),
+                    .offset(y = (-18).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Column(
