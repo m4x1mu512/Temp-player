@@ -759,11 +759,21 @@ fun ExpandablePlayerSheet(
                                 ),
                                 shape = glassShape
                             )
-                            .border(
-                                width = 1.dp,
-                                color = (if (colorScheme.isDark) Color.White else Color.Black)
-                                    .copy(alpha = 0.08f),
-                                shape = glassShape
+                            // Keep the collapsed mini-player outline only while collapsed.
+                            // During expansion the full-screen Liquid Glass player covers this
+                            // layer, so do not let the mini-player's edge stroke bleed onto the
+                            // physical screen perimeter on devices with backdrop compositing.
+                            .then(
+                                if (!isExpanded) {
+                                    Modifier.border(
+                                        width = 1.dp,
+                                        color = (if (colorScheme.isDark) Color.White else Color.Black)
+                                            .copy(alpha = 0.08f),
+                                        shape = glassShape
+                                    )
+                                } else {
+                                    Modifier
+                                }
                             )
                     )
                 }
