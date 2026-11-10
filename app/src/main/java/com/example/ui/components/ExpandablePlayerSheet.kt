@@ -1891,7 +1891,7 @@ private fun LiquidGlassExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(coverHeight)
-                    .pointerInput(track.id, maxWidth) {
+                    .pointerInput(track.id) {
                         var totalDragX = 0f
                         var velocityTracker = VelocityTracker()
                         val swipeThreshold = size.width * 0.18f
