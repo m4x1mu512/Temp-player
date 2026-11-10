@@ -1891,6 +1891,32 @@ private fun LiquidGlassExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(coverHeight)
+                    .pointerInput(track.id, maxWidth) {
+                        var totalDragX = 0f
+                        var velocityTracker = VelocityTracker()
+                        val swipeThreshold = size.width * 0.18f
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                totalDragX = 0f
+                                velocityTracker = VelocityTracker()
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                totalDragX += dragAmount
+                                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                change.consume()
+                            },
+                            onDragEnd = {
+                                val velocityX = velocityTracker.calculateVelocity().x
+                                val flingThreshold = 600f
+                                when {
+                                    totalDragX <= -swipeThreshold ||
+                                        (totalDragX < -24f && velocityX <= -flingThreshold) -> onNext()
+                                    totalDragX >= swipeThreshold ||
+                                        (totalDragX > 24f && velocityX >= flingThreshold) -> onPrevious()
+                                }
+                            }
+                        )
+                    }
                     .testTag("liquid_glass_album_art")
             )
 
