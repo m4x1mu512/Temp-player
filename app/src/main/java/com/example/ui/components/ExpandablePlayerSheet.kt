@@ -1923,7 +1923,7 @@ private fun LiquidGlassExpandedPlayer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = if (compact) 6.dp else 10.dp)
+                    .padding(horizontal = 14.dp, vertical = if (compact) 4.dp else 6.dp)
                     .drawBackdrop(
                         backdrop = artworkBackdrop,
                         shape = { RoundedCornerShape(30.dp) },
@@ -1936,7 +1936,8 @@ private fun LiquidGlassExpandedPlayer(
                         BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)),
                         RoundedCornerShape(30.dp)
                     )
-                    .padding(horizontal = 18.dp, vertical = if (compact) 8.dp else 14.dp),
+                    .padding(horizontal = 18.dp, vertical = if (compact) 6.dp else 10.dp)
+                    .offset(y = (-10).dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -1958,7 +1959,7 @@ private fun LiquidGlassExpandedPlayer(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(modifier = Modifier.height(if (compact) 4.dp else 8.dp))
+                Spacer(modifier = Modifier.height(if (compact) 2.dp else 4.dp))
 
                 SheetProgressSection(
                     trackId = track.id,
