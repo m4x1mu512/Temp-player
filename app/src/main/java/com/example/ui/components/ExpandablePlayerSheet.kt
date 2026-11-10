@@ -1941,7 +1941,7 @@ private fun LiquidGlassExpandedPlayer(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Column(
-                    modifier = Modifier.offset(y = if (compact) 5.dp else 8.dp),
+                    modifier = Modifier.offset(y = if (compact) 8.dp else 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -2123,7 +2123,8 @@ private fun SheetProgressSection(
                 text = formattedCurrent,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                maxLines = 1,
+                modifier = Modifier.width((formattedDuration.length * 7).dp)
             )
             GlowProgressSlider(
                 value = sliderVal,
@@ -2149,7 +2150,8 @@ private fun SheetProgressSection(
                 text = formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                maxLines = 1,
+                modifier = Modifier.width((formattedDuration.length * 7).dp)
             )
         }
     }
