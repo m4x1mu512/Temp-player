@@ -1921,26 +1921,37 @@ private fun LiquidGlassExpandedPlayer(
                     .testTag("liquid_glass_album_art")
             )
 
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = if (compact) 4.dp else 6.dp)
-                    .drawBackdrop(
-                        backdrop = artworkBackdrop,
-                        shape = { RoundedCornerShape(30.dp) },
-                        effects = { backdropBlur(24.dp.toPx()) },
-                        onDrawSurface = {
-                            drawRect(Color.White.copy(alpha = 0.16f))
-                        }
-                    )
-                    .border(
-                        BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)),
-                        RoundedCornerShape(30.dp)
-                    )
-                    .padding(horizontal = 18.dp, vertical = if (compact) 6.dp else 10.dp)
-                    .offset(y = (-28).dp),
-                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Move only the glass surface upward; keep all player controls and text fixed.
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .offset(y = (-10).dp)
+                        .drawBackdrop(
+                            backdrop = artworkBackdrop,
+                            shape = { RoundedCornerShape(30.dp) },
+                            effects = { backdropBlur(24.dp.toPx()) },
+                            onDrawSurface = {
+                                drawRect(Color.White.copy(alpha = 0.16f))
+                            }
+                        )
+                        .border(
+                            BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)),
+                            RoundedCornerShape(30.dp)
+                        )
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = if (compact) 6.dp else 10.dp)
+                        .offset(y = (-28).dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 Column(
                     modifier = Modifier.offset(y = if (compact) 8.dp else 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -2026,6 +2037,7 @@ private fun LiquidGlassExpandedPlayer(
                     IconButton(onClick = onSeekForward, modifier = Modifier.size(44.dp)) {
                         Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White)
                     }
+                }
                 }
             }
         }
