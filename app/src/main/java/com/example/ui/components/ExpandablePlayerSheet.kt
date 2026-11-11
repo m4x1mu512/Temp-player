@@ -1925,8 +1925,9 @@ private fun LiquidGlassExpandedPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = if (compact) 4.dp else 6.dp)
+                    .offset(y = (-15).dp)
             ) {
-                // Move only the glass surface upward; keep all player controls and text fixed.
+                // Move the glass surface and all of its contents together, preserving internal spacing.
                 Box(
                     modifier = Modifier
                         .matchParentSize()
