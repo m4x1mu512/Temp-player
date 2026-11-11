@@ -109,41 +109,59 @@ fun GlowProgressSlider(
             .pointerInput(rangeLength, valueRange.start) {
                 detectTapGestures { offset ->
                     val thumbRadiusPx = thumbRadius.toPx()
-                    val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
-                    val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
-                    val newFraction = touchX / availableWidth
-                    val newValue = valueRange.start + newFraction * rangeLength
-                    currentOnValueChange(newValue)
-                    currentOnValueChangeFinished?.invoke()
+                    val touchTolerance = thumbRadiusPx + 6.dp.toPx()
+                    // The composable keeps a 48.dp accessible height, but only taps
+                    // close to the visible track should seek playback.
+                    if (abs(offset.y - size.height / 2f) <= touchTolerance) {
+                        val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                        val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                        val newFraction = touchX / availableWidth
+                        val newValue = valueRange.start + newFraction * rangeLength
+                        currentOnValueChange(newValue)
+                        currentOnValueChangeFinished?.invoke()
+                    }
                 }
             }
             .pointerInput(rangeLength, valueRange.start) {
+                var dragStartedOnTrack = false
                 detectDragGestures(
                     onDragStart = { offset ->
-                        isDragging = true
                         val thumbRadiusPx = thumbRadius.toPx()
-                        val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
-                        val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
-                        dragProgressFraction = (touchX / availableWidth).coerceIn(0f, 1f)
-                        val newValue = valueRange.start + dragProgressFraction * rangeLength
-                        currentOnValueChange(newValue)
+                        val touchTolerance = thumbRadiusPx + 6.dp.toPx()
+                        dragStartedOnTrack = abs(offset.y - size.height / 2f) <= touchTolerance
+                        if (dragStartedOnTrack) {
+                            isDragging = true
+                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                            val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                            dragProgressFraction = (touchX / availableWidth).coerceIn(0f, 1f)
+                            val newValue = valueRange.start + dragProgressFraction * rangeLength
+                            currentOnValueChange(newValue)
+                        }
                     },
                     onDrag = { change, _ ->
-                        change.consume()
-                        val thumbRadiusPx = thumbRadius.toPx()
-                        val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
-                        val touchX = (change.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
-                        dragProgressFraction = (touchX / availableWidth).coerceIn(0f, 1f)
-                        val newValue = valueRange.start + dragProgressFraction * rangeLength
-                        currentOnValueChange(newValue)
+                        if (dragStartedOnTrack) {
+                            change.consume()
+                            val thumbRadiusPx = thumbRadius.toPx()
+                            val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
+                            val touchX = (change.position.x - thumbRadiusPx).coerceIn(0f, availableWidth)
+                            dragProgressFraction = (touchX / availableWidth).coerceIn(0f, 1f)
+                            val newValue = valueRange.start + dragProgressFraction * rangeLength
+                            currentOnValueChange(newValue)
+                        }
                     },
                     onDragEnd = {
-                        isDragging = false
-                        currentOnValueChangeFinished?.invoke()
+                        if (dragStartedOnTrack) {
+                            isDragging = false
+                            currentOnValueChangeFinished?.invoke()
+                        }
+                        dragStartedOnTrack = false
                     },
                     onDragCancel = {
-                        isDragging = false
-                        currentOnValueChangeFinished?.invoke()
+                        if (dragStartedOnTrack) {
+                            isDragging = false
+                            currentOnValueChangeFinished?.invoke()
+                        }
+                        dragStartedOnTrack = false
                     }
                 )
             }
