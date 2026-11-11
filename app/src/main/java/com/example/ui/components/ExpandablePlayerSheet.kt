@@ -1930,7 +1930,7 @@ private fun LiquidGlassExpandedPlayer(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .offset(y = (-10).dp)
+                        .offset(y = (-17).dp)
                         .drawBackdrop(
                             backdrop = artworkBackdrop,
                             shape = { RoundedCornerShape(30.dp) },
