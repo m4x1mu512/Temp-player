@@ -126,6 +126,7 @@ fun GlowProgressSlider(
                 var dragStartedOnTrack = false
                 detectDragGestures(
                     onDragStart = { offset ->
+                        val thumbRadiusPx = thumbRadius.toPx()
                         val touchTolerance = trackHeight.toPx() / 2f + 2.dp.toPx()
                         dragStartedOnTrack = abs(offset.y - size.height / 2f) <= touchTolerance
                         if (dragStartedOnTrack) {
