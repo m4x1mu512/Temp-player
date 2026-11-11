@@ -109,9 +109,9 @@ fun GlowProgressSlider(
             .pointerInput(rangeLength, valueRange.start) {
                 detectTapGestures { offset ->
                     val thumbRadiusPx = thumbRadius.toPx()
-                    val touchTolerance = thumbRadiusPx + 6.dp.toPx()
-                    // The composable keeps a 48.dp accessible height, but only taps
-                    // close to the visible track should seek playback.
+                    val touchTolerance = trackHeight.toPx() / 2f + 2.dp.toPx()
+                    // Keep the 48.dp layout target, but accept taps only immediately
+                    // around the visible progress line, not in the empty area above it.
                     if (abs(offset.y - size.height / 2f) <= touchTolerance) {
                         val availableWidth = (size.width - thumbRadiusPx * 2).coerceAtLeast(1f)
                         val touchX = (offset.x - thumbRadiusPx).coerceIn(0f, availableWidth)
@@ -126,8 +126,7 @@ fun GlowProgressSlider(
                 var dragStartedOnTrack = false
                 detectDragGestures(
                     onDragStart = { offset ->
-                        val thumbRadiusPx = thumbRadius.toPx()
-                        val touchTolerance = thumbRadiusPx + 6.dp.toPx()
+                        val touchTolerance = trackHeight.toPx() / 2f + 2.dp.toPx()
                         dragStartedOnTrack = abs(offset.y - size.height / 2f) <= touchTolerance
                         if (dragStartedOnTrack) {
                             isDragging = true
