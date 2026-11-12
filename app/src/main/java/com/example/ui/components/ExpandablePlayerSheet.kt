@@ -1933,6 +1933,19 @@ private fun LiquidGlassExpandedPlayer(
                                 radius = maxOf(size.width, size.height) * 0.78f
                             )
                         )
+                        // Gently blend the lower edge of the sharp cover into the
+                        // blurred artwork background beneath it.
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.68f to Color.Transparent,
+                                    1.0f to Color.Black.copy(alpha = 0.42f)
+                                ),
+                                startY = size.height * 0.52f,
+                                endY = size.height
+                            )
+                        )
                     }
                     .testTag("liquid_glass_album_art")
             )
