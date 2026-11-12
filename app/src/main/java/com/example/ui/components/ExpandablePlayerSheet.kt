@@ -1938,6 +1938,14 @@ private fun LiquidGlassExpandedPlayer(
                             effects = { backdropBlur(24.dp.toPx()) },
                             onDrawSurface = {
                                 drawRect(Color.White.copy(alpha = 0.16f))
+                                drawRect(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.10f),
+                                            Color.Black.copy(alpha = 0.035f)
+                                        )
+                                    )
+                                )
                             }
                         )
                         .border(
@@ -1960,7 +1968,13 @@ private fun LiquidGlassExpandedPlayer(
                     Text(
                         text = track.title,
                         color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.28f),
+                                offset = Offset(0f, 1.5f),
+                                blurRadius = 3f
+                            )
+                        ),
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -1970,7 +1984,13 @@ private fun LiquidGlassExpandedPlayer(
                     Text(
                         text = track.artist,
                         color = Color.White.copy(alpha = 0.78f),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.22f),
+                                offset = Offset(0f, 1.5f),
+                                blurRadius = 3f
+                            )
+                        ),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
