@@ -1937,6 +1937,16 @@ private fun LiquidGlassExpandedPlayer(
                             shape = { RoundedCornerShape(30.dp) },
                             effects = { backdropBlur(24.dp.toPx()) },
                             onDrawSurface = {
+                                // Keep the Liquid Glass translucent while gently darkening
+                                // brighter artwork near the title and controls.
+                                drawRect(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Black.copy(alpha = 0.10f),
+                                            Color.Black.copy(alpha = 0.035f)
+                                        )
+                                    )
+                                )
                                 drawRect(Color.White.copy(alpha = 0.16f))
                             }
                         )
@@ -1960,7 +1970,13 @@ private fun LiquidGlassExpandedPlayer(
                     Text(
                         text = track.title,
                         color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.28f),
+                                offset = Offset(0f, 1.5f),
+                                blurRadius = 3f
+                            )
+                        ),
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -1970,7 +1986,13 @@ private fun LiquidGlassExpandedPlayer(
                     Text(
                         text = track.artist,
                         color = Color.White.copy(alpha = 0.78f),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.22f),
+                                offset = Offset(0f, 1.5f),
+                                blurRadius = 3f
+                            )
+                        ),
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -1995,19 +2017,19 @@ private fun LiquidGlassExpandedPlayer(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onShuffle) {
-                        Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", tint = if (isShuffle) Color.White else Color.White.copy(alpha = 0.62f))
+                        Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", tint = if (isShuffle) Color.White else Color.White.copy(alpha = 0.62f), modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onFavorite) {
-                        Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (isFavorite) FavoriteRed else Color.White)
+                        Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (isFavorite) FavoriteRed else Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onAddToPlaylist) {
-                        Icon(Icons.Default.PlaylistAdd, contentDescription = "Добавить в плейлист", tint = Color.White)
+                        Icon(Icons.Default.PlaylistAdd, contentDescription = "Добавить в плейлист", tint = Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onRepeat) {
-                        Icon(if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, contentDescription = "Повтор", tint = if (repeatMode == RepeatMode.OFF) Color.White.copy(alpha = 0.62f) else Color.White)
+                        Icon(if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, contentDescription = "Повтор", tint = if (repeatMode == RepeatMode.OFF) Color.White.copy(alpha = 0.62f) else Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onQueue, modifier = Modifier.testTag("liquid_glass_queue")) {
-                        Icon(Icons.Default.QueueMusic, contentDescription = "Очередь", tint = Color.White)
+                        Icon(Icons.Default.QueueMusic, contentDescription = "Очередь", tint = Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                 }
 
@@ -2017,10 +2039,10 @@ private fun LiquidGlassExpandedPlayer(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onSeekBack, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 секунд", tint = Color.White)
+                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 секунд", tint = Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onPrevious, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White, modifier = Modifier.size(34.dp))
+                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White, modifier = Modifier.size(34.dp).shadow(1.dp, CircleShape, clip = false))
                     }
                     FilledIconButton(
                         onClick = onPlayPause,
@@ -2033,10 +2055,10 @@ private fun LiquidGlassExpandedPlayer(
                         Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = if (isPlaying) "Пауза" else "Воспроизведение", modifier = Modifier.size(38.dp))
                     }
                     IconButton(onClick = onNext, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(34.dp))
+                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(34.dp).shadow(1.dp, CircleShape, clip = false))
                     }
                     IconButton(onClick = onSeekForward, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White)
+                        Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White, modifier = Modifier.shadow(1.dp, CircleShape, clip = false))
                     }
                 }
                 }
