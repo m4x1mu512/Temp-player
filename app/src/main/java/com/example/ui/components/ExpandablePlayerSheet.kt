@@ -115,7 +115,6 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur as backdropBlur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -1917,34 +1916,6 @@ private fun LiquidGlassExpandedPlayer(
                                         (totalDragX > 24f && velocityX >= flingThreshold) -> onPrevious()
                                 }
                             }
-                        )
-                    }
-                    .drawWithContent {
-                        drawContent()
-                        // A subtle vignette belongs to the artwork only; keep the glass card untouched.
-                        drawRect(
-                            brush = Brush.radialGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color.Transparent,
-                                    0.62f to Color.Transparent,
-                                    1.0f to Color.Black.copy(alpha = 0.22f)
-                                ),
-                                center = Offset(size.width / 2f, size.height / 2f),
-                                radius = maxOf(size.width, size.height) * 0.78f
-                            )
-                        )
-                        // Gently blend the lower edge of the sharp cover into the
-                        // blurred artwork background beneath it.
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color.Transparent,
-                                    0.68f to Color.Transparent,
-                                    1.0f to Color.Black.copy(alpha = 0.42f)
-                                ),
-                                startY = size.height * 0.52f,
-                                endY = size.height
-                            )
                         )
                     }
                     .testTag("liquid_glass_album_art")
