@@ -1817,7 +1817,7 @@ private fun LiquidGlassExpandedPlayer(
     val artworkRequest = remember(track.albumArtUri) {
         ImageRequest.Builder(context)
             .data(track.albumArtUri ?: R.drawable.ic_default_art)
-            .crossfade(180)
+            .crossfade(false)
             .placeholder(R.drawable.ic_default_art)
             .error(R.drawable.ic_default_art)
             .build()
