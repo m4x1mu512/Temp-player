@@ -1811,14 +1811,13 @@ private fun LiquidGlassExpandedPlayer(
 ) {
     val artworkBackdrop = rememberLayerBackdrop()
     val context = LocalContext.current
-    // Keep the sharp cover and the backdrop source in sync when the track changes.
-    // Crossfading the source prevents a one-frame sharp full-screen flash while
-    // the backdrop layer is being refreshed with the next album artwork.
+    // Use the same request for the sharp cover and blurred backdrop.
+    // Do not show the generic artwork while Coil decodes the next track:
+    // the player background remains black until the real cover is ready.
     val artworkRequest = remember(track.albumArtUri) {
         ImageRequest.Builder(context)
             .data(track.albumArtUri ?: R.drawable.ic_default_art)
             .crossfade(false)
-            .placeholder(R.drawable.ic_default_art)
             .error(R.drawable.ic_default_art)
             .build()
     }
