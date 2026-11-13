@@ -115,18 +115,16 @@ fun EqualizerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
-            shape = RoundedCornerShape(28.dp),
+            shape = androidx.compose.ui.graphics.RectangleShape,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .widthIn(max = 580.dp)
-                .padding(vertical = 16.dp)
+                .fillMaxSize()
                 .testTag("equalizer_dialog")
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(horizontal = 20.dp, vertical = 20.dp)
             ) {
                 // Header: Title & Master Power Toggle
