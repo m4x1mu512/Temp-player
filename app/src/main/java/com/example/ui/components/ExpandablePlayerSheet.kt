@@ -1810,6 +1810,18 @@ private fun LiquidGlassExpandedPlayer(
     modifier: Modifier = Modifier
 ) {
     val artworkBackdrop = rememberLayerBackdrop()
+    val context = LocalContext.current
+    // Keep the sharp cover and the backdrop source in sync when the track changes.
+    // Crossfading the source prevents a one-frame sharp full-screen flash while
+    // the backdrop layer is being refreshed with the next album artwork.
+    val artworkRequest = remember(track.albumArtUri) {
+        ImageRequest.Builder(context)
+            .data(track.albumArtUri ?: R.drawable.ic_default_art)
+            .crossfade(180)
+            .placeholder(R.drawable.ic_default_art)
+            .error(R.drawable.ic_default_art)
+            .build()
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -1832,7 +1844,7 @@ private fun LiquidGlassExpandedPlayer(
                 .layerBackdrop(artworkBackdrop)
         ) {
             AsyncImage(
-                model = track.albumArtUri ?: R.drawable.ic_default_art,
+                model = artworkRequest,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -1885,7 +1897,7 @@ private fun LiquidGlassExpandedPlayer(
             }
 
             AsyncImage(
-                model = track.albumArtUri ?: R.drawable.ic_default_art,
+                model = artworkRequest,
                 contentDescription = "Обложка трека",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
