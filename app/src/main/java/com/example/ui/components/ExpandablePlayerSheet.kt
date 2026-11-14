@@ -2166,7 +2166,13 @@ private fun SheetProgressSection(
         ) {
             Text(
                 text = formattedCurrent,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.White.copy(alpha = 0.85f),
+                        offset = Offset.Zero,
+                        blurRadius = 4f
+                    )
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 modifier = Modifier.width((formattedDuration.length * 7).dp)
@@ -2193,7 +2199,13 @@ private fun SheetProgressSection(
             )
             Text(
                 text = formattedDuration,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.White.copy(alpha = 0.85f),
+                        offset = Offset.Zero,
+                        blurRadius = 4f
+                    )
+                ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 modifier = Modifier.width((formattedDuration.length * 7).dp)
