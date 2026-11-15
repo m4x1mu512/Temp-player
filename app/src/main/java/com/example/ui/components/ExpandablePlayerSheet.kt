@@ -2053,15 +2053,44 @@ private fun LiquidGlassExpandedPlayer(
                     IconButton(onClick = onPrevious, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White, modifier = Modifier.size(34.dp))
                     }
-                    FilledIconButton(
-                        onClick = onPlayPause,
-                        modifier = Modifier.size(66.dp).shadow(10.dp, CircleShape),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = Color.White.copy(alpha = 0.90f),
-                            contentColor = Color(0xFF252525)
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .shadow(12.dp, CircleShape)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFFF4F5F6).copy(alpha = 0.96f),
+                                        Color(0xFFD9DCE0).copy(alpha = 0.92f),
+                                        Color(0xFFBFC3C8).copy(alpha = 0.94f),
+                                        Color(0xFFE9EBED).copy(alpha = 0.96f)
+                                    ),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(180f, 180f)
+                                )
+                            )
+                            .border(
+                                BorderStroke(1.5.dp, Color.White.copy(alpha = 0.82f)),
+                                CircleShape
+                            )
+                            .clickable(onClick = onPlayPause)
+                            .testTag("liquid_glass_play_pause_button"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = if (isPlaying) "Пауза" else "Воспроизведение", modifier = Modifier.size(38.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Color(0xFF777D83).copy(alpha = 0.28f), CircleShape)
+                        )
+                        Icon(
+                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
+                            tint = Color(0xFF292B2E),
+                            modifier = Modifier.size(42.dp)
+                        )
                     }
                     IconButton(onClick = onNext, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(34.dp))
