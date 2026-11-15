@@ -63,7 +63,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -575,30 +574,27 @@ private fun VerticalBandSlider(
 ) {
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = Color(0xFF26362A)
-    var trackHeightPx by remember { mutableFloatStateOf(0f) }
-
-    fun updateFromY(y: Float) {
-        if (!enabled || trackHeightPx <= 0f) return
-        val fraction = (1f - (y / trackHeightPx)).coerceIn(0f, 1f)
+    fun updateFromY(y: Float, height: Float) {
+        if (!enabled || height <= 0f) return
+        val fraction = (1f - (y / height)).coerceIn(0f, 1f)
         onValueChange(-1200f + fraction * 2400f)
     }
 
     Canvas(
         modifier = modifier
-            .pointerInput(enabled, trackHeightPx) {
-                detectTapGestures { position -> updateFromY(position.y) }
+            .pointerInput(enabled) {
+                detectTapGestures { position -> updateFromY(position.y, size.height.toFloat()) }
             }
-            .pointerInput(enabled, trackHeightPx) {
+            .pointerInput(enabled) {
                 detectDragGestures(
-                    onDragStart = { position -> updateFromY(position.y) },
+                    onDragStart = { position -> updateFromY(position.y, size.height.toFloat()) },
                     onDrag = { change, _ ->
-                        updateFromY(change.position.y)
+                        updateFromY(change.position.y, size.height.toFloat())
                         change.consume()
                     }
                 )
             }
     ) {
-        trackHeightPx = size.height
         val centerX = size.width / 2f
         val top = 8.dp.toPx()
         val bottom = size.height - 8.dp.toPx()
