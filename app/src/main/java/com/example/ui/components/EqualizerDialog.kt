@@ -472,7 +472,7 @@ private fun EqualizerTabContent(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Box(
-                                    modifier = Modifier.width(42.dp).height(154.dp),
+                                    modifier = Modifier.width(42.dp).height(190.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     VerticalBandSlider(
