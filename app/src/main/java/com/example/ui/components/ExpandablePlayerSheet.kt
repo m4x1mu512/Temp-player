@@ -2173,7 +2173,7 @@ private fun SheetProgressSection(
                         blurRadius = 4f
                     )
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.Black,
                 maxLines = 1,
                 modifier = Modifier.width((formattedDuration.length * 7).dp)
             )
@@ -2206,7 +2206,7 @@ private fun SheetProgressSection(
                         blurRadius = 4f
                     )
                 ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color.Black,
                 maxLines = 1,
                 modifier = Modifier.width((formattedDuration.length * 7).dp)
             )
