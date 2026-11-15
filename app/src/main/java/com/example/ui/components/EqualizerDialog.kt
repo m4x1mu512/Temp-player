@@ -422,12 +422,21 @@ private fun EqualizerTabContent(
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        listOf("НЧ", "СЧ", "ВЧ").forEach {
-                            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        bands.forEach { band ->
+                            val frequencyLabel = if (band.centerFreqHz >= 1000) {
+                                "${band.centerFreqHz / 1000} кГц"
+                            } else {
+                                "${band.centerFreqHz} Гц"
+                            }
+                            Text(
+                                frequencyLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
                         }
-                        Text("Частота", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
