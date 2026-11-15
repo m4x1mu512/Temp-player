@@ -24,6 +24,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.consume
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -59,6 +63,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -371,7 +376,7 @@ private fun EqualizerTabContent(
     onReset: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Text(
@@ -475,29 +480,19 @@ private fun EqualizerTabContent(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Box(
-                                    modifier = Modifier.width(42.dp).height(112.dp),
+                                    modifier = Modifier.width(42.dp).height(154.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Slider(
+                                    VerticalBandSlider(
                                         value = band.levelMilliBels.toFloat(),
+                                        enabled = isEnabled,
                                         onValueChange = { newMilliBels ->
                                             val quantized = ((newMilliBels / 25f).roundToInt() * 25)
                                                 .coerceIn(-1200, 1200).toShort()
                                             onBandLevelChanged(band.bandIndex, quantized)
                                         },
-                                        valueRange = -1200f..1200f,
-                                        enabled = isEnabled,
-                                        colors = SliderDefaults.colors(
-                                            thumbColor = MaterialTheme.colorScheme.primary,
-                                            activeTrackColor = MaterialTheme.colorScheme.primary,
-                                            inactiveTrackColor = Color(0xFF26362A),
-                                            activeTickColor = Color.Transparent,
-                                            inactiveTickColor = Color.Transparent
-                                        ),
                                         modifier = Modifier
-                                            .requiredWidth(112.dp)
-                                            .requiredHeight(38.dp)
-                                            .graphicsLayer { rotationZ = -90f }
+                                            .fillMaxSize()
                                             .testTag("band_slider_${band.bandIndex}")
                                     )
                                 }
@@ -528,6 +523,8 @@ private fun EqualizerTabContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
+        Spacer(modifier = Modifier.weight(1f))
 
         Card(
             shape = RoundedCornerShape(18.dp),
@@ -569,6 +566,59 @@ private fun EqualizerTabContent(
 }
 
 // ==========================================
+@Composable
+private fun VerticalBandSlider(
+    value: Float,
+    enabled: Boolean,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val activeColor = MaterialTheme.colorScheme.primary
+    val inactiveColor = Color(0xFF26362A)
+    var trackHeightPx by remember { mutableFloatStateOf(0f) }
+
+    fun updateFromY(y: Float) {
+        if (!enabled || trackHeightPx <= 0f) return
+        val fraction = (1f - (y / trackHeightPx)).coerceIn(0f, 1f)
+        onValueChange(-1200f + fraction * 2400f)
+    }
+
+    Canvas(
+        modifier = modifier
+            .pointerInput(enabled, trackHeightPx) {
+                detectTapGestures { position -> updateFromY(position.y) }
+            }
+            .pointerInput(enabled, trackHeightPx) {
+                detectDragGestures(
+                    onDragStart = { position -> updateFromY(position.y) },
+                    onDrag = { change, _ ->
+                        updateFromY(change.position.y)
+                        change.consume()
+                    }
+                )
+            }
+    ) {
+        trackHeightPx = size.height
+        val centerX = size.width / 2f
+        val top = 8.dp.toPx()
+        val bottom = size.height - 8.dp.toPx()
+        val fraction = ((value + 1200f) / 2400f).coerceIn(0f, 1f)
+        val thumbY = bottom - fraction * (bottom - top)
+        val railWidth = 5.dp.toPx()
+
+        drawLine(inactiveColor, Offset(centerX, top), Offset(centerX, bottom), railWidth, cap = StrokeCap.Round)
+        drawLine(
+            if (enabled) activeColor else inactiveColor,
+            Offset(centerX, thumbY),
+            Offset(centerX, bottom),
+            railWidth,
+            cap = StrokeCap.Round
+        )
+        drawCircle(Color(0xFF17251A), 12.dp.toPx(), Offset(centerX, thumbY))
+        drawCircle(if (enabled) activeColor else Color(0xFF657064), 9.dp.toPx(), Offset(centerX, thumbY))
+    }
+}
+
 // TAB 2: AUDIO EFFECTS CONTENT
 // ==========================================
 @Composable
