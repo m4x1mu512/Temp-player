@@ -146,7 +146,7 @@ fun EqualizerDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 // Header: Title & Master Power Toggle
                 Row(
@@ -200,7 +200,7 @@ fun EqualizerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Primary Tabs: Эквалайзер, Аудиоэффекты, Скорость и тон
                 PrimaryTabRow(
@@ -256,13 +256,13 @@ fun EqualizerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Scrollable Content per Tab
+                // Keep the complete equalizer tab visible; secondary tabs remain scrollable.
                 Box(
                     modifier = Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
+                        .weight(1f)
+                        .then(if (selectedTabIndex == 0) Modifier else Modifier.verticalScroll(rememberScrollState()))
                 ) {
                     when (selectedTabIndex) {
                         0 -> EqualizerTabContent(
@@ -304,20 +304,50 @@ fun EqualizerDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Dialog Bottom Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onDismiss,
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.testTag("equalizer_close_button")
+                // Fixed bottom actions, matching the reference layout.
+                if (selectedTabIndex == 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Готово", fontWeight = FontWeight.SemiBold)
+                        OutlinedButton(
+                            onClick = { viewModel?.resetEqualizer() },
+                            enabled = isEnabled,
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier.weight(1f).height(52.dp)
+                        ) {
+                            Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Сбросить всё", maxLines = 1, fontSize = 13.sp)
+                        }
+                        Button(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        ) {
+                            Text("✓", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Применить", maxLines = 1, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Button(
+                            onClick = onDismiss,
+                            shape = RoundedCornerShape(18.dp),
+                            modifier = Modifier.testTag("equalizer_close_button")
+                        ) {
+                            Text("Готово", fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
@@ -340,177 +370,83 @@ private fun EqualizerTabContent(
     onPreampChanged: (Int) -> Unit,
     onReset: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // Presets Chips
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
         Text(
             text = "Пресеты",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.height(6.dp))
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
         ) {
             EqualizerPreset.entries.forEach { preset ->
                 FilterChip(
                     selected = currentPreset == preset,
                     onClick = { onPresetSelected(preset) },
-                    label = { Text(preset.displayName, style = MaterialTheme.typography.bodySmall) },
+                    label = { Text(preset.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 1) },
                     enabled = isEnabled,
                     modifier = Modifier.testTag("preset_${preset.name.lowercase()}"),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                     ),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(18.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Visual Frequency Response Curve
         if (bands.isNotEmpty()) {
-            Text(
-                text = "Амплитудно-частотная характеристика (АЧХ)",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            FrequencyResponseCurveView(
-                bands = bands,
-                isEnabled = isEnabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(90.dp)
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-        }
-
-        // Headroom / Preamp protection slider
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "Предусиление (Preamp Headroom)",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Защита от перегрузки при усилении частот",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
-                        )
-                    }
-                    val preampDb = eqPreamp / 100f
-                    val preampFormatted = if (preampDb > 0) "+%.1f дБ".format(preampDb) else "%.1f дБ".format(preampDb)
-                    Text(
-                        text = preampFormatted,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Slider(
-                    value = eqPreamp.toFloat(),
-                    onValueChange = {
-                        val quantized = ((it / 50f).roundToInt() * 50).coerceIn(-1200, 600)
-                        onPreampChanged(quantized)
-                    },
-                    valueRange = -1200f..600f,
-                    enabled = isEnabled,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Frequency Bands Header with Reset Button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Полосы частот",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            TextButton(
-                onClick = onReset,
-                enabled = isEnabled,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Icon(
-                    Icons.Default.RestartAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Сбросить в 0 дБ", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        if (bands.isEmpty()) {
-            Text(
-                text = "Эквалайзер недоступен на данном устройстве",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
-        } else {
             Card(
-                shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "Полосы частот",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Проведите для настройки",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Text("АЧХ", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("Уровень, дБ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    FrequencyResponseCurveView(
+                        bands = bands,
+                        isEnabled = isEnabled,
+                        modifier = Modifier.fillMaxWidth().height(78.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        listOf("НЧ", "СЧ", "ВЧ").forEach {
+                            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text("Частота", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            Card(
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Полосы частот", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("−12 … +12 дБ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -530,9 +466,7 @@ private fun EqualizerTabContent(
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Box(
-                                    modifier = Modifier
-                                        .width(48.dp)
-                                        .height(174.dp),
+                                    modifier = Modifier.width(42.dp).height(112.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Slider(
@@ -552,8 +486,8 @@ private fun EqualizerTabContent(
                                             inactiveTickColor = Color.Transparent
                                         ),
                                         modifier = Modifier
-                                            .requiredWidth(174.dp)
-                                            .requiredHeight(44.dp)
+                                            .requiredWidth(112.dp)
+                                            .requiredHeight(38.dp)
                                             .graphicsLayer { rotationZ = -90f }
                                             .testTag("band_slider_${band.bandIndex}")
                                     )
@@ -563,19 +497,63 @@ private fun EqualizerTabContent(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     textAlign = TextAlign.Center,
-                                    minLines = 1
+                                    maxLines = 1
                                 )
                                 Text(
                                     text = dbText,
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
                 }
+            }
+        } else {
+            Text(
+                text = "Эквалайзер недоступен на данном устройстве",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Предусиление", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text("Общий уровень громкости", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    val preampDb = eqPreamp / 100f
+                    val preampFormatted = if (preampDb > 0) "+%.1f дБ".format(preampDb) else "%.1f дБ".format(preampDb)
+                    Text(preampFormatted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                Slider(
+                    value = eqPreamp.toFloat(),
+                    onValueChange = {
+                        val quantized = ((it / 50f).roundToInt() * 50).coerceIn(-1200, 600)
+                        onPreampChanged(quantized)
+                    },
+                    valueRange = -1200f..600f,
+                    enabled = isEnabled,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = Color(0xFF26362A)
+                    ),
+                    modifier = Modifier.fillMaxWidth().height(30.dp)
+                )
             }
         }
     }
