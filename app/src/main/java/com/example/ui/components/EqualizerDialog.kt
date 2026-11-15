@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -205,58 +206,51 @@ fun EqualizerDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Primary Tabs: Эквалайзер, Аудиоэффекты, Скорость и тон
-                PrimaryTabRow(
-                    selectedTabIndex = selectedTabIndex,
-                    containerColor = Color.Transparent,
-                    divider = {},
-                    modifier = Modifier.fillMaxWidth()
+                // Rounded segmented tabs matching the dark lime reference design.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(glassCard)
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Tab(
-                        selected = selectedTabIndex == 0,
-                        onClick = { selectedTabIndex = 0 },
-                        text = {
+                    val tabItems = listOf(
+                        Triple("Эквалайзер", Icons.Default.Tune, 0),
+                        Triple("Эффекты", Icons.Default.Waves, 1),
+                        Triple("Скорость", Icons.Default.Speed, 2)
+                    )
+                    tabItems.forEach { (label, icon, index) ->
+                        val selected = selectedTabIndex == index
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (selected) glassLime else Color.Transparent)
+                                .clickable { selectedTabIndex = index }
+                                .padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = if (selected) Color(0xFF17210B) else glassMuted,
+                                modifier = Modifier.size(17.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Эквалайзер",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontSize = 12.sp,
+                                text = label,
+                                color = if (selected) Color(0xFF17210B) else glassText,
+                                fontSize = 11.sp,
                                 maxLines = 1,
                                 softWrap = false,
-                                fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                             )
-                        },
-                        icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(20.dp)) }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 1,
-                        onClick = { selectedTabIndex = 1 },
-                        text = {
-                            Text(
-                                text = "Эффекты",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                                fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        icon = { Icon(Icons.Default.Waves, contentDescription = null, modifier = Modifier.size(20.dp)) }
-                    )
-                    Tab(
-                        selected = selectedTabIndex == 2,
-                        onClick = { selectedTabIndex = 2 },
-                        text = {
-                            Text(
-                                text = "Скорость",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                                fontWeight = if (selectedTabIndex == 2) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        icon = { Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(20.dp)) }
-                    )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
