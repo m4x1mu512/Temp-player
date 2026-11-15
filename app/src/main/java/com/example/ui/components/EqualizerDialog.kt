@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -62,6 +64,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -111,6 +114,23 @@ fun EqualizerDialog(
     val playbackSpeed = viewModel?.playbackSpeed?.collectAsStateWithLifecycle()?.value ?: 1.0f
     val playbackPitch = viewModel?.playbackPitch?.collectAsStateWithLifecycle()?.value ?: 1.0f
 
+    val glassBackground = Color(0xFF07110A)
+    val glassCard = Color(0xFF111F16)
+    val glassLime = Color(0xFFC8FF55)
+    val glassText = Color(0xFFEAF2E6)
+    val glassMuted = Color(0xFFA5B2A2)
+
+    MaterialTheme(
+        colorScheme = MaterialTheme.colorScheme.copy(
+            primary = glassLime,
+            onPrimary = Color(0xFF17210B),
+            surface = glassBackground,
+            onSurface = glassText,
+            surfaceVariant = glassCard,
+            onSurfaceVariant = glassMuted,
+            outlineVariant = Color(0xFF354638)
+        )
+    ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -303,6 +323,7 @@ fun EqualizerDialog(
             }
         }
     }
+    }
 }
 
 // ==========================================
@@ -463,67 +484,96 @@ private fun EqualizerTabContent(
                 modifier = Modifier.padding(vertical = 12.dp)
             )
         } else {
-            bands.forEach { band ->
-                val freqText = if (band.centerFreqHz >= 1000) {
-                    "${band.centerFreqHz / 1000} кГц"
-                } else {
-                    "${band.centerFreqHz} Гц"
-                }
-
-                val dbValue = band.levelMilliBels.toFloat() / 100f
-                val dbText = if (dbValue > 0) "+%.1f дБ".format(dbValue) else "%.1f дБ".format(dbValue)
-
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 10.dp)
+            Card(
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Frequency label
-                            Text(
-                                text = freqText,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-
-                            // Current dB value
-                            Text(
-                                text = dbText,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        // Full-width extended slider for maximum finger control
-                        Slider(
-                            value = band.levelMilliBels.toFloat(),
-                            onValueChange = { newMilliBels ->
-                                val quantized = ((newMilliBels / 25f).roundToInt() * 25).coerceIn(-1200, 1200).toShort()
-                                onBandLevelChanged(band.bandIndex, quantized)
-                            },
-                            valueRange = -1200f..1200f,
-                            enabled = isEnabled,
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("band_slider_${band.bandIndex}")
+                        Text(
+                            "Полосы частот",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
                         )
+                        Text(
+                            "Проведите для настройки",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        bands.forEach { band ->
+                            val freqText = if (band.centerFreqHz >= 1000) {
+                                "${band.centerFreqHz / 1000} кГц"
+                            } else {
+                                "${band.centerFreqHz} Гц"
+                            }
+                            val dbValue = band.levelMilliBels.toFloat() / 100f
+                            val dbText = if (dbValue > 0) "+%.1f".format(dbValue) else "%.1f".format(dbValue)
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(48.dp)
+                                        .height(174.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Slider(
+                                        value = band.levelMilliBels.toFloat(),
+                                        onValueChange = { newMilliBels ->
+                                            val quantized = ((newMilliBels / 25f).roundToInt() * 25)
+                                                .coerceIn(-1200, 1200).toShort()
+                                            onBandLevelChanged(band.bandIndex, quantized)
+                                        },
+                                        valueRange = -1200f..1200f,
+                                        enabled = isEnabled,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = MaterialTheme.colorScheme.primary,
+                                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                                            inactiveTrackColor = Color(0xFF26362A),
+                                            activeTickColor = Color.Transparent,
+                                            inactiveTickColor = Color.Transparent
+                                        ),
+                                        modifier = Modifier
+                                            .requiredWidth(174.dp)
+                                            .requiredHeight(44.dp)
+                                            .graphicsLayer { rotationZ = -90f }
+                                            .testTag("band_slider_${band.bandIndex}")
+                                    )
+                                }
+                                Text(
+                                    text = freqText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center,
+                                    minLines = 1
+                                )
+                                Text(
+                                    text = dbText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (band.levelMilliBels != 0.toShort()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
                     }
                 }
             }
