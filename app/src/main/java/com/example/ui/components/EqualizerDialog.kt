@@ -204,7 +204,7 @@ fun EqualizerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(if (compact) 2.dp else 6.dp))
 
                 // Rounded segmented tabs matching the dark lime reference design.
                 Row(
@@ -259,7 +259,7 @@ fun EqualizerDialog(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .then(if (selectedTabIndex == 0) Modifier else Modifier.verticalScroll(rememberScrollState()))
+                        .then(if (selectedTabIndex == 0 || selectedTabIndex == 1) Modifier else Modifier.verticalScroll(rememberScrollState()))
                 ) {
                     when (selectedTabIndex) {
                         0 -> EqualizerTabContent(
@@ -304,13 +304,16 @@ fun EqualizerDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Fixed bottom actions, matching the reference layout.
-                if (selectedTabIndex == 0) {
+                if (selectedTabIndex == 0 || selectedTabIndex == 1) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
-                            onClick = { viewModel?.resetEqualizer() },
+                            onClick = {
+                                if (selectedTabIndex == 0) viewModel?.resetEqualizer()
+                                else viewModel?.resetAudioEffects()
+                            },
                             enabled = isEnabled,
                             shape = RoundedCornerShape(18.dp),
                             modifier = Modifier.weight(1f).height(52.dp)
@@ -631,30 +634,16 @@ private fun AudioEffectsTabContent(
     onResetEffects: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Reset Header Button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Пространственные и звуковые эффекты",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold
-            )
-            TextButton(
-                onClick = onResetEffects,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-            ) {
-                Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Сбросить всё", style = MaterialTheme.typography.labelSmall)
-            }
-        }
+        Text(
+            text = "Пространственные и звуковые эффекты",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
 
         // 1. Bass Boost Card
         AudioEffectCard(
@@ -666,7 +655,8 @@ private fun AudioEffectsTabContent(
             sliderValue = (bassBoostStrength / 10f).roundToInt(),
             sliderValueText = "${(bassBoostStrength / 10f).roundToInt()}%",
             onSliderChange = { onBassBoostStrengthChanged((it * 10).roundToInt()) },
-            valueRange = 0f..100f
+            valueRange = 0f..100f,
+            compact = true
         )
 
         // 2. Virtualizer Card
@@ -679,7 +669,8 @@ private fun AudioEffectsTabContent(
             sliderValue = (virtualizerStrength / 10f).roundToInt(),
             sliderValueText = "${(virtualizerStrength / 10f).roundToInt()}%",
             onSliderChange = { onVirtualizerStrengthChanged((it * 10).roundToInt()) },
-            valueRange = 0f..100f
+            valueRange = 0f..100f,
+            compact = true
         )
 
         // 3. Preset Reverb Card
@@ -688,7 +679,7 @@ private fun AudioEffectsTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(10.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -727,7 +718,7 @@ private fun AudioEffectsTabContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Row(
                     modifier = Modifier
@@ -768,7 +759,8 @@ private fun AudioEffectsTabContent(
             sliderValue = loudnessGain,
             sliderValueText = "+%.1f дБ".format(loudnessDb),
             onSliderChange = { onLoudnessGainChanged(((it / 25f).roundToInt() * 25).coerceIn(0, 800)) },
-            valueRange = 0f..800f
+            valueRange = 0f..800f,
+            compact = true
         )
     }
 }
@@ -815,7 +807,7 @@ private fun PlaybackSpeedPitchTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(if (compact) 9.dp else 14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -932,7 +924,8 @@ private fun AudioEffectCard(
     sliderValue: Int,
     sliderValueText: String,
     onSliderChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>
+    valueRange: ClosedFloatingPointRange<Float>,
+    compact: Boolean = false
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -990,7 +983,7 @@ private fun AudioEffectCard(
                         activeTrackColor = MaterialTheme.colorScheme.primary,
                         inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).then(if (compact) Modifier.height(28.dp) else Modifier)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
