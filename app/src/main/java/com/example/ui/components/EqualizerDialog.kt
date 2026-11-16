@@ -204,7 +204,7 @@ fun EqualizerDialog(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(if (compact) 2.dp else 6.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Rounded segmented tabs matching the dark lime reference design.
                 Row(
