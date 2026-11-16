@@ -314,7 +314,7 @@ fun EqualizerDialog(
                                 if (selectedTabIndex == 0) viewModel?.resetEqualizer()
                                 else viewModel?.resetAudioEffects()
                             },
-                            enabled = isEnabled,
+                            enabled = selectedTabIndex == 1 || isEnabled,
                             shape = RoundedCornerShape(18.dp),
                             modifier = Modifier.weight(1f).height(52.dp)
                         ) {
@@ -807,7 +807,7 @@ private fun PlaybackSpeedPitchTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(if (compact) 9.dp else 14.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -932,7 +932,7 @@ private fun AudioEffectCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(modifier = Modifier.padding(if (compact) 9.dp else 14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
