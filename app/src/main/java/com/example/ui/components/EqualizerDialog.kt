@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
@@ -527,7 +528,7 @@ private fun EqualizerTabContent(
         Card(
             shape = RoundedCornerShape(18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().offset(y = (-8).dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
                 Row(
