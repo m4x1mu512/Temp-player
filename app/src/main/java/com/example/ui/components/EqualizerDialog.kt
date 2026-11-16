@@ -543,7 +543,7 @@ private fun EqualizerTabContent(
                     val preampFormatted = if (preampDb > 0) "+%.1f дБ".format(preampDb) else "%.1f дБ".format(preampDb)
                     Text(preampFormatted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
-                Slider(
+                DotSlider(
                     value = eqPreamp.toFloat(),
                     onValueChange = {
                         val quantized = ((it / 50f).roundToInt() * 50).coerceIn(-1200, 600)
@@ -551,11 +551,6 @@ private fun EqualizerTabContent(
                     },
                     valueRange = -1200f..600f,
                     enabled = isEnabled,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = Color(0xFF26362A)
-                    ),
                     modifier = Modifier.fillMaxWidth().height(30.dp)
                 )
             }
@@ -824,14 +819,10 @@ private fun PlaybackSpeedPitchTabContent(
                     Text("%.2fx".format(speed), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
-                Slider(
+                DotSlider(
                     value = speed,
                     onValueChange = onSpeedChanged,
                     valueRange = 0.5f..2.0f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -878,14 +869,10 @@ private fun PlaybackSpeedPitchTabContent(
                     Text("%.2fx".format(pitch), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
-                Slider(
+                DotSlider(
                     value = pitch,
                     onValueChange = onPitchChanged,
                     valueRange = 0.5f..2.0f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -912,6 +899,40 @@ private fun PlaybackSpeedPitchTabContent(
             }
         }
     }
+}
+
+@Composable
+private fun DotSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) {
+    val active = MaterialTheme.colorScheme.primary
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        valueRange = valueRange,
+        enabled = enabled,
+        modifier = modifier,
+        colors = SliderDefaults.colors(
+            thumbColor = active,
+            activeTrackColor = active,
+            inactiveTrackColor = Color(0xFF26362A),
+            disabledThumbColor = Color(0xFF657064),
+            disabledActiveTrackColor = Color(0xFF657064)
+        ),
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .background(Color(0xFF17251A), CircleShape)
+                    .padding(3.dp)
+                    .background(if (enabled) active else Color(0xFF657064), CircleShape)
+            )
+        }
+    )
 }
 
 // ==========================================
@@ -976,16 +997,11 @@ private fun AudioEffectCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Slider(
+                DotSlider(
                     value = sliderValue.toFloat(),
                     onValueChange = onSliderChange,
                     valueRange = valueRange,
                     enabled = isEnabled,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    ),
                     modifier = Modifier.weight(1f).then(if (compact) Modifier.height(28.dp) else Modifier)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
