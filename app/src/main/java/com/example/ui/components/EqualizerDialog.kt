@@ -304,17 +304,20 @@ fun EqualizerDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Fixed bottom actions, matching the reference layout.
-                if (selectedTabIndex == 0 || selectedTabIndex == 1) {
+                if (selectedTabIndex == 0 || selectedTabIndex == 1 || selectedTabIndex == 2) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         OutlinedButton(
                             onClick = {
-                                if (selectedTabIndex == 0) viewModel?.resetEqualizer()
-                                else viewModel?.resetAudioEffects()
+                                when (selectedTabIndex) {
+                                    0 -> viewModel?.resetEqualizer()
+                                    1 -> viewModel?.resetAudioEffects()
+                                    2 -> viewModel?.resetPlaybackSpeedAndPitch()
+                                }
                             },
-                            enabled = selectedTabIndex == 1 || isEnabled,
+                            enabled = selectedTabIndex != 0 || isEnabled,
                             shape = RoundedCornerShape(18.dp),
                             modifier = Modifier.weight(1f).height(52.dp)
                         ) {
