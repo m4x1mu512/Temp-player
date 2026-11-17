@@ -429,22 +429,15 @@ fun LibraryScreen(
                         shape = glassShape
                     )
                     .statusBarsPadding()
-                    .padding(top = 9.dp, bottom = 12.dp)
+                    .padding(top = 4.dp, bottom = 6.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 12.dp, bottom = 9.dp),
+                        .padding(start = 20.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "ВАША МУЗЫКА",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.8.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                         Text(
                             text = when (pagerState.currentPage) {
                                 0 -> "Сейчас в очереди"
@@ -454,7 +447,7 @@ fun LibraryScreen(
                                 4 -> "Исполнители"
                                 else -> "Поиск"
                             },
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -463,14 +456,14 @@ fun LibraryScreen(
                         IconButton(
                             onClick = { moreMenuExpanded = true },
                             modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(15.dp))
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
                                 .testTag("nav_more_button")
                         ) {
                             if (isScanning) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
+                                    modifier = Modifier.size(17.dp),
                                     strokeWidth = 2.dp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -478,7 +471,8 @@ fun LibraryScreen(
                                 Icon(
                                     imageVector = Icons.Default.MoreVert,
                                     contentDescription = "Меню",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(19.dp)
                                 )
                             }
                         }
