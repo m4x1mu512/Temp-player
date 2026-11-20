@@ -2204,7 +2204,7 @@ private fun SheetProgressSection(
                 ),
                 color = Color.Black,
                 maxLines = 1,
-                modifier = Modifier.width((formattedDuration.length * 7).dp)
+                modifier = Modifier.width(49.dp)
             )
             GlowProgressSlider(
                 value = sliderVal,
@@ -2237,7 +2237,7 @@ private fun SheetProgressSection(
                 ),
                 color = Color.Black,
                 maxLines = 1,
-                modifier = Modifier.width((formattedDuration.length * 7).dp)
+                modifier = Modifier.width(49.dp)
             )
         }
     }
