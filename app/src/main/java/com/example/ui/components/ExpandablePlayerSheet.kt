@@ -2190,7 +2190,7 @@ private fun SheetProgressSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -2204,7 +2204,7 @@ private fun SheetProgressSection(
                 ),
                 color = Color.Black,
                 maxLines = 1,
-                modifier = Modifier.width(49.dp)
+                modifier = Modifier.width(42.dp)
             )
             GlowProgressSlider(
                 value = sliderVal,
@@ -2237,7 +2237,7 @@ private fun SheetProgressSection(
                 ),
                 color = Color.Black,
                 maxLines = 1,
-                modifier = Modifier.width(49.dp)
+                modifier = Modifier.width(42.dp)
             )
         }
     }
