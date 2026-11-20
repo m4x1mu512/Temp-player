@@ -1968,12 +1968,14 @@ private fun LiquidGlassExpandedPlayer(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = if (compact) 6.dp else 10.dp)
+                        .padding(horizontal = 8.dp, vertical = if (compact) 6.dp else 10.dp)
                         .offset(y = (-28).dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                 Column(
-                    modifier = Modifier.offset(y = if (compact) 8.dp else 12.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 10.dp)
+                        .offset(y = if (compact) 8.dp else 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -2021,7 +2023,7 @@ private fun LiquidGlassExpandedPlayer(
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                     horizontalArrangement = Arrangement.SpaceAround,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2043,7 +2045,7 @@ private fun LiquidGlassExpandedPlayer(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -2236,6 +2238,7 @@ private fun SheetProgressSection(
                     )
                 ),
                 color = Color.Black,
+                textAlign = TextAlign.End,
                 maxLines = 1,
                 modifier = Modifier.width(42.dp)
             )
