@@ -991,7 +991,11 @@ fun LibraryScreen(
                                             modifier = Modifier
                                                 .fillMaxSize()
                                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                                            contentAlignment = Alignment.Center
+                                            contentAlignment = if (searchQuery.isBlank()) {
+                                                Alignment.TopCenter
+                                            } else {
+                                                Alignment.Center
+                                            }
                                         ) {
                                             Column(
                                                 modifier = Modifier
