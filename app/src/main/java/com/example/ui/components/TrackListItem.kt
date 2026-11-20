@@ -81,10 +81,10 @@ fun TrackListItem(
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // Track rows can recompose when playback/favorite state changes. Keep the
-    // formatted subtitle stable unless its actual source fields change.
-    val trackSubtitle = remember(track.artist, track.duration) {
-        "${track.artist} • ${track.formattedDuration()}"
+    // Keep duration separate from the artist so long artist names cannot
+    // truncate the track length.
+    val formattedDuration = remember(track.duration) {
+        track.formattedDuration()
     }
 
     val targetBgColor = when {
@@ -198,13 +198,24 @@ fun TrackListItem(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = trackSubtitle,
+                text = track.artist,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Text(
+            text = formattedDuration,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.width(6.dp))
 
         // Action buttons grouped closely together near the right edge
         Row(
