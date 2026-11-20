@@ -557,6 +557,8 @@ private fun VerticalBandSlider(
 ) {
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.outlineVariant
+    val thumbBaseColor = MaterialTheme.colorScheme.surfaceVariant
+    val disabledColor = MaterialTheme.colorScheme.onSurfaceVariant
     fun updateFromY(y: Float, height: Float) {
         if (!enabled || height <= 0f) return
         val fraction = (1f - (y / height)).coerceIn(0f, 1f)
@@ -593,8 +595,8 @@ private fun VerticalBandSlider(
             railWidth,
             cap = StrokeCap.Round
         )
-        drawCircle(MaterialTheme.colorScheme.surfaceVariant, 12.dp.toPx(), Offset(centerX, thumbY))
-        drawCircle(if (enabled) activeColor else MaterialTheme.colorScheme.onSurfaceVariant, 9.dp.toPx(), Offset(centerX, thumbY))
+        drawCircle(thumbBaseColor, 12.dp.toPx(), Offset(centerX, thumbY))
+        drawCircle(if (enabled) activeColor else disabledColor, 9.dp.toPx(), Offset(centerX, thumbY))
     }
 }
 
