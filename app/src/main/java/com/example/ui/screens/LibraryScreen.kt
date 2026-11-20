@@ -457,8 +457,6 @@ fun LibraryScreen(
                             onClick = { moreMenuExpanded = true },
                             modifier = Modifier
                                 .size(36.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
                                 .testTag("nav_more_button")
                         ) {
                             if (isScanning) {
