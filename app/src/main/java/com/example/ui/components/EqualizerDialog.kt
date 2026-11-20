@@ -203,7 +203,7 @@ fun EqualizerDialog(
                         .clip(RoundedCornerShape(18.dp))
                         .background(glassCard)
                         .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val tabItems = listOf(
@@ -217,8 +217,11 @@ fun EqualizerDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(42.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (selected) glassLime else Color.Transparent)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
                                 .clickable { selectedTabIndex = index }
                                 .padding(horizontal = 4.dp),
                             horizontalArrangement = Arrangement.Center,
