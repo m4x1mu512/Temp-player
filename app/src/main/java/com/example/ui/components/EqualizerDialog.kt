@@ -806,7 +806,7 @@ private fun PlaybackSpeedPitchTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -856,7 +856,7 @@ private fun PlaybackSpeedPitchTabContent(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -927,10 +927,11 @@ private fun DotSlider(
         thumb = {
             Box(
                 modifier = Modifier
-                    .size(18.dp)
-                    .background(Color(0xFF17251A), CircleShape)
-                    .padding(3.dp)
-                    .background(if (enabled) active else Color(0xFF657064), CircleShape)
+                    .size(width = 12.dp, height = 18.dp)
+                    .background(
+                        color = if (enabled) active else Color(0xFF657064),
+                        shape = RoundedCornerShape(3.dp)
+                    )
             )
         }
     )
@@ -957,7 +958,7 @@ private fun AudioEffectCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(if (compact) 9.dp else 14.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -994,27 +995,21 @@ private fun AudioEffectCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            Row(
+            Text(
+                text = sliderValueText,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                DotSlider(
-                    value = sliderValue.toFloat(),
-                    onValueChange = onSliderChange,
-                    valueRange = valueRange,
-                    enabled = isEnabled,
-                    modifier = Modifier.weight(1f).then(if (compact) Modifier.height(28.dp) else Modifier)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = sliderValueText,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(52.dp),
-                    textAlign = TextAlign.End
-                )
-            }
+                textAlign = TextAlign.End
+            )
+            DotSlider(
+                value = sliderValue.toFloat(),
+                onValueChange = onSliderChange,
+                valueRange = valueRange,
+                enabled = isEnabled,
+                modifier = Modifier.fillMaxWidth().height(30.dp)
+            )
         }
     }
 }
