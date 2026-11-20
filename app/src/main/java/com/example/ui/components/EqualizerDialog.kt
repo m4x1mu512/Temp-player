@@ -119,30 +119,19 @@ fun EqualizerDialog(
     val playbackSpeed = viewModel?.playbackSpeed?.collectAsStateWithLifecycle()?.value ?: 1.0f
     val playbackPitch = viewModel?.playbackPitch?.collectAsStateWithLifecycle()?.value ?: 1.0f
 
-    val glassBackground = Color(0xFF07110A)
-    val glassCard = Color(0xFF111F16)
-    val glassLime = Color(0xFFC8FF55)
-    val glassText = Color(0xFFEAF2E6)
-    val glassMuted = Color(0xFFA5B2A2)
+    // Use the app's selected theme and background accent palette.
+    val glassCard = MaterialTheme.colorScheme.surfaceVariant
+    val glassLime = MaterialTheme.colorScheme.primary
+    val glassText = MaterialTheme.colorScheme.onSurface
+    val glassMuted = MaterialTheme.colorScheme.onSurfaceVariant
 
-    MaterialTheme(
-        colorScheme = MaterialTheme.colorScheme.copy(
-            primary = glassLime,
-            onPrimary = Color(0xFF17210B),
-            surface = glassBackground,
-            onSurface = glassText,
-            surfaceVariant = glassCard,
-            onSurfaceVariant = glassMuted,
-            outlineVariant = Color(0xFF354638)
-        )
-    ) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
             shape = androidx.compose.ui.graphics.RectangleShape,
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             modifier = Modifier
                 .fillMaxSize()
@@ -238,13 +227,13 @@ fun EqualizerDialog(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = if (selected) Color(0xFF17210B) else glassMuted,
+                                tint = if (selected) MaterialTheme.colorScheme.onPrimary else glassMuted,
                                 modifier = Modifier.size(17.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = label,
-                                color = if (selected) Color(0xFF17210B) else glassText,
+                                color = if (selected) MaterialTheme.colorScheme.onPrimary else glassText,
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 softWrap = false,
@@ -356,7 +345,6 @@ fun EqualizerDialog(
                 }
             }
         }
-    }
     }
 }
 
@@ -568,7 +556,7 @@ private fun VerticalBandSlider(
     modifier: Modifier = Modifier
 ) {
     val activeColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = Color(0xFF26362A)
+    val inactiveColor = MaterialTheme.colorScheme.outlineVariant
     fun updateFromY(y: Float, height: Float) {
         if (!enabled || height <= 0f) return
         val fraction = (1f - (y / height)).coerceIn(0f, 1f)
@@ -605,8 +593,8 @@ private fun VerticalBandSlider(
             railWidth,
             cap = StrokeCap.Round
         )
-        drawCircle(Color(0xFF17251A), 12.dp.toPx(), Offset(centerX, thumbY))
-        drawCircle(if (enabled) activeColor else Color(0xFF657064), 9.dp.toPx(), Offset(centerX, thumbY))
+        drawCircle(MaterialTheme.colorScheme.surfaceVariant, 12.dp.toPx(), Offset(centerX, thumbY))
+        drawCircle(if (enabled) activeColor else MaterialTheme.colorScheme.onSurfaceVariant, 9.dp.toPx(), Offset(centerX, thumbY))
     }
 }
 
@@ -920,16 +908,16 @@ private fun DotSlider(
         colors = SliderDefaults.colors(
             thumbColor = active,
             activeTrackColor = active,
-            inactiveTrackColor = Color(0xFF26362A),
-            disabledThumbColor = Color(0xFF657064),
-            disabledActiveTrackColor = Color(0xFF657064)
+            inactiveTrackColor = MaterialTheme.colorScheme.outlineVariant,
+            disabledThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledActiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         thumb = {
             Box(
                 modifier = Modifier
                     .size(width = 12.dp, height = 18.dp)
                     .background(
-                        color = if (enabled) active else Color(0xFF657064),
+                        color = if (enabled) active else MaterialTheme.colorScheme.onSurfaceVariant,
                         shape = RoundedCornerShape(3.dp)
                     )
             )
