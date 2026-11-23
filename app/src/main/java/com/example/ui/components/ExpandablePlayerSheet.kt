@@ -2065,9 +2065,11 @@ private fun LiquidGlassExpandedPlayer(
                     Box(
                         modifier = Modifier
                             .size(72.dp)
-                            .shadow(10.dp, CircleShape)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.16f))
+                            .graphicsLayer {
+                                shape = CircleShape
+                                clip = true
+                            }
+                            .background(Color.White.copy(alpha = 0.16f), CircleShape)
                             .border(
                                 BorderStroke(1.5.dp, Color.White.copy(alpha = 0.38f)),
                                 CircleShape
