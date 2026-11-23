@@ -275,36 +275,56 @@ private fun SpectrumVisualizer(
     colorEnd: Color,
     modifier: Modifier
 ) {
+    // Keep the existing spectrum palette, but spread it horizontally like the reference.
     val barBrush = remember(colorStart, colorMiddle, colorEnd) {
-        Brush.verticalGradient(listOf(Color(0xFF8A32FF), colorEnd, colorStart, Color(0xFF28E8FF)))
-    }
-    val centerGlowBrush = remember(colorMiddle) {
-        Brush.horizontalGradient(listOf(Color.Transparent, NeonMagenta.copy(alpha = 0.7f), colorMiddle.copy(alpha = 0.9f), Color.Transparent))
+        Brush.horizontalGradient(listOf(Color(0xFF8A32FF), colorEnd, colorStart, Color(0xFF28E8FF)))
     }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
-        val mid = h * 0.52f
+        val mid = h * 0.50f
         val data = dataState.value
-        // Use fewer frequency columns and keep only a very small gap between them.
-        val count = (data.size / 2).coerceIn(16, 32)
+        val count = (data.size / 2).coerceIn(18, 28)
         val step = w / count
-        val centerWidth = (step * 0.92f).coerceAtLeast(0.8f)
-        // Continuous center glow keeps the entire frequency strip visually alive.
-        drawLine(centerGlowBrush, Offset(0f, mid), Offset(w, mid), strokeWidth = (h * 0.07f).coerceAtLeast(1f))
+        val barWidth = (step * 0.92f).coerceAtLeast(1f)
+        val blockCount = 10
+        val blockGap = (h * 0.009f).coerceAtLeast(1f)
+        val maxBarHeight = h * 0.46f
+        val blockHeight = ((maxBarHeight - blockGap * (blockCount - 1)) / blockCount).coerceAtLeast(1f)
+
         for (i in 0 until count) {
-            val dataIndex = ((i + 0.5f) * data.size / count).toInt().coerceIn(0, (data.size - 1).coerceAtLeast(0))
+            val dataIndex = ((i + 0.5f) * data.size / count).toInt()
+                .coerceIn(0, (data.size - 1).coerceAtLeast(0))
             val raw = if (isPlaying && data.isNotEmpty()) data[dataIndex].coerceIn(0f, 1f) else 0.035f
             val floor = if (isPlaying) 0.16f else 0.035f
             val value = (floor + raw * 0.84f).coerceIn(floor, 1f)
-            val barH = (h * 0.48f * value).coerceAtLeast(1.5f)
-            val x = (i + 0.5f) * step
-            drawLine(colorMiddle.copy(alpha = if (isPlaying) 0.16f else 0.05f), Offset(x, mid - barH), Offset(x, mid + barH), strokeWidth = (centerWidth * 1.8f).coerceAtLeast(1.5f), cap = StrokeCap.Round)
-            drawLine(brush = barBrush, start = Offset(x, mid - barH), end = Offset(x, mid + barH), strokeWidth = centerWidth, cap = StrokeCap.Round, alpha = if (isPlaying) 0.95f else 0.3f)
-            if (isPlaying && value > 0.32f) {
-                drawCircle(color = Color.White.copy(alpha = 0.65f), radius = (centerWidth * 0.45f).coerceAtLeast(0.6f), center = Offset(x, mid - barH))
-                drawCircle(color = colorStart.copy(alpha = 0.6f), radius = (centerWidth * 0.35f).coerceAtLeast(0.5f), center = Offset(x, mid + barH))
+            val litBlocks = (value * blockCount).toInt().coerceIn(1, blockCount)
+            val x = i * step + (step - barWidth) * 0.5f
+
+            for (block in 0 until blockCount) {
+                val y = mid - (block + 1) * (blockHeight + blockGap)
+                val isLit = block < litBlocks
+                if (isLit) {
+                    drawRect(
+                        brush = barBrush,
+                        topLeft = Offset(x, y),
+                        size = Size(barWidth, blockHeight),
+                        alpha = if (isPlaying) 0.96f else 0.3f
+                    )
+
+                    // Mirrored rectangular segments fade progressively below the baseline.
+                    if (block < 8) {
+                        val reflectionY = mid + block * (blockHeight + blockGap)
+                        val reflectionAlpha = (0.24f * (1f - block / 9f)).coerceAtLeast(0.025f)
+                        drawRect(
+                            brush = barBrush,
+                            topLeft = Offset(x, reflectionY),
+                            size = Size(barWidth, blockHeight),
+                            alpha = reflectionAlpha * if (isPlaying) 1f else 0.3f
+                        )
+                    }
+                }
             }
         }
     }
