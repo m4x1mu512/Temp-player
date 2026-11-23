@@ -54,6 +54,7 @@ fun GlowProgressSlider(
     thumbRadius: Dp = 5.dp,
     glowRadius: Dp = 18.dp,
     glowAlpha: Float = 0.55f,
+    showThumb: Boolean = true,
     testTag: String = "player_progress_slider"
 ) {
     var isDragging by remember { mutableStateOf(false) }
@@ -218,29 +219,27 @@ fun GlowProgressSlider(
                 )
             }
 
-            // 4. Thumb Knob (Sleek circle with subtle elevation & inner core)
-            val currentThumbRadius = if (isDragging) thumbRadiusPx * 1.25f else thumbRadiusPx
+            // 4. Optional thumb. Liquid Glass uses a continuous glowing track
+            // without a visible knob, while other player layouts keep the standard thumb.
+            if (showThumb) {
+                val currentThumbRadius = if (isDragging) thumbRadiusPx * 1.25f else thumbRadiusPx
 
-            // Subtle drop shadow under thumb
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.30f),
-                radius = currentThumbRadius + 1.dp.toPx(),
-                center = Offset(thumbX, centerY + 0.5.dp.toPx())
-            )
-
-            // Main thumb body
-            drawCircle(
-                color = accentColor,
-                radius = currentThumbRadius,
-                center = Offset(thumbX, centerY)
-            )
-
-            // Crisp inner highlight
-            drawCircle(
-                color = Color.White.copy(alpha = 0.95f),
-                radius = currentThumbRadius * 0.38f,
-                center = Offset(thumbX, centerY)
-            )
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.30f),
+                    radius = currentThumbRadius + 1.dp.toPx(),
+                    center = Offset(thumbX, centerY + 0.5.dp.toPx())
+                )
+                drawCircle(
+                    color = accentColor,
+                    radius = currentThumbRadius,
+                    center = Offset(thumbX, centerY)
+                )
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.95f),
+                    radius = currentThumbRadius * 0.38f,
+                    center = Offset(thumbX, centerY)
+                )
+            }
         }
     }
 }
