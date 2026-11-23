@@ -208,14 +208,16 @@ fun TrackListItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Text(
-            text = formattedDuration,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-
-        Spacer(modifier = Modifier.width(6.dp))
+        // In the playback queue, duration occupies the former favorite-button slot.
+        if (onRemoveFromQueue == null) {
+            Text(
+                text = formattedDuration,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+        }
 
         // Action buttons grouped closely together near the right edge
         Row(
@@ -223,8 +225,16 @@ fun TrackListItem(
             horizontalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier.padding(end = 0.dp)
         ) {
-            // Favorite Button
-            val heartScale by animateFloatAsState(
+            if (onRemoveFromQueue != null) {
+                Text(
+                    text = formattedDuration,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            } else {
+                // Favorite Button
+                val heartScale by animateFloatAsState(
                 targetValue = if (isFavorite) 1.25f else 1.0f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -251,6 +261,7 @@ fun TrackListItem(
                             scaleY = heartScale
                         }
                 )
+                }
             }
 
             // More options dropdown
