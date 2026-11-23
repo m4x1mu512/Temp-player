@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DragHandle
@@ -208,61 +207,19 @@ fun TrackListItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // In the playback queue, duration occupies the former favorite-button slot.
-        if (onRemoveFromQueue == null) {
-            Text(
-                text = formattedDuration,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-        }
-
         // Action buttons grouped closely together near the right edge
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(0.dp),
             modifier = Modifier.padding(end = 0.dp)
         ) {
-            if (onRemoveFromQueue != null) {
-                Text(
-                    text = formattedDuration,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            } else {
-                // Favorite Button
-                val heartScale by animateFloatAsState(
-                targetValue = if (isFavorite) 1.25f else 1.0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
-                ),
-                label = "heartScale_${track.id}"
+            // Duration is shown in the same position in every track list.
+            Text(
+                text = formattedDuration,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .clickable { onToggleFavorite() }
-                    .testTag("favorite_button_${track.id}"),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
-                    tint = if (isFavorite) FavoriteRed else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .size(19.dp)
-                        .graphicsLayer {
-                            scaleX = heartScale
-                            scaleY = heartScale
-                        }
-                )
-                }
-            }
 
             // More options dropdown
             Box(contentAlignment = Alignment.Center) {
