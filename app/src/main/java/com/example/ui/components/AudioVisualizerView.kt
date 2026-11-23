@@ -287,18 +287,20 @@ private fun SpectrumVisualizer(
         if (w <= 0f || h <= 0f) return@Canvas
         val mid = h * 0.52f
         val data = dataState.value
-        val count = data.size.coerceIn(24, 64)
+        // Use fewer frequency columns and keep only a very small gap between them.
+        val count = (data.size / 2).coerceIn(16, 32)
         val step = w / count
-        val centerWidth = (step * 0.12f).coerceAtLeast(0.8f)
+        val centerWidth = (step * 0.92f).coerceAtLeast(0.8f)
         // Continuous center glow keeps the entire frequency strip visually alive.
         drawLine(centerGlowBrush, Offset(0f, mid), Offset(w, mid), strokeWidth = (h * 0.07f).coerceAtLeast(1f))
         for (i in 0 until count) {
-            val raw = if (isPlaying && i < data.size) data[i].coerceIn(0f, 1f) else 0.035f
+            val dataIndex = ((i + 0.5f) * data.size / count).toInt().coerceIn(0, (data.size - 1).coerceAtLeast(0))
+            val raw = if (isPlaying && data.isNotEmpty()) data[dataIndex].coerceIn(0f, 1f) else 0.035f
             val floor = if (isPlaying) 0.16f else 0.035f
             val value = (floor + raw * 0.84f).coerceIn(floor, 1f)
             val barH = (h * 0.48f * value).coerceAtLeast(1.5f)
             val x = (i + 0.5f) * step
-            drawLine(colorMiddle.copy(alpha = if (isPlaying) 0.16f else 0.05f), Offset(x, mid - barH), Offset(x, mid + barH), strokeWidth = (centerWidth * 3.4f).coerceAtLeast(1.5f), cap = StrokeCap.Round)
+            drawLine(colorMiddle.copy(alpha = if (isPlaying) 0.16f else 0.05f), Offset(x, mid - barH), Offset(x, mid + barH), strokeWidth = (centerWidth * 1.8f).coerceAtLeast(1.5f), cap = StrokeCap.Round)
             drawLine(brush = barBrush, start = Offset(x, mid - barH), end = Offset(x, mid + barH), strokeWidth = centerWidth, cap = StrokeCap.Round, alpha = if (isPlaying) 0.95f else 0.3f)
             if (isPlaying && value > 0.32f) {
                 drawCircle(color = Color.White.copy(alpha = 0.65f), radius = (centerWidth * 0.45f).coerceAtLeast(0.6f), center = Offset(x, mid - barH))
