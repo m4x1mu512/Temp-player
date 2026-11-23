@@ -29,11 +29,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -2063,41 +2065,41 @@ private fun LiquidGlassExpandedPlayer(
                     Box(
                         modifier = Modifier
                             .size(72.dp)
-                            .shadow(12.dp, CircleShape)
+                            .shadow(10.dp, CircleShape)
                             .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        Color(0xFFF4F5F6).copy(alpha = 0.96f),
-                                        Color(0xFFD9DCE0).copy(alpha = 0.92f),
-                                        Color(0xFFBFC3C8).copy(alpha = 0.94f),
-                                        Color(0xFFE9EBED).copy(alpha = 0.96f)
-                                    ),
-                                    start = Offset(0f, 0f),
-                                    end = Offset(180f, 180f)
-                                )
-                            )
+                            .background(Color.White.copy(alpha = 0.16f))
                             .border(
-                                BorderStroke(1.5.dp, Color.White.copy(alpha = 0.82f)),
+                                BorderStroke(1.5.dp, Color.White.copy(alpha = 0.38f)),
                                 CircleShape
                             )
                             .clickable(onClick = onPlayPause)
                             .testTag("liquid_glass_play_pause_button"),
                         contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(4.dp)
-                                .clip(CircleShape)
-                                .border(1.dp, Color(0xFF777D83).copy(alpha = 0.28f), CircleShape)
-                        )
-                        Icon(
-                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "Пауза" else "Воспроизведение",
-                            tint = Color(0xFF292B2E),
-                            modifier = Modifier.size(42.dp)
-                        )
+                        if (isPlaying) {
+                            Icon(
+                                Icons.Default.Pause,
+                                contentDescription = "Пауза",
+                                tint = Color.White,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        } else {
+                            Canvas(modifier = Modifier.size(42.dp)) {
+                                val w = size.width
+                                val h = size.height
+                                val triangle = Path().apply {
+                                    moveTo(w * 0.29f, h * 0.12f)
+                                    lineTo(w * 0.29f, h * 0.88f)
+                                    quadraticTo(w * 0.29f, h * 0.96f, w * 0.37f, h * 0.91f)
+                                    lineTo(w * 0.85f, h * 0.55f)
+                                    quadraticTo(w * 0.94f, h * 0.5f, w * 0.85f, h * 0.45f)
+                                    lineTo(w * 0.37f, h * 0.09f)
+                                    quadraticTo(w * 0.29f, h * 0.04f, w * 0.29f, h * 0.12f)
+                                    close()
+                                }
+                                drawPath(triangle, Color.White)
+                            }
+                        }
                     }
                     IconButton(onClick = onNext, modifier = Modifier.size(52.dp)) {
                         Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(34.dp))
