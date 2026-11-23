@@ -808,8 +808,7 @@ fun SettingsScreen(
 
             }
 
-            // Audio & Playback Section
-            SettingsSectionHeader(title = "Звук и воспроизведение", icon = Icons.Default.Tune)
+            // Audio and playback options are shown in their own categories.
 
             if (selectedCategory == "audio") {
             Card(
