@@ -284,14 +284,14 @@ private fun SpectrumVisualizer(
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
-        val mid = h * 0.50f
+        // Anchor the columns to the bottom edge and let them grow upward.
         val data = dataState.value
         val count = (data.size / 2).coerceIn(18, 28)
         val step = w / count
         val barWidth = (step * 0.92f).coerceAtLeast(1f)
         val blockCount = 10
         val blockGap = (h * 0.009f).coerceAtLeast(1f)
-        val maxBarHeight = h * 0.46f
+        val maxBarHeight = h * 0.94f
         val blockHeight = ((maxBarHeight - blockGap * (blockCount - 1)) / blockCount).coerceAtLeast(1f)
 
         for (i in 0 until count) {
@@ -317,7 +317,7 @@ private fun SpectrumVisualizer(
             val x = i * step + (step - barWidth) * 0.5f
 
             for (block in 0 until blockCount) {
-                val y = mid - (block + 1) * (blockHeight + blockGap)
+                val y = h - blockHeight - block * (blockHeight + blockGap)
                 val isLit = block < litBlocks
                 if (isLit) {
                     drawRect(
@@ -326,18 +326,6 @@ private fun SpectrumVisualizer(
                         size = Size(barWidth, blockHeight),
                         alpha = if (isPlaying) 0.96f else 0.3f
                     )
-
-                    // Mirrored rectangular segments fade progressively below the baseline.
-                    if (block < 8) {
-                        val reflectionY = mid + block * (blockHeight + blockGap)
-                        val reflectionAlpha = (0.24f * (1f - block / 9f)).coerceAtLeast(0.025f)
-                        drawRect(
-                            brush = barBrush,
-                            topLeft = Offset(x, reflectionY),
-                            size = Size(barWidth, blockHeight),
-                            alpha = reflectionAlpha * if (isPlaying) 1f else 0.3f
-                        )
-                    }
                 }
             }
         }
