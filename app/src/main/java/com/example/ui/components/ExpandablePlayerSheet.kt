@@ -1691,7 +1691,6 @@ fun ExpandablePlayerSheet(
                 // presentation above it only while the sheet is fully expanded.
                 if (isExpanded && liquidGlassPlayerEnabled) {
                     LiquidGlassExpandedPlayer(
-                        progressAccentColor = colorScheme.accentColor,
                         track = track,
                         isPlaying = isPlaying,
                         isShuffle = isShuffle,
@@ -1786,7 +1785,6 @@ fun ExpandablePlayerSheet(
 
 @Composable
 private fun LiquidGlassExpandedPlayer(
-    progressAccentColor: Color,
     track: Track,
     isPlaying: Boolean,
     isShuffle: Boolean,
@@ -2020,7 +2018,7 @@ private fun LiquidGlassExpandedPlayer(
                     duration = duration,
                     isPlaying = isPlaying,
                     onSeek = onSeek,
-                    playedTrackColor = progressAccentColor,
+                    playedTrackColor = Color.White,
                     inactiveTrackColor = Color.White.copy(alpha = 0.28f),
                     progressTrackHeight = 7.dp,
                     progressThumbRadius = 0.dp,
