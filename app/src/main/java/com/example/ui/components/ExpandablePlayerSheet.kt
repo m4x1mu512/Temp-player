@@ -57,6 +57,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -1378,9 +1379,10 @@ fun ExpandablePlayerSheet(
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .fillMaxWidth()
+                                            // Break out of the portrait content's horizontal padding.
+                                            // Centering this screen-width container aligns it with the physical screen edges.
+                                            .requiredWidth(configuration.screenWidthDp.dp)
                                             .height(36.dp)
-                                            .clip(RoundedCornerShape(8.dp))
                                             .clickable { viewModel.cycleVisualizerMode() }
                                             .testTag("player_visualizer_container_portrait")
                                     ) {
