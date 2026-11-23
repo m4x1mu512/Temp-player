@@ -1691,6 +1691,7 @@ fun ExpandablePlayerSheet(
                 // presentation above it only while the sheet is fully expanded.
                 if (isExpanded && liquidGlassPlayerEnabled) {
                     LiquidGlassExpandedPlayer(
+                        progressAccentColor = colorScheme.accentColor,
                         track = track,
                         isPlaying = isPlaying,
                         isShuffle = isShuffle,
@@ -1785,6 +1786,7 @@ fun ExpandablePlayerSheet(
 
 @Composable
 private fun LiquidGlassExpandedPlayer(
+    progressAccentColor: Color,
     track: Track,
     isPlaying: Boolean,
     isShuffle: Boolean,
@@ -2018,8 +2020,13 @@ private fun LiquidGlassExpandedPlayer(
                     duration = duration,
                     isPlaying = isPlaying,
                     onSeek = onSeek,
-                    playedTrackColor = Color.White,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.28f)
+                    playedTrackColor = progressAccentColor,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.28f),
+                    progressTrackHeight = 7.dp,
+                    progressThumbRadius = 0.dp,
+                    progressGlowRadius = 20.dp,
+                    progressGlowAlpha = 0.24f,
+                    showProgressThumb = false
                 )
 
                 Row(
@@ -2143,6 +2150,11 @@ private fun SheetProgressSection(
     onSeek: (Long) -> Unit,
     playedTrackColor: Color? = null,
     inactiveTrackColor: Color,
+    progressTrackHeight: Dp = 4.dp,
+    progressThumbRadius: Dp = 5.dp,
+    progressGlowRadius: Dp = 14.dp,
+    progressGlowAlpha: Float = 0.36f,
+    showProgressThumb: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
@@ -2222,10 +2234,11 @@ private fun SheetProgressSection(
                 modifier = Modifier.weight(1f),
                 accentColor = accentColor,
                 inactiveTrackColor = inactiveTrackColor,
-                trackHeight = 4.dp,
-                thumbRadius = 5.dp,
-                glowRadius = 14.dp,
-                glowAlpha = 0.36f,
+                trackHeight = progressTrackHeight,
+                thumbRadius = progressThumbRadius,
+                glowRadius = progressGlowRadius,
+                glowAlpha = progressGlowAlpha,
+                showThumb = showProgressThumb,
                 testTag = "player_progress_slider"
             )
             Text(
@@ -2398,16 +2411,3 @@ private fun ExpandedSlidingArtwork(
                     )
                 }
             },
-            label = "expanded_player_sliding_artwork"
-        ) { targetTrack ->
-            PlayerArtworkCard(
-                track = targetTrack,
-                size = artSize,
-                cornerRadius = cornerRadius,
-                isPlaying = isPlaying,
-                progressTrackColor = progressTrackColor,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-}
