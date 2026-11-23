@@ -1019,14 +1019,6 @@ fun SettingsScreen(
                         testTag = "settings_rescan_library"
                     )
 
-                    if (selectedCategory == "maintenance") {
-                    SettingsActionItem(
-                        icon = Icons.Default.RestartAlt,
-                        title = "Сбросить настройки",
-                        subtitle = "Восстановить настройки по умолчанию",
-                        onClick = { showResetDialog = true },
-                        testTag = "settings_reset_button"
-                    )                    }
 
                 }
             }
@@ -1054,6 +1046,13 @@ fun SettingsScreen(
                         subtitle = "Сохранить файл app_logs.txt для выявления багов и падений",
                         onClick = { CrashLogger.exportLogs(context) },
                         testTag = "settings_export_logs_button"
+                    )
+                    SettingsActionItem(
+                        icon = Icons.Default.RestartAlt,
+                        title = "Сбросить настройки",
+                        subtitle = "Восстановить настройки по умолчанию",
+                        onClick = { showResetDialog = true },
+                        testTag = "settings_reset_button"
                     )
                 }
             }
