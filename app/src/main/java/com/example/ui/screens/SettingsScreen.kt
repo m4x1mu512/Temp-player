@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Brightness4
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.FolderOpen
@@ -126,6 +127,7 @@ fun SettingsScreen(
     // whole settings screen recomposed while music played. Equalizer bands and the sleep
     // timer countdown are read inside their dialogs instead.
 
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -165,14 +167,14 @@ fun SettingsScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "Настройки",
+                        text = selectedCategory?.let { category -> when (category) { "appearance" -> "Внешний вид"; "playback" -> "Воспроизведение"; "library" -> "Медиатека"; "audio" -> "Аудио"; "maintenance" -> "Обслуживание и диагностика"; else -> "О приложении" } } ?: "Настройки",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = onNavigateBack,
+                        onClick = { if (selectedCategory != null) selectedCategory = null else onNavigateBack() },
                         modifier = Modifier.testTag("settings_back_button")
                     ) {
                         Icon(
@@ -194,6 +196,16 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (selectedCategory == null) {
+                SettingsCategoryItem(Icons.Default.Palette, "Внешний вид", "Тема, цвета, фон плеера и визуализатор", "settings_category_appearance") { selectedCategory = "appearance" }
+                SettingsCategoryItem(Icons.Default.Tune, "Воспроизведение", "Автоповорот, Crossfade и таймер сна", "settings_category_playback") { selectedCategory = "playback" }
+                SettingsCategoryItem(Icons.Default.FolderOpen, "Медиатека", "Папки с музыкой и сканирование", "settings_category_library") { selectedCategory = "library" }
+                SettingsCategoryItem(Icons.Default.GraphicEq, "Аудио", "Эквалайзер, эффекты и нормализация громкости", "settings_category_audio") { selectedCategory = "audio" }
+                SettingsCategoryItem(Icons.Default.BugReport, "Обслуживание и диагностика", "Сброс настроек и файлы журналов", "settings_category_maintenance") { selectedCategory = "maintenance" }
+                SettingsCategoryItem(Icons.Default.Info, "О приложении", "Версия и сведения о плеере", "settings_category_about") { selectedCategory = "about" }
+                Spacer(modifier = Modifier.height(24.dp))
+            } else {
+            if (selectedCategory == "appearance") {
             // Theme Section
             SettingsSectionHeader(title = "Оформление", icon = Icons.Default.Palette)
 
@@ -659,6 +671,9 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            }
+
+            if (selectedCategory == "playback") {
             // Screen Auto-Rotate Card
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -699,6 +714,9 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            }
+
+            if (selectedCategory == "appearance") {
             // Visualizer Section
             SettingsSectionHeader(title = "Визуализатор звука", icon = Icons.Default.GraphicEq)
 
@@ -788,9 +806,12 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            }
+
             // Audio & Playback Section
             SettingsSectionHeader(title = "Звук и воспроизведение", icon = Icons.Default.Tune)
 
+            if (selectedCategory == "audio") {
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -827,7 +848,10 @@ fun SettingsScreen(
                     )
                 }
             }
+            }
 
+
+            if (selectedCategory == "playback") {
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -901,6 +925,8 @@ fun SettingsScreen(
                     }
                 }
             }
+            }
+
 
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -911,6 +937,7 @@ fun SettingsScreen(
                     .padding(vertical = 4.dp)
             ) {
                 Column {
+                    if (selectedCategory == "audio") {
                     SettingsActionItem(
                         icon = Icons.Default.Tune,
                         title = "Эквалайзер и аудиоэффекты",
@@ -918,7 +945,9 @@ fun SettingsScreen(
                         onClick = { showEqualizerDialog = true },
                         testTag = "settings_open_equalizer"
                     )
+                    }
 
+                    if (selectedCategory == "playback") {
                     SettingsActionItem(
                         icon = Icons.Default.Bedtime,
                         title = "Таймер сна",
@@ -928,11 +957,13 @@ fun SettingsScreen(
                         onClick = { showSleepTimerDialog = true },
                         testTag = "settings_open_sleep_timer"
                     )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (selectedCategory == "library") {
             // Library Section
             SettingsSectionHeader(title = "Медиатека", icon = Icons.Default.Refresh)
 
@@ -988,18 +1019,23 @@ fun SettingsScreen(
                         testTag = "settings_rescan_library"
                     )
 
+                    if (selectedCategory == "maintenance") {
                     SettingsActionItem(
                         icon = Icons.Default.RestartAlt,
                         title = "Сбросить настройки",
                         subtitle = "Восстановить настройки по умолчанию",
                         onClick = { showResetDialog = true },
                         testTag = "settings_reset_button"
-                    )
+                    )                    }
+
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            }
+
+            if (selectedCategory == "maintenance") {
             // Diagnostics and Logs Section
             SettingsSectionHeader(title = "Диагностика и отчёты", icon = Icons.Default.BugReport)
 
@@ -1059,6 +1095,9 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            }
+
+            if (selectedCategory == "about") {
             // About App Section
             SettingsSectionHeader(title = "О приложении", icon = Icons.Default.Info)
 
@@ -1092,7 +1131,10 @@ fun SettingsScreen(
                 }
             }
 
+            }
+
             Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 
@@ -1143,6 +1185,18 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SettingsCategoryItem(icon: ImageVector, title: String, subtitle: String, testTag: String, onClick: () -> Unit) {
+    Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp).clickable(onClick = onClick).testTag(testTag)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold); Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Icon(Icons.Default.ChevronRight, contentDescription = "Открыть", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
