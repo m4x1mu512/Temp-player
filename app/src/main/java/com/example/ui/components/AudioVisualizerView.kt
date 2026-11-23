@@ -35,6 +35,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val NeonMagenta = Color(0xFFFF35E8)
 private val NeonBlue = Color(0xFF397BFF)
@@ -294,11 +295,24 @@ private fun SpectrumVisualizer(
         val blockHeight = ((maxBarHeight - blockGap * (blockCount - 1)) / blockCount).coerceAtLeast(1f)
 
         for (i in 0 until count) {
-            val dataIndex = ((i + 0.5f) * data.size / count).toInt()
-                .coerceIn(0, (data.size - 1).coerceAtLeast(0))
-            val raw = if (isPlaying && data.isNotEmpty()) data[dataIndex].coerceIn(0f, 1f) else 0.035f
+            // Aggregate every FFT band covered by this column instead of sampling one bin.
+            // RMS aggregation prevents narrow frequency peaks from being skipped, while
+            // square-root compression lifts quieter upper-frequency bands so the whole row reacts.
+            val startIndex = (i * data.size / count).coerceIn(0, (data.size - 1).coerceAtLeast(0))
+            val endIndex = (((i + 1) * data.size + count - 1) / count)
+                .coerceIn(startIndex + 1, data.size)
+            var energy = 0f
+            if (isPlaying && data.isNotEmpty()) {
+                for (band in startIndex until endIndex) {
+                    val sample = data[band].coerceIn(0f, 1f)
+                    energy += sample * sample
+                }
+            }
+            val bandCount = (endIndex - startIndex).coerceAtLeast(1)
+            val raw = if (isPlaying && data.isNotEmpty()) sqrt(energy / bandCount).coerceIn(0f, 1f) else 0.035f
+            val responsiveLevel = if (isPlaying) sqrt(raw).coerceIn(0f, 1f) else raw
             val floor = if (isPlaying) 0.16f else 0.035f
-            val value = (floor + raw * 0.84f).coerceIn(floor, 1f)
+            val value = (floor + responsiveLevel * 0.84f).coerceIn(floor, 1f)
             val litBlocks = (value * blockCount).toInt().coerceIn(1, blockCount)
             val x = i * step + (step - barWidth) * 0.5f
 
