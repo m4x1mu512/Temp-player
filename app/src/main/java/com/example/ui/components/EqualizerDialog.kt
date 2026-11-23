@@ -196,13 +196,9 @@ fun EqualizerDialog(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Rounded segmented tabs matching the dark lime reference design.
+                // Three independent outlined tabs without a shared container background.
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(glassCard)
-                        .padding(4.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -219,8 +215,14 @@ fun EqualizerDialog(
                                 .height(42.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
-                                    if (selected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant
+                                    if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                                    else Color.Transparent
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant,
+                                    shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable { selectedTabIndex = index }
                                 .padding(horizontal = 4.dp),
@@ -230,13 +232,13 @@ fun EqualizerDialog(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = if (selected) MaterialTheme.colorScheme.onPrimary else glassMuted,
+                                tint = if (selected) MaterialTheme.colorScheme.primary else glassMuted,
                                 modifier = Modifier.size(17.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = label,
-                                color = if (selected) MaterialTheme.colorScheme.onPrimary else glassText,
+                                color = if (selected) MaterialTheme.colorScheme.primary else glassText,
                                 fontSize = 11.sp,
                                 maxLines = 1,
                                 softWrap = false,
