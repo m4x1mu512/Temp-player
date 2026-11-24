@@ -1876,6 +1876,7 @@ private fun LiquidGlassExpandedPlayer(
             LiquidGlassLandscapeContent(
                 track = track,
                 artworkRequest = artworkRequest,
+                artworkBackdrop = artworkBackdrop,
                 isPlaying = isPlaying,
                 isShuffle = isShuffle,
                 repeatMode = repeatMode,
@@ -2151,6 +2152,7 @@ private fun LiquidGlassExpandedPlayer(
 private fun LiquidGlassLandscapeContent(
     track: Track,
     artworkRequest: ImageRequest,
+    artworkBackdrop: com.kyant.backdrop.backdrops.LayerBackdrop,
     isPlaying: Boolean,
     isShuffle: Boolean,
     repeatMode: RepeatMode,
@@ -2234,9 +2236,9 @@ private fun LiquidGlassLandscapeContent(
                     .weight(1.08f)
                     .fillMaxHeight()
                     .drawBackdrop(
-                        backdrop = rememberLayerBackdrop(),
+                        backdrop = artworkBackdrop,
                         shape = { RoundedCornerShape(28.dp) },
-                        effects = { backdropBlur(0.dp.toPx()) },
+                        effects = { backdropBlur(24.dp.toPx()) },
                         onDrawSurface = {
                             drawRect(Color.White.copy(alpha = 0.13f))
                             drawRect(
