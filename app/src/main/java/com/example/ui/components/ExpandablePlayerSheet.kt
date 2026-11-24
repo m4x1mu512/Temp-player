@@ -1696,6 +1696,7 @@ fun ExpandablePlayerSheet(
                 if (isExpanded && liquidGlassPlayerEnabled) {
                     LiquidGlassExpandedPlayer(
                         track = track,
+                        isLandscape = isLandscape,
                         isPlaying = isPlaying,
                         isShuffle = isShuffle,
                         repeatMode = repeatMode,
@@ -1790,6 +1791,7 @@ fun ExpandablePlayerSheet(
 @Composable
 private fun LiquidGlassExpandedPlayer(
     track: Track,
+    isLandscape: Boolean,
     isPlaying: Boolean,
     isShuffle: Boolean,
     repeatMode: RepeatMode,
@@ -1870,6 +1872,32 @@ private fun LiquidGlassExpandedPlayer(
                 )
         )
 
+        if (isLandscape) {
+            LiquidGlassLandscapeContent(
+                track = track,
+                artworkRequest = artworkRequest,
+                isPlaying = isPlaying,
+                isShuffle = isShuffle,
+                repeatMode = repeatMode,
+                isFavorite = isFavorite,
+                duration = duration,
+                positionFlow = positionFlow,
+                onCollapse = onCollapse,
+                onSleepTimer = onSleepTimer,
+                onEqualizer = onEqualizer,
+                onSeek = onSeek,
+                onPrevious = onPrevious,
+                onPlayPause = onPlayPause,
+                onNext = onNext,
+                onSeekBack = onSeekBack,
+                onSeekForward = onSeekForward,
+                onShuffle = onShuffle,
+                onFavorite = onFavorite,
+                onAddToPlaylist = onAddToPlaylist,
+                onRepeat = onRepeat,
+                onQueue = onQueue
+            )
+        } else {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -2112,6 +2140,236 @@ private fun LiquidGlassExpandedPlayer(
                         Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White)
                     }
                 }
+                }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun LiquidGlassLandscapeContent(
+    track: Track,
+    artworkRequest: ImageRequest,
+    isPlaying: Boolean,
+    isShuffle: Boolean,
+    repeatMode: RepeatMode,
+    isFavorite: Boolean,
+    duration: Long,
+    positionFlow: StateFlow<Long>,
+    onCollapse: () -> Unit,
+    onSleepTimer: () -> Unit,
+    onEqualizer: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onPrevious: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onShuffle: () -> Unit,
+    onFavorite: () -> Unit,
+    onAddToPlaylist: () -> Unit,
+    onRepeat: () -> Unit,
+    onQueue: () -> Unit
+) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            )
+            .padding(horizontal = 18.dp, vertical = 6.dp)
+    ) {
+        val artworkSize = minOf(maxHeight * 0.88f, maxWidth * 0.46f)
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(22.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.92f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = artworkRequest,
+                    contentDescription = "Обложка трека",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(artworkSize)
+                        .clip(RoundedCornerShape(22.dp))
+                        .pointerInput(track.id) {
+                            var totalDragX = 0f
+                            var velocityTracker = VelocityTracker()
+                            val swipeThreshold = size.width * 0.18f
+                            detectHorizontalDragGestures(
+                                onDragStart = {
+                                    totalDragX = 0f
+                                    velocityTracker = VelocityTracker()
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    totalDragX += dragAmount
+                                    velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                    change.consume()
+                                },
+                                onDragEnd = {
+                                    val velocityX = velocityTracker.calculateVelocity().x
+                                    when {
+                                        totalDragX <= -swipeThreshold ||
+                                            (totalDragX < -24f && velocityX <= -600f) -> onNext()
+                                        totalDragX >= swipeThreshold ||
+                                            (totalDragX > 24f && velocityX >= 600f) -> onPrevious()
+                                    }
+                                }
+                            )
+                        }
+                        .testTag("liquid_glass_album_art")
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1.08f)
+                    .fillMaxHeight()
+                    .drawBackdrop(
+                        backdrop = rememberLayerBackdrop(),
+                        shape = { RoundedCornerShape(28.dp) },
+                        effects = { backdropBlur(0.dp.toPx()) },
+                        onDrawSurface = {
+                            drawRect(Color.White.copy(alpha = 0.13f))
+                            drawRect(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = 0.07f),
+                                        Color.Black.copy(alpha = 0.10f)
+                                    )
+                                )
+                            )
+                        }
+                    )
+                    .border(
+                        BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                        RoundedCornerShape(28.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onCollapse, modifier = Modifier.testTag("liquid_glass_collapse")) {
+                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Свернуть плеер", tint = Color.White)
+                    }
+                    Row {
+                        IconButton(onClick = onSleepTimer) {
+                            Icon(Icons.Default.Bedtime, contentDescription = "Таймер сна", tint = Color.White)
+                        }
+                        IconButton(onClick = onEqualizer) {
+                            Icon(Icons.Default.Tune, contentDescription = "Эквалайзер", tint = Color.White)
+                        }
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = track.title,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().basicMarquee(iterations = Int.MAX_VALUE)
+                    )
+                    Text(
+                        text = track.artist,
+                        color = Color.White.copy(alpha = 0.78f),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                SheetProgressSection(
+                    trackId = track.id,
+                    positionFlow = positionFlow,
+                    duration = duration,
+                    isPlaying = isPlaying,
+                    onSeek = onSeek,
+                    playedTrackColor = Color.White,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.28f),
+                    progressTrackHeight = 7.dp,
+                    progressThumbRadius = 0.dp,
+                    progressGlowRadius = 18.dp,
+                    progressGlowAlpha = 0.22f,
+                    showProgressThumb = false
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onShuffle) {
+                        Icon(Icons.Default.Shuffle, contentDescription = "Перемешать", tint = if (isShuffle) Color.White else Color.White.copy(alpha = 0.62f))
+                    }
+                    IconButton(onClick = onFavorite) {
+                        Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Избранное", tint = if (isFavorite) FavoriteRed else Color.White)
+                    }
+                    IconButton(onClick = onAddToPlaylist) {
+                        Icon(Icons.Default.PlaylistAdd, contentDescription = "Добавить в плейлист", tint = Color.White)
+                    }
+                    IconButton(onClick = onRepeat) {
+                        Icon(if (repeatMode == RepeatMode.ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, contentDescription = "Повтор", tint = if (repeatMode == RepeatMode.OFF) Color.White.copy(alpha = 0.62f) else Color.White)
+                    }
+                    IconButton(onClick = onQueue, modifier = Modifier.testTag("liquid_glass_queue")) {
+                        Icon(Icons.Default.QueueMusic, contentDescription = "Очередь", tint = Color.White)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onSeekBack, modifier = Modifier.size(42.dp)) {
+                        Icon(Icons.Default.Replay10, contentDescription = "Назад на 10 секунд", tint = Color.White)
+                    }
+                    IconButton(onClick = onPrevious, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.16f), CircleShape)
+                            .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.38f)), CircleShape)
+                            .clickable(onClick = onPlayPause)
+                            .testTag("liquid_glass_play_pause_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isPlaying) {
+                            Icon(Icons.Default.Pause, contentDescription = "Пауза", tint = Color.White, modifier = Modifier.size(36.dp))
+                        } else {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Воспроизвести", tint = Color.White, modifier = Modifier.size(40.dp))
+                        }
+                    }
+                    IconButton(onClick = onNext, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White, modifier = Modifier.size(32.dp))
+                    }
+                    IconButton(onClick = onSeekForward, modifier = Modifier.size(42.dp)) {
+                        Icon(Icons.Default.Forward10, contentDescription = "Вперёд на 10 секунд", tint = Color.White)
+                    }
                 }
             }
         }
