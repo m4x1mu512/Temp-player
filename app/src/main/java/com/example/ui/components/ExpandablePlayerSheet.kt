@@ -1856,17 +1856,23 @@ private fun LiquidGlassExpandedPlayer(
     val defaultArtworkPainter = painterResource(R.drawable.ic_default_art)
     var displayedArtworkPainter by remember { mutableStateOf<Painter?>(null) }
     val latestArtworkTrackId = rememberUpdatedState(track.id)
+    val artworkRequestTrackId = remember(track.albumArtUri) { track.id }
     val loadingArtworkPainter = rememberAsyncImagePainter(
         model = artworkRequest,
         onState = { state ->
             if (state is AsyncImagePainter.State.Success &&
-                latestArtworkTrackId.value == track.id
+                latestArtworkTrackId.value == artworkRequestTrackId
             ) {
                 displayedArtworkPainter = state.painter
             }
         }
     )
-    val artworkPainter = displayedArtworkPainter ?: defaultArtworkPainter
+    val artworkPainter = displayedArtworkPainter
+        ?: if (loadingArtworkPainter.state is AsyncImagePainter.State.Success) {
+            loadingArtworkPainter
+        } else {
+            defaultArtworkPainter
+        }
 
     BoxWithConstraints(
         modifier = modifier
