@@ -126,6 +126,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -144,6 +145,8 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.AccentColor
@@ -1790,6 +1793,27 @@ fun ExpandablePlayerSheet(
 }
 
 @Composable
+private fun LiquidGlassArtworkImage(
+    painter: Painter,
+    contentDescription: String?,
+    contentScale: ContentScale,
+    modifier: Modifier = Modifier
+) {
+    Crossfade(
+        targetState = painter,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "liquid_glass_artwork_crossfade"
+    ) { currentPainter ->
+        Image(
+            painter = currentPainter,
+            contentDescription = contentDescription,
+            contentScale = contentScale,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
 private fun LiquidGlassExpandedPlayer(
     track: Track,
     isLandscape: Boolean,
@@ -1818,16 +1842,31 @@ private fun LiquidGlassExpandedPlayer(
 ) {
     val artworkBackdrop = rememberLayerBackdrop()
     val context = LocalContext.current
-    // Use the same request for the sharp cover and blurred backdrop.
-    // Do not show the generic artwork while Coil decodes the next track:
-    // the player background remains black until the real cover is ready.
+    // Keep the last successfully decoded cover visible while Coil loads the next one.
+    // The same painter feeds the sharp artwork and blurred backdrop, preventing either
+    // layer from briefly becoming empty or black during a track change.
     val artworkRequest = remember(track.albumArtUri) {
         ImageRequest.Builder(context)
             .data(track.albumArtUri ?: R.drawable.ic_default_art)
+            .size(1200, 1200)
             .crossfade(false)
             .error(R.drawable.ic_default_art)
             .build()
     }
+    val defaultArtworkPainter = painterResource(R.drawable.ic_default_art)
+    var displayedArtworkPainter by remember { mutableStateOf<Painter?>(null) }
+    val latestArtworkTrackId = rememberUpdatedState(track.id)
+    val loadingArtworkPainter = rememberAsyncImagePainter(
+        model = artworkRequest,
+        onState = { state ->
+            if (state is AsyncImagePainter.State.Success &&
+                latestArtworkTrackId.value == track.id
+            ) {
+                displayedArtworkPainter = state.painter
+            }
+        }
+    )
+    val artworkPainter = displayedArtworkPainter ?: defaultArtworkPainter
 
     BoxWithConstraints(
         modifier = modifier
@@ -1849,8 +1888,8 @@ private fun LiquidGlassExpandedPlayer(
                 .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
                 .layerBackdrop(artworkBackdrop)
         ) {
-            AsyncImage(
-                model = artworkRequest,
+            LiquidGlassArtworkImage(
+                painter = artworkPainter,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
@@ -1876,7 +1915,7 @@ private fun LiquidGlassExpandedPlayer(
         if (isLandscape) {
             LiquidGlassLandscapeContent(
                 track = track,
-                artworkRequest = artworkRequest,
+                artworkPainter = artworkPainter,
                 artworkBackdrop = artworkBackdrop,
                 isPlaying = isPlaying,
                 isShuffle = isShuffle,
@@ -1929,8 +1968,8 @@ private fun LiquidGlassExpandedPlayer(
                 }
             }
 
-            AsyncImage(
-                model = artworkRequest,
+            LiquidGlassArtworkImage(
+                painter = artworkPainter,
                 contentDescription = "Обложка трека",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -2152,7 +2191,7 @@ private fun LiquidGlassExpandedPlayer(
 @Composable
 private fun LiquidGlassLandscapeContent(
     track: Track,
-    artworkRequest: ImageRequest,
+    artworkPainter: Painter,
     artworkBackdrop: com.kyant.backdrop.backdrops.LayerBackdrop,
     isPlaying: Boolean,
     isShuffle: Boolean,
@@ -2196,8 +2235,8 @@ private fun LiquidGlassLandscapeContent(
                     .fillMaxHeight(),
                 contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = artworkRequest,
+                LiquidGlassArtworkImage(
+                    painter = artworkPainter,
                     contentDescription = "Обложка трека",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
