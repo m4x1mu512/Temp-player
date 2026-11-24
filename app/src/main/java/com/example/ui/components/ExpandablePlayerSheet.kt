@@ -1799,18 +1799,15 @@ private fun LiquidGlassArtworkImage(
     contentScale: ContentScale,
     modifier: Modifier = Modifier
 ) {
-    Crossfade(
-        targetState = painter,
-        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
-        label = "liquid_glass_artwork_crossfade"
-    ) { currentPainter ->
-        Image(
-            painter = currentPainter,
-            contentDescription = contentDescription,
-            contentScale = contentScale,
-            modifier = modifier
-        )
-    }
+    // The caller keeps the previous decoded painter until Coil reports Success.
+    // Swap the complete image atomically: animating Painter instances here can
+    // briefly expose an intermediate frame while the backdrop and cover redraw.
+    Image(
+        painter = painter,
+        contentDescription = contentDescription,
+        contentScale = contentScale,
+        modifier = modifier
+    )
 }
 
 @Composable
