@@ -1103,11 +1103,45 @@ class PlaybackManager private constructor(private val context: Context) {
 
         // Queue entries may reference the same media Track more than once.
         // Remove the exact tapped occurrence, not the first matching Track.id.
+        val removedCurrentTrack = removeIndex == state.currentIndex
+        val wasPlaying = _isPlaying.value || activePlayer?.playWhenReady == true
+        val oldShuffleOrder = if (_isShuffle.value) shuffleIndices.toList() else emptyList()
+        val oldShufflePosition = shufflePosition
         val updated = state.tracks.toMutableList().apply { removeAt(removeIndex) }
+
+        if (removedCurrentTrack) {
+            // When shuffle is active, follow the already established shuffled sequence
+            // instead of choosing the item that happens to follow in the visible list.
+            val nextIndex = if (_isShuffle.value) {
+                oldShuffleOrder
+                    .drop((oldShufflePosition + 1).coerceAtLeast(0))
+                    .firstOrNull { it != removeIndex }
+                    ?.let { oldIndex -> if (oldIndex > removeIndex) oldIndex - 1 else oldIndex }
+            } else {
+                removeIndex.takeIf { it in updated.indices }
+            }
+
+            val shouldWrap = nextIndex == null && _repeatMode.value == RepeatMode.ALL && updated.isNotEmpty()
+            val targetIndex = nextIndex ?: if (shouldWrap) 0 else 0
+
+            publishQueue(updated, targetIndex.takeIf { updated.isNotEmpty() } ?: -1)
+            if (_isShuffle.value) rebuildShuffleOrder(targetIndex)
+
+            if (updated.isNotEmpty()) {
+                // Without Repeat All, reaching the end stops playback but keeps the
+                // first queue item visible in the mini-player. Repeat All wraps to it.
+                val autoPlay = wasPlaying && (nextIndex != null || shouldWrap)
+                playTrackAtIndex(targetIndex, autoPlay = autoPlay)
+            } else {
+                stop()
+                publishQueue(emptyList(), -1)
+            }
+            return
+        }
+
         val newCurrentIndex = when {
             state.currentIndex !in state.tracks.indices -> -1
             removeIndex < state.currentIndex -> state.currentIndex - 1
-            removeIndex == state.currentIndex -> -1
             else -> state.currentIndex
         }
         publishQueue(updated, newCurrentIndex)
