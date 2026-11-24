@@ -61,6 +61,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
@@ -128,6 +129,10 @@ fun SettingsScreen(
     // timer countdown are read inside their dialogs instead.
 
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+
+    BackHandler(enabled = selectedCategory != null) {
+        selectedCategory = null
+    }
     var showEqualizerDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
