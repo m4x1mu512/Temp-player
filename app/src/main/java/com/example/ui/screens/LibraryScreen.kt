@@ -718,6 +718,7 @@ fun LibraryScreen(
                                     Box(modifier = Modifier.fillMaxSize()) {
                                         ReorderableTrackList(
                                             tracks = queueTracks,
+                                            entryIds = currentQueueState.entryIds,
                                             currentTrack = currentTrack,
                                             isPlaying = isPlaying,
                                             currentTrackIndex = currentQueueIndex.takeIf { it in queueTracks.indices },
@@ -742,7 +743,7 @@ fun LibraryScreen(
                                             onAddToPlaylist = onAddToPlaylistCallback,
                                             onEditTrackInfo = onEditTrackInfoCallback,
                                             onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) },
-                                            onRemoveFromQueue = { _, index -> viewModel.removeFromQueueAt(index) }
+                                            onRemoveFromQueue = { entryId -> viewModel.removeFromQueueEntry(entryId) }
                                         )
 
                                         ScrollToCurrentTrackFab(
