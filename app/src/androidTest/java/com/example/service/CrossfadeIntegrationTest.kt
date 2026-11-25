@@ -104,8 +104,9 @@ class CrossfadeIntegrationTest {
         prepareAndStart(first, "cancel-outgoing")
         prepareAndStart(second, "cancel-incoming")
 
+        val cancelled = CountDownLatch(1)
         instrumentation.runOnMainSync {
-            requireNotNull(controller).startCrossfade(first, second) {}
+            requireNotNull(controller).startCrossfade(first, second) { cancelled.countDown() }
         }
         awaitCondition("crossfade should begin") {
             requireNotNull(controller).isCrossfading && second.volume == 0f
@@ -119,6 +120,11 @@ class CrossfadeIntegrationTest {
             assertEquals(1f, second.volume, 0.001f)
             assertTrue(second.isPlaying)
         }
+        assertTrue(
+            "cancellation must invoke the completion hook exactly once",
+            cancelled.await(1, TimeUnit.SECONDS)
+        )
+        assertEquals("completion hook must not run twice", 0L, cancelled.count)
     }
 
     private fun prepareAndStart(player: ExoPlayer, id: String) {
