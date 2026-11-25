@@ -32,6 +32,10 @@ object TrackMoveLogger {
 
     private fun file(context: Context) = File(context.filesDir, FILE_NAME)
 
+    fun log(context: Context, event: String, details: String) {
+        log(context, event) { details }
+    }
+
     fun log(context: Context, event: String, details: () -> String) {
         if (!enabled) return
         val appContext = context.applicationContext
@@ -44,10 +48,10 @@ object TrackMoveLogger {
                         val target = file(appContext)
                         if (target.exists() && target.length() > MAX_BYTES) {
                             val old = target.readText()
-                            target.writeText("=== LOG ROTATED ===\\n" + old.takeLast((MAX_BYTES / 2).toInt()))
+                            target.writeText("=== LOG ROTATED ===\n" + old.takeLast((MAX_BYTES / 2).toInt()))
                         }
                         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
-                        target.appendText("$timestamp | $event | $message\\n")
+                        target.appendText("$timestamp | $event | $message\n")
                     } catch (_: Exception) {
                         // Diagnostics must never interrupt playback or reordering.
                     }
