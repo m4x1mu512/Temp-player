@@ -997,6 +997,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun resetSettings() {
         viewModelScope.launch {
             settingsDataStore.resetSettings()
+            // Clearing the store does not touch the in-memory copies of the manual orders.
+            // Before this fix the library kept the arrangement the user had made before the
+            // reset, even though the stored order was gone.
+            _sortOrder.value = SortOrder.BY_TITLE
+            _inMemoryAllTracksOrder.value = null
+            _inMemoryFavoriteOrder.value = null
+            _inMemoryPlaylistOrder.values.forEach { it.value = null }
             playbackManager.cancelSleepTimer()
             playbackManager.setRepeatMode(RepeatMode.OFF)
             playbackManager.setEqualizerPreset(EqualizerPreset.FLAT)
