@@ -524,7 +524,7 @@ fun PlayerScreen(
                 if (liquidGlassPlayerEnabled) {
                     LiquidGlassPlayerContent(
                         track = track,
-                        timeColor = playerTimeColor,
+                        timeColor = Color.White,
                         isPlaying = isPlaying,
                         isShuffle = isShuffle,
                         repeatMode = repeatMode,
