@@ -1523,7 +1523,7 @@ private fun LiquidGlassPlayerContent(
                         isCompact = isCompact,
                         onSeek = onSeek,
                         sliderTestTag = "liquid_glass_progress_slider",
-                        timeColor = playerTimeColor,
+                        timeColor = timeColor,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
