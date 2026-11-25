@@ -88,8 +88,9 @@ class PlaybackManager private constructor(private val context: Context) {
         frameDelayMs = com.example.ui.util.DevicePerformanceHelper.getVisualizerDelayMs(context)
     }
     val equalizerController = EqualizerController()
-    val replayGainController = ReplayGainController(context)
-    val crossfadeController = CrossfadeController(serviceScope)
+    val volumeCoordinator = PlayerVolumeCoordinator()
+    val replayGainController = ReplayGainController(context, volumeCoordinator)
+    val crossfadeController = CrossfadeController(serviceScope, volumeCoordinator)
 
     fun createPlayerAudioProcessors(): Array<androidx.media3.common.audio.AudioProcessor> {
         val eq = com.example.service.audio.RhythmEqualizerProcessor().apply {
@@ -465,6 +466,8 @@ class PlaybackManager private constructor(private val context: Context) {
         player1.addListener(playerAListener)
         player2?.addListener(playerBListener)
 
+        volumeCoordinator.attach(player1)
+        player2?.let(volumeCoordinator::attach)
         replayGainController.attachPlayer(player1)
 
         visualizerController.ensureStarted()
@@ -523,6 +526,8 @@ class PlaybackManager private constructor(private val context: Context) {
         playerB?.removeListener(playerBListener)
         // Release both here: the second player may have been created lazily by this manager,
         // so PlaybackService's own player2 field can still be null when the service dies.
+        playerA?.let(volumeCoordinator::release)
+        playerB?.let(volumeCoordinator::release)
         try {
             playerA?.release()
         } catch (_: Exception) {}
@@ -596,6 +601,7 @@ class PlaybackManager private constructor(private val context: Context) {
             playerA = newPlayer
             newPlayer.addListener(playerAListener)
         }
+        volumeCoordinator.attach(newPlayer)
         return newPlayer
     }
 
@@ -698,7 +704,9 @@ class PlaybackManager private constructor(private val context: Context) {
                 try {
                     sec.stop()
                     sec.clearMediaItems()
-                    sec.volume = 1f
+                    volumeCoordinator.setCrossfadeGain(sec, 1f)
+                    volumeCoordinator.setReplayGain(sec, 1f)
+                    volumeCoordinator.setTransitionGain(sec, 1f)
                 } catch (_: Exception) {}
             }
             executePlay(player, track, startPaused)
@@ -1011,8 +1019,9 @@ class PlaybackManager private constructor(private val context: Context) {
 
         val mediaItem = createMediaItem(nextTrack)
 
-        // Prepare incoming player silently for equal-power fade-in
-        incomingPlayer.volume = 0f
+        // Register the incoming player with the shared volume owner before fading it in.
+        volumeCoordinator.attach(incomingPlayer)
+        volumeCoordinator.setCrossfadeGain(incomingPlayer, 0f)
         incomingPlayer.setMediaItem(mediaItem)
         incomingPlayer.prepare()
         incomingPlayer.playWhenReady = true
@@ -1223,8 +1232,8 @@ class PlaybackManager private constructor(private val context: Context) {
         _sleepTimerMode.value = 0
     }
 
-    private var equalizerVolumeRestoreTarget: Float? = null
     private var equalizerVolumeTransitionJob: Job? = null
+    private var equalizerVolumeTransitionGeneration: Long = 0L
 
     fun setEqualizerEnabled(enabled: Boolean) {
         _isEqualizerEnabled.value = enabled
@@ -1242,60 +1251,42 @@ class PlaybackManager private constructor(private val context: Context) {
             return
         }
 
-        val restoreVolume = equalizerVolumeRestoreTarget ?: (if (player.volume > 0f) player.volume else 1.0f)
-        if (restoreVolume <= 0f) {
-            equalizerController.setEnabled(enabled)
-            return
-        }
-
         equalizerVolumeTransitionJob?.cancel()
-        equalizerVolumeRestoreTarget = restoreVolume
+        val generation = ++equalizerVolumeTransitionGeneration
 
-        // Flag internal volume adjustment so ReplayGain engine doesn't overwrite with ducked values
-        replayGainController.isInternalVolumeAdjustment = true
-
-        // 1. Duck player volume to 0.0f on both dual-players to completely silence transient DSP / buffer burst
-        playerA?.volume = 0.0f
-        playerB?.volume = 0.0f
+        // Duck only the temporary transition factor. ReplayGain and crossfade factors remain
+        // intact and are multiplied back in by PlayerVolumeCoordinator on every update.
+        playerA?.let { volumeCoordinator.setTransitionGain(it, 0f) }
+        playerB?.let { volumeCoordinator.setTransitionGain(it, 0f) }
 
         equalizerVolumeTransitionJob = serviceScope.launch(Dispatchers.Main.immediate) {
             try {
-                // If disabling, set the band levels to 0 (flat) first before waiting,
-                // so DSP coefficients transition smoothly in the background without burst.
                 if (!enabled) {
                     equalizerController.equalizerProcessor.setLevels(List(5) { 0 })
                 }
 
-                // 2. Wait for ducked volume state to propagate and audio track's buffer to clear
-                // Use 300ms when disabling to ensure audio buffer is completely drained in silence
                 val drainDelay = if (enabled) 120L else 300L
                 delay(drainDelay)
-
-                // 3. Safely toggle equalizer enabled state while fully silent
                 equalizerController.setEnabled(enabled)
 
-                // 4. Settle delay to allow audio pipeline / hardware DSP to fully transition
-                // 550ms deactivation settle delay ensures driver pops finish in complete silence
                 val settleDelay = if (enabled) 45L else 550L
                 delay(settleDelay)
 
-                // 5. Smoothly ramp volume back up to restoreVolume from 0.0f over 10 steps (200ms total)
                 val rampSteps = 10
                 val rampStepDelayMs = 20L
                 repeat(rampSteps) { step ->
                     val fraction = (step + 1).toFloat() / rampSteps.toFloat()
-                    val targetVol = restoreVolume * fraction
-                    playerA?.volume = targetVol
-                    playerB?.volume = targetVol
+                    playerA?.let { volumeCoordinator.setTransitionGain(it, fraction) }
+                    playerB?.let { volumeCoordinator.setTransitionGain(it, fraction) }
                     delay(rampStepDelayMs)
                 }
             } finally {
-                if (equalizerVolumeRestoreTarget == restoreVolume) {
-                    playerA?.volume = restoreVolume
-                    playerB?.volume = restoreVolume
-                    equalizerVolumeRestoreTarget = null
+                // A cancelled older transition must not un-duck a newer one.
+                if (equalizerVolumeTransitionGeneration == generation) {
+                    playerA?.let { volumeCoordinator.setTransitionGain(it, 1f) }
+                    playerB?.let { volumeCoordinator.setTransitionGain(it, 1f) }
+                    equalizerVolumeTransitionJob = null
                 }
-                replayGainController.isInternalVolumeAdjustment = false
             }
         }
     }
