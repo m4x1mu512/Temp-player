@@ -12,7 +12,6 @@ import java.util.IdentityHashMap
  */
 class PlayerVolumeCoordinator {
     private data class Gains(
-        var master: Float = 1f,
         var replayGain: Float = 1f,
         var crossfade: Float = 1f,
         var transition: Float = 1f
@@ -23,9 +22,6 @@ class PlayerVolumeCoordinator {
     fun attach(player: ExoPlayer) {
         apply(player, gainsByPlayer.getOrPut(player) { Gains() })
     }
-
-    fun setMasterGain(player: ExoPlayer, gain: Float) =
-        update(player) { master = gain.sanitizedGain() }
 
     fun setReplayGain(player: ExoPlayer, gain: Float) =
         update(player) { replayGain = gain.sanitizedGain() }
@@ -51,7 +47,6 @@ class PlayerVolumeCoordinator {
 
     private fun apply(player: ExoPlayer, gains: Gains) {
         player.volume = calculateOutputVolume(
-            gains.master,
             gains.replayGain,
             gains.crossfade,
             gains.transition
@@ -60,12 +55,10 @@ class PlayerVolumeCoordinator {
 
     internal companion object {
         fun calculateOutputVolume(
-            master: Float,
             replayGain: Float,
             crossfade: Float,
             transition: Float
-        ): Float = master.sanitizedGain() *
-            replayGain.sanitizedGain() *
+        ): Float = replayGain.sanitizedGain() *
             crossfade.sanitizedGain() *
             transition.sanitizedGain()
 

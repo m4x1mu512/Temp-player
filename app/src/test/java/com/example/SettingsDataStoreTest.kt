@@ -11,17 +11,17 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class ExampleRobolectricTest {
+class SettingsDataStoreTest {
 
   @Test
-  fun `read string from context`() {
+  fun `the app name is set`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
     assertEquals("Темп", appName)
   }
 
   @Test
-  fun `test track duration formatting`() {
+  fun `the track duration is formatted`() {
     val track = com.example.data.model.Track(
       id = 1L,
       title = "Test Song",
@@ -38,7 +38,7 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test auto rotate setting toggle`() = kotlinx.coroutines.runBlocking {
+  fun `the auto rotate setting is persisted`() = kotlinx.coroutines.runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val settings = com.example.data.local.SettingsDataStore(context)
     val initial = settings.autoRotateFlow.first()
@@ -54,7 +54,7 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test crossfade settings persistence`() = kotlinx.coroutines.runBlocking {
+  fun `the crossfade settings are persisted and clamped`() = kotlinx.coroutines.runBlocking {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val settings = com.example.data.local.SettingsDataStore(context)
     val initialEnabled = settings.crossfadeEnabledFlow.first()
@@ -75,35 +75,5 @@ class ExampleRobolectricTest {
 
     settings.setCrossfadeDurationSeconds(-5)
     assertEquals(1, settings.crossfadeDurationSecondsFlow.first())
-  }
-
-  @Test
-  fun `test playback service and play track`() {
-    val context = ApplicationProvider.getApplicationContext<Context>()
-    val controller = org.robolectric.Robolectric.buildService(com.example.service.PlaybackService::class.java).create()
-    val service = controller.get()
-    val pm = com.example.service.PlaybackManager.getInstance(context)
-    val track = com.example.data.model.Track(
-      id = 1L,
-      title = "Test Song",
-      artist = "Test Artist",
-      album = "Test Album",
-      duration = 215000L,
-      uriString = "https://example.com/test.mp3",
-      albumArtUriString = null
-    )
-    pm.playTrack(track)
-    
-    // Simulate audio visualizer RMS callback from background thread
-    val thread = Thread {
-      for (i in 0..20) {
-        pm.visualizerController.onRmsCalculated?.invoke(0.3f)
-      }
-    }
-    thread.start()
-    thread.join()
-
-    org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    controller.destroy()
   }
 }

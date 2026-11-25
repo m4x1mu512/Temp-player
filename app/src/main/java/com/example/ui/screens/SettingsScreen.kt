@@ -141,17 +141,34 @@ fun SettingsScreen(
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    // The file size was read straight from disk during composition, so the subtitle kept
+    // showing the old size after the log was cleared. It is state now and refreshed on clear.
+    var movementLogSizeKb by remember { mutableStateOf(TrackMoveLogger.sizeBytes(context) / 1024L) }
     val folderPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         if (uri != null) {
-            try {
+            // Without a persisted grant the access to the folder dies with the process.
+            // Storing the uri anyway produced a folder that silently stopped being scanned
+            // after a restart, so the folder is only added when the grant was really taken.
+            val permissionTaken = try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
-            } catch (_: Exception) { }
-            viewModel.addMusicFolder(uri.toString())
+                true
+            } catch (_: Exception) {
+                false
+            }
+            if (permissionTaken) {
+                viewModel.addMusicFolder(uri.toString())
+            } else {
+                Toast.makeText(
+                    context,
+                    "Не удалось закрепить доступ к папке — папка не добавлена",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
@@ -1097,9 +1114,10 @@ fun SettingsScreen(
                     SettingsActionItem(
                         icon = Icons.Default.Delete,
                         title = "Очистить логи перемещения",
-                        subtitle = "Размер текущего файла: ${(TrackMoveLogger.sizeBytes(context) / 1024L)} КБ",
+                        subtitle = "Размер текущего файла: ${movementLogSizeKb} КБ",
                         onClick = {
                             TrackMoveLogger.clear(context)
+                            movementLogSizeKb = TrackMoveLogger.sizeBytes(context) / 1024L
                             Toast.makeText(context, "Логи перемещения очищены", Toast.LENGTH_SHORT).show()
                         },
                         testTag = "settings_clear_track_movement_logs"

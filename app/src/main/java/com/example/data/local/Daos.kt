@@ -125,7 +125,10 @@ interface PlaylistDao {
     @Query("DELETE FROM playlist_track_cross_ref WHERE playlistId = :playlistId")
     suspend fun clearPlaylistTracks(playlistId: Long)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    // IGNORE, not REPLACE: the row is identified by (playlistId, trackId). REPLACE deleted the
+    // existing row and inserted a new one with the next position, so adding a track that was
+    // already in the playlist silently moved it to the end of the list.
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun addTrackToPlaylist(crossRef: PlaylistTrackCrossRef)
 
     @Query("SELECT MAX(position) FROM playlist_track_cross_ref WHERE playlistId = :playlistId")
