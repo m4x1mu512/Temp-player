@@ -66,26 +66,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.StateFlow
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.R
 import com.example.data.model.MiniPlayerBgMode
 import com.example.data.model.Track
-import com.example.data.model.ThemeMode
-import com.example.data.local.SettingsDataStore
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.util.KEY_PLAYER_ALBUM_ART
 import com.example.ui.util.KEY_PLAYER_CONTAINER
@@ -174,20 +170,9 @@ fun MiniPlayer(
         val configuration = LocalConfiguration.current
         val isLandscape = autoRotate && (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
         val isCompactWidth = configuration.screenWidthDp < 360
-        // Observe the selected app theme so text colors update immediately when the
-        // user changes "Тема оформления" without restarting the player.
-        val appContext = LocalContext.current
-        val initialThemeMode = remember(appContext) {
-            SettingsDataStore.getInitialThemeMode(appContext)
-        }
-        val selectedThemeMode by remember(appContext) {
-            SettingsDataStore(appContext).themeModeFlow
-        }.collectAsStateWithLifecycle(initialValue = initialThemeMode)
-        val appUsesDarkTheme = when (selectedThemeMode) {
-            ThemeMode.LIGHT -> false
-            ThemeMode.DARK -> true
-            ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        }
+        // Read the theme actually applied by MyApplicationTheme. This keeps collapsed
+        // controls independent from the separately selected mini-player background color.
+        val appUsesDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
         val appUsesLightTheme = !appUsesDarkTheme
         // Collapsed mini-player controls follow the app theme, never the selected player
         // background color. The play button uses the inverse foreground/background pair.
