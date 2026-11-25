@@ -57,7 +57,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.DataInputStream
 
-data class PlaybackQueueState(val tracks: List<Track> = emptyList(), val currentIndex: Int = -1)
+data class PlaybackQueueState(
+    val tracks: List<Track> = emptyList(),
+    val currentIndex: Int = -1,
+    val entryIds: List<Long> = emptyList()
+)
 
 @OptIn(UnstableApi::class)
 class PlaybackManager private constructor(private val context: Context) {
@@ -152,14 +156,34 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private val _queueState = MutableStateFlow(PlaybackQueueState())
+    private var nextQueueEntryId: Long = 1L
     val queueState: StateFlow<PlaybackQueueState> = _queueState.asStateFlow()
     private val _queue = MutableStateFlow<List<Track>>(emptyList())
     val queue: StateFlow<List<Track>> = _queue.asStateFlow()
     private val _queueIndex = MutableStateFlow(-1)
     val queueIndex: StateFlow<Int> = _queueIndex.asStateFlow()
 
-    private fun publishQueue(tracks: List<Track>, index: Int) {
-        val snapshot = PlaybackQueueState(tracks.toList(), index.takeIf { it in tracks.indices } ?: -1)
+    private fun reconcileQueueEntryIds(tracks: List<Track>): List<Long> {
+        val previous = _queueState.value
+        val used = BooleanArray(previous.tracks.size)
+        return tracks.map { track ->
+            val match = previous.tracks.indices.firstOrNull { index ->
+                !used[index] && (previous.tracks[index] === track || previous.tracks[index] == track)
+            }
+            if (match != null) {
+                used[match] = true
+                previous.entryIds.getOrNull(match) ?: nextQueueEntryId++
+            } else nextQueueEntryId++
+        }
+    }
+
+    private fun publishQueue(tracks: List<Track>, index: Int, entryIds: List<Long>? = null) {
+        val stableIds = entryIds?.takeIf { it.size == tracks.size } ?: reconcileQueueEntryIds(tracks)
+        val snapshot = PlaybackQueueState(
+            tracks = tracks.toList(),
+            currentIndex = index.takeIf { it in tracks.indices } ?: -1,
+            entryIds = stableIds.toList()
+        )
         _queueState.value = snapshot
         _queue.value = snapshot.tracks
         _queueIndex.value = snapshot.currentIndex
@@ -1106,6 +1130,11 @@ class PlaybackManager private constructor(private val context: Context) {
         saveCurrentState()
     }
 
+    fun removeTrackFromQueueEntry(entryId: Long) {
+        val index = _queueState.value.entryIds.indexOf(entryId)
+        if (index >= 0) removeTrackFromQueueAt(index)
+    }
+
     fun removeTrackFromQueueAt(removeIndex: Int) {
         val state = _queueState.value
         if (removeIndex !in state.tracks.indices) return
@@ -1184,8 +1213,11 @@ class PlaybackManager private constructor(private val context: Context) {
         val oldTracks = _queue.value
         if (fromIndex !in oldTracks.indices || toIndex !in oldTracks.indices || fromIndex == toIndex) return
         val updated = oldTracks.toMutableList()
+        val updatedEntryIds = _queueState.value.entryIds.toMutableList()
         val moved = updated.removeAt(fromIndex)
         updated.add(toIndex, moved)
+        val movedEntryId = updatedEntryIds.removeAt(fromIndex)
+        updatedEntryIds.add(toIndex, movedEntryId)
         val oldIndex = _queueIndex.value
         val newIndex = when {
             oldIndex !in oldTracks.indices -> -1
@@ -1194,7 +1226,7 @@ class PlaybackManager private constructor(private val context: Context) {
             fromIndex > oldIndex && toIndex <= oldIndex -> oldIndex + 1
             else -> oldIndex
         }
-        publishQueue(updated, newIndex)
+        publishQueue(updated, newIndex, updatedEntryIds)
         if (_isShuffle.value) rebuildShuffleOrder(newIndex)
         saveCurrentState()
     }
