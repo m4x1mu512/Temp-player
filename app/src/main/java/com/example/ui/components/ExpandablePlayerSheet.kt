@@ -123,7 +123,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.Painter
@@ -158,6 +161,9 @@ import com.example.ui.screens.AudioSpecsBadge
 import com.example.ui.theme.FavoriteRed
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonPurple
+import com.example.ui.util.blurredGlassBackground
+import com.example.ui.util.gpuBlurSupported
+import com.example.ui.util.rememberBlurredArtwork
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
@@ -1835,6 +1841,9 @@ private fun LiquidGlassExpandedPlayer(
     }
     val defaultArtworkPainter = painterResource(R.drawable.ic_default_art)
     var displayedArtworkPainter by remember { mutableStateOf<Painter?>(null) }
+    // Counts the covers that actually arrived. The painter itself cannot identify the
+    // content: painterResource creates a new instance on every recomposition.
+    var artworkVersion by remember { mutableIntStateOf(0) }
     val latestArtworkTrackId = rememberUpdatedState(track.id)
     val artworkRequestTrackId = remember(track.albumArtUri) { track.id }
     val loadingArtworkPainter = rememberAsyncImagePainter(
@@ -1844,6 +1853,7 @@ private fun LiquidGlassExpandedPlayer(
                 latestArtworkTrackId.value == artworkRequestTrackId
             ) {
                 displayedArtworkPainter = state.painter
+                artworkVersion++
             }
         }
     )
@@ -1853,6 +1863,13 @@ private fun LiquidGlassExpandedPlayer(
         } else {
             defaultArtworkPainter
         }
+    // Below Android 12 there is no RenderEffect, so the glass surfaces use a copy of the
+    // cover that is blurred on the CPU instead.
+    val blurredArtwork = rememberBlurredArtwork(
+        painter = artworkPainter,
+        key = artworkVersion,
+        enabled = !gpuBlurSupported
+    )
 
     BoxWithConstraints(
         modifier = modifier
@@ -1862,24 +1879,42 @@ private fun LiquidGlassExpandedPlayer(
         val coverHeight = minOf(maxWidth, maxHeight * 0.56f)
         val compact = maxHeight < 700.dp
 
+        // The overlays of the glass control card. They are drawn on top of the blurred
+        // background, whichever way that background was produced.
+        val controlCardSurface: DrawScope.() -> Unit = {
+            drawRect(Color.White.copy(alpha = 0.16f))
+            drawRect(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.10f),
+                        Color.Black.copy(alpha = 0.035f)
+                    )
+                )
+            )
+        }
+
         // A low-cost source layer is captured once for the glass blur. The album
         // artwork itself stays sharp in the foreground.
         // Extend the backdrop source a few dp beyond the physical screen edges.
         // This gives the blur shader pixels to sample at the viewport boundary and
         // prevents a bright one-pixel seam along the sides without changing the
         // foreground artwork or the glass control card.
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
-                .layerBackdrop(artworkBackdrop)
-        ) {
-            LiquidGlassArtworkImage(
-                painter = artworkPainter,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
+        // Without a GPU blur the source is not captured at all: it would only add a
+        // sharp copy of the cover behind the blurred one.
+        if (gpuBlurSupported) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
+                    .layerBackdrop(artworkBackdrop)
+            ) {
+                LiquidGlassArtworkImage(
+                    painter = artworkPainter,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
         Box(
             modifier = Modifier
@@ -1888,12 +1923,23 @@ private fun LiquidGlassExpandedPlayer(
                 // one-pixel bright seam exactly at the physical screen boundary.
                 .align(Alignment.Center)
                 .requiredSize(width = maxWidth + 8.dp, height = maxHeight + 8.dp)
-                .drawBackdrop(
-                    backdrop = artworkBackdrop,
-                    shape = { androidx.compose.ui.graphics.RectangleShape },
-                    effects = { backdropBlur(38.dp.toPx()) },
-                    onDrawSurface = {
-                        drawRect(Color.Black.copy(alpha = 0.30f))
+                .then(
+                    if (gpuBlurSupported) {
+                        Modifier.drawBackdrop(
+                            backdrop = artworkBackdrop,
+                            shape = { RectangleShape },
+                            effects = { backdropBlur(38.dp.toPx()) },
+                            onDrawSurface = {
+                                drawRect(Color.Black.copy(alpha = 0.30f))
+                            }
+                        )
+                    } else {
+                        Modifier.blurredGlassBackground(
+                            artwork = blurredArtwork,
+                            shape = RectangleShape
+                        ) {
+                            drawRect(Color.Black.copy(alpha = 0.30f))
+                        }
                     }
                 )
         )
@@ -1903,6 +1949,7 @@ private fun LiquidGlassExpandedPlayer(
                 track = track,
                 artworkPainter = artworkPainter,
                 artworkBackdrop = artworkBackdrop,
+                blurredArtwork = blurredArtwork,
                 isPlaying = isPlaying,
                 isShuffle = isShuffle,
                 repeatMode = repeatMode,
@@ -2002,19 +2049,19 @@ private fun LiquidGlassExpandedPlayer(
                     modifier = Modifier
                         .matchParentSize()
                         .offset(y = (-17).dp)
-                        .drawBackdrop(
-                            backdrop = artworkBackdrop,
-                            shape = { RoundedCornerShape(30.dp) },
-                            effects = { backdropBlur(24.dp.toPx()) },
-                            onDrawSurface = {
-                                drawRect(Color.White.copy(alpha = 0.16f))
-                                drawRect(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            Color.Black.copy(alpha = 0.10f),
-                                            Color.Black.copy(alpha = 0.035f)
-                                        )
-                                    )
+                        .then(
+                            if (gpuBlurSupported) {
+                                Modifier.drawBackdrop(
+                                    backdrop = artworkBackdrop,
+                                    shape = { RoundedCornerShape(30.dp) },
+                                    effects = { backdropBlur(24.dp.toPx()) },
+                                    onDrawSurface = controlCardSurface
+                                )
+                            } else {
+                                Modifier.blurredGlassBackground(
+                                    artwork = blurredArtwork,
+                                    shape = RoundedCornerShape(30.dp),
+                                    onDrawSurface = controlCardSurface
                                 )
                             }
                         )
@@ -2179,6 +2226,7 @@ private fun LiquidGlassLandscapeContent(
     track: Track,
     artworkPainter: Painter,
     artworkBackdrop: com.kyant.backdrop.backdrops.LayerBackdrop,
+    blurredArtwork: ImageBitmap?,
     isPlaying: Boolean,
     isShuffle: Boolean,
     repeatMode: RepeatMode,
@@ -2200,6 +2248,19 @@ private fun LiquidGlassLandscapeContent(
     onRepeat: () -> Unit,
     onQueue: () -> Unit
 ) {
+    // The overlays of the glass column. They are drawn on top of the blurred background,
+    // whichever way that background was produced.
+    val landscapeSurface: DrawScope.() -> Unit = {
+        drawRect(Color.White.copy(alpha = 0.13f))
+        drawRect(
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.07f),
+                    Color.Black.copy(alpha = 0.10f)
+                )
+            )
+        )
+    }
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -2261,19 +2322,19 @@ private fun LiquidGlassLandscapeContent(
                 modifier = Modifier
                     .weight(1.08f)
                     .fillMaxHeight()
-                    .drawBackdrop(
-                        backdrop = artworkBackdrop,
-                        shape = { RoundedCornerShape(28.dp) },
-                        effects = { backdropBlur(24.dp.toPx()) },
-                        onDrawSurface = {
-                            drawRect(Color.White.copy(alpha = 0.13f))
-                            drawRect(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.White.copy(alpha = 0.07f),
-                                        Color.Black.copy(alpha = 0.10f)
-                                    )
-                                )
+                    .then(
+                        if (gpuBlurSupported) {
+                            Modifier.drawBackdrop(
+                                backdrop = artworkBackdrop,
+                                shape = { RoundedCornerShape(28.dp) },
+                                effects = { backdropBlur(24.dp.toPx()) },
+                                onDrawSurface = landscapeSurface
+                            )
+                        } else {
+                            Modifier.blurredGlassBackground(
+                                artwork = blurredArtwork,
+                                shape = RoundedCornerShape(28.dp),
+                                onDrawSurface = landscapeSurface
                             )
                         }
                     )
