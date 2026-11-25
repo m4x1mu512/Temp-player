@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.DataInputStream
+import java.util.ArrayDeque
 
 data class PlaybackQueueState(
     val tracks: List<Track> = emptyList(),
@@ -165,15 +166,13 @@ class PlaybackManager private constructor(private val context: Context) {
 
     private fun reconcileQueueEntryIds(tracks: List<Track>): List<Long> {
         val previous = _queueState.value
-        val used = BooleanArray(previous.tracks.size)
+        val idsByTrack = HashMap<Track, ArrayDeque<Long>>()
+        previous.tracks.forEachIndexed { index, track ->
+            val entryId = previous.entryIds.getOrNull(index) ?: nextQueueEntryId++
+            idsByTrack.getOrPut(track) { ArrayDeque() }.addLast(entryId)
+        }
         return tracks.map { track ->
-            val match = previous.tracks.indices.firstOrNull { index ->
-                !used[index] && (previous.tracks[index] === track || previous.tracks[index] == track)
-            }
-            if (match != null) {
-                used[match] = true
-                previous.entryIds.getOrNull(match) ?: nextQueueEntryId++
-            } else nextQueueEntryId++
+            idsByTrack[track]?.pollFirst() ?: nextQueueEntryId++
         }
     }
 
