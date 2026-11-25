@@ -189,6 +189,11 @@ fun MiniPlayer(
             ThemeMode.SYSTEM -> isSystemInDarkTheme()
         }
         val appUsesLightTheme = !appUsesDarkTheme
+        // Collapsed mini-player controls follow the app theme, never the selected player
+        // background color. The play button uses the inverse foreground/background pair.
+        val miniControlColor = if (appUsesLightTheme) Color.Black else Color.White
+        val miniPlayButtonColor = if (appUsesLightTheme) Color.Black else Color.White
+        val miniPlayIconColor = if (appUsesLightTheme) Color.White else Color.Black
         val useWhiteAlbumModeText = appUsesDarkTheme
         val useBlackMiniPlayerText = appUsesLightTheme
         val colorScheme = rememberMiniPlayerColors(
@@ -381,7 +386,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                     contentDescription = if (isFavorite) "Удалить из избранного" else "В избранное",
-                                    tint = if (isFavorite) FavoriteRed else colorScheme.onSurfaceVariantColor,
+                                    tint = if (isFavorite) FavoriteRed else miniControlColor,
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -402,7 +407,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = miniControlColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -410,8 +415,8 @@ fun MiniPlayer(
                             FilledIconButton(
                                 onClick = onTogglePlayPause,
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = colorScheme.accentColor,
-                                    contentColor = colorScheme.onAccentColor
+                                    containerColor = miniPlayButtonColor,
+                                    contentColor = miniPlayIconColor
                                 ),
                                 modifier = Modifier
                                     .size(46.dp)
@@ -579,8 +584,8 @@ fun MiniPlayer(
                             FilledIconButton(
                                 onClick = onTogglePlayPause,
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = colorScheme.accentColor,
-                                    contentColor = colorScheme.onAccentColor
+                                    containerColor = miniPlayButtonColor,
+                                    contentColor = miniPlayIconColor
                                 ),
                                 modifier = Modifier
                                     .size(if (isCompactWidth) 42.dp else 48.dp)
