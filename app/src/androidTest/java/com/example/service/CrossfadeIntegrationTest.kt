@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -105,8 +106,12 @@ class CrossfadeIntegrationTest {
         prepareAndStart(second, "cancel-incoming")
 
         val cancelled = CountDownLatch(1)
+        val callbackCalls = AtomicInteger(0)
         instrumentation.runOnMainSync {
-            requireNotNull(controller).startCrossfade(first, second) { cancelled.countDown() }
+            requireNotNull(controller).startCrossfade(first, second) {
+                callbackCalls.incrementAndGet()
+                cancelled.countDown()
+            }
         }
         awaitCondition("crossfade should begin") {
             requireNotNull(controller).isCrossfading && second.volume == 0f
@@ -124,7 +129,7 @@ class CrossfadeIntegrationTest {
             "cancellation must invoke the completion hook exactly once",
             cancelled.await(1, TimeUnit.SECONDS)
         )
-        assertEquals("completion hook must not run twice", 0L, cancelled.count)
+        assertEquals("completion hook must run exactly once", 1, callbackCalls.get())
     }
 
     private fun prepareAndStart(player: ExoPlayer, id: String) {
