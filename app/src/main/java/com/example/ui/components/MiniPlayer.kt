@@ -447,7 +447,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = miniControlColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -575,7 +575,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = miniControlColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
@@ -619,7 +619,7 @@ fun MiniPlayer(
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = miniControlColor,
                                     modifier = Modifier.size(26.dp)
                                 )
                             }
