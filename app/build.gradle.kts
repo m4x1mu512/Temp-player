@@ -98,7 +98,20 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        // Robolectric downloads Android framework jars at test runtime (outside
+        // Gradle's dependency resolver). Use Maven Central's canonical endpoint
+        // rather than repo1, which has intermittently failed in GitHub Actions.
+        systemProperty(
+          "robolectric.dependency.repo.url",
+          "https://repo.maven.apache.org/maven2"
+        )
+      }
+    }
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
