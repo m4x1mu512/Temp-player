@@ -164,15 +164,30 @@ class PlaybackManager private constructor(private val context: Context) {
     private val _queueIndex = MutableStateFlow(-1)
     val queueIndex: StateFlow<Int> = _queueIndex.asStateFlow()
 
+    /**
+     * Stable identity for every occurrence in the queue.
+     *
+     * Entry ids are matched by media id, not by the whole Track object: editing a track's
+     * metadata replaces the object but must not change the row's identity, otherwise a
+     * pending "remove this row" action would silently target nothing. The fast path (same
+     * media ids in the same order) is allocation free; a full rebuild only happens when the
+     * queue identity really changed.
+     */
     private fun reconcileQueueEntryIds(tracks: List<Track>): List<Long> {
         val previous = _queueState.value
-        val idsByTrack = HashMap<Track, ArrayDeque<Long>>()
+        val previousIds = previous.entryIds
+        if (previousIds.size == previous.tracks.size && previous.tracks.size == tracks.size &&
+            previous.tracks.indices.all { previous.tracks[it].id == tracks[it].id }
+        ) {
+            return previousIds
+        }
+        val idsByMediaId = HashMap<Long, ArrayDeque<Long>>()
         previous.tracks.forEachIndexed { index, track ->
-            val entryId = previous.entryIds.getOrNull(index) ?: nextQueueEntryId++
-            idsByTrack.getOrPut(track) { ArrayDeque() }.addLast(entryId)
+            val entryId = previousIds.getOrNull(index) ?: nextQueueEntryId++
+            idsByMediaId.getOrPut(track.id) { ArrayDeque() }.addLast(entryId)
         }
         return tracks.map { track ->
-            idsByTrack[track]?.pollFirst() ?: nextQueueEntryId++
+            idsByMediaId[track.id]?.pollFirst() ?: nextQueueEntryId++
         }
     }
 
@@ -1130,9 +1145,19 @@ class PlaybackManager private constructor(private val context: Context) {
         saveCurrentState()
     }
 
-    fun removeTrackFromQueueEntry(entryId: Long) {
-        val index = _queueState.value.entryIds.indexOf(entryId)
-        if (index >= 0) removeTrackFromQueueAt(index)
+    /**
+     * Removes one queue occurrence by its stable entry id.
+     *
+     * The media id is a fallback: if the entry id is unknown (the row was already removed,
+     * or the queue was rebuilt between opening the menu and tapping delete) the occurrence
+     * with the same media id is removed instead of doing nothing at all.
+     */
+    fun removeTrackFromQueueEntry(entryId: Long, trackId: Long) {
+        val state = _queueState.value
+        val index = state.entryIds.indexOf(entryId).takeIf { it >= 0 }
+            ?: state.tracks.indexOfFirst { it.id == trackId }.takeIf { it >= 0 }
+            ?: return
+        removeTrackFromQueueAt(index)
     }
 
     fun removeTrackFromQueueAt(removeIndex: Int) {
