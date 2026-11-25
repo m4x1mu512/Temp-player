@@ -34,6 +34,23 @@ import com.example.TrackMoveLogger
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+/**
+ * Formats the row snapshot for the movement log.
+ *
+ * The rows are captured as two primitive arrays on the UI thread and formatted on the
+ * background writer: building a list of Pairs per drag event was the remaining main-thread
+ * cost of the diagnostic log.
+ */
+private fun formatRows(ids: LongArray, keys: LongArray): String {
+    val sb = StringBuilder(ids.size * 24)
+    for (i in ids.indices) {
+        if (i > 0) sb.append(';')
+        sb.append(i).append(":id=").append(ids[i])
+        if (i < keys.size) sb.append(",key=").append(keys[i])
+    }
+    return sb.toString()
+}
+
 @Composable
 fun ReorderableTrackList(
     tracks: List<Track>,
@@ -50,7 +67,7 @@ fun ReorderableTrackList(
     onEditTrackInfo: ((Track) -> Unit)? = null,
     onPlayNext: ((Track) -> Unit)? = null,
     onAddToQueue: ((Track) -> Unit)? = null,
-    onRemoveFromQueue: ((Long) -> Unit)? = null,
+    onRemoveFromQueue: ((Long, Track) -> Unit)? = null,
     entryIds: List<Long>? = null,
     onRemoveFromPlaylist: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
@@ -118,12 +135,13 @@ fun ReorderableTrackList(
     ) { from, to ->
         val fromIndex = from.index
         val toIndex = to.index
-        val rowsBeforeMove = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+        val rowsBeforeIds = LongArray(currentList.size) { currentList[it].id }
+        val rowsBeforeKeys = LongArray(entryKeys.size) { entryKeys[it] }
         val beforeCurrentTrackId = currentTrack?.id
         val beforeCurrentTrackIndex = currentTrackIndex
         TrackMoveLogger.log(context, "REORDER_CALLBACK_BEFORE") {
             "fromIndex=${fromIndex} toIndex=${toIndex} currentTrackId=$beforeCurrentTrackId currentTrackIndex=$beforeCurrentTrackIndex rows=" +
-                rowsBeforeMove.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                formatRows(rowsBeforeIds, rowsBeforeKeys)
         }
         currentList.apply {
             add(to.index, removeAt(from.index))
@@ -131,12 +149,13 @@ fun ReorderableTrackList(
         entryKeys.apply {
             add(to.index, removeAt(from.index))
         }
-        val rowsAfterMove = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+        val rowsAfterIds = LongArray(currentList.size) { currentList[it].id }
+        val rowsAfterKeys = LongArray(entryKeys.size) { entryKeys[it] }
         val afterCurrentTrackId = currentTrack?.id
         val afterCurrentTrackIndex = currentTrackIndex
         TrackMoveLogger.log(context, "REORDER_CALLBACK_AFTER") {
             "currentTrackId=$afterCurrentTrackId currentTrackIndex=$afterCurrentTrackIndex rows=" +
-                rowsAfterMove.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                formatRows(rowsAfterIds, rowsAfterKeys)
         }
         try {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -253,7 +272,7 @@ fun ReorderableTrackList(
                     onEditTrackInfo = { onEditTrackInfo?.invoke(track) },
                     onPlayNext = onPlayNext?.let { callback -> { callback(track) } },
                     onAddToQueue = onAddToQueue?.let { callback -> { callback(track) } },
-                    onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(itemKey) } },
+                    onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(itemKey, track) } },
                     onRemoveFromPlaylist = onRemoveFromPlaylist?.let { callback -> { callback(track) } },
                     showReorderHandle = reorderEnabled,
                     isDragging = isDragging,
@@ -285,7 +304,8 @@ fun ReorderableTrackList(
                                 }
                             } ?: -1
                             dragCurrentTrackEntryKey = entryKeys.getOrNull(liveCurrentIndex)
-                            val dragStartRows = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+                            val dragStartIds = LongArray(currentList.size) { currentList[it].id }
+                            val dragStartKeys = LongArray(entryKeys.size) { entryKeys[it] }
                             val draggedTrackId = currentList.getOrNull(liveDraggedIndex)?.id
                             val currentTrackIdAtStart = liveTrack?.id
                             val pinnedCurrentKey = dragCurrentTrackEntryKey
@@ -295,14 +315,15 @@ fun ReorderableTrackList(
                                 "draggedIndex=$liveDraggedIndex draggedTrackId=$draggedTrackId draggedEntryKey=$itemKey " +
                                     "currentTrackId=$currentTrackIdAtStart currentTrackIndex=$liveQueueIndex resolvedCurrentIndex=$resolvedIndexAtStart " +
                                     "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$pinnedCurrentKey isPlaying=$isPlayingAtStart rows=" +
-                                    dragStartRows.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                                    formatRows(dragStartIds, dragStartKeys)
                             }
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
                             val from = dragStartIndex ?: -1
                             val to = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
-                            val dragStopRows = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+                            val dragStopIds = LongArray(currentList.size) { currentList[it].id }
+                            val dragStopKeys = LongArray(entryKeys.size) { entryKeys[it] }
                             val draggedTrackIdAtStop = currentList.getOrNull(to)?.id
                             val currentTrackIdAtStop = latestCurrentTrack?.id
                             val currentTrackIndexAtStop = latestCurrentTrackIndex
@@ -314,7 +335,7 @@ fun ReorderableTrackList(
                                     "draggedTrackId=$draggedTrackIdAtStop currentTrackId=$currentTrackIdAtStop " +
                                     "currentTrackIndex=$currentTrackIndexAtStop resolvedCurrentIndex=$resolvedIndexAtStop " +
                                     "pinnedCurrentKey=$pinnedKeyAtStop isPlaying=$isPlayingAtStop rows=" +
-                                    dragStopRows.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                                    formatRows(dragStopIds, dragStopKeys)
                             }
                             if (from >= 0 && to >= 0 && from != to) {
                                 // 'from' is the index in the unchanged parent snapshot at
