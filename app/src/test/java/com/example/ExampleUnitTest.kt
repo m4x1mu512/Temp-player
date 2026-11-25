@@ -1,6 +1,7 @@
 package com.example
 
 import com.example.service.CrossfadeController
+import com.example.service.PlayerVolumeCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,6 +12,30 @@ import org.junit.Test
 
 class ExampleUnitTest {
     @Test
+    fun `shared volume gains are multiplied and clamped independently`() {
+        assertEquals(
+            0.25f,
+            PlayerVolumeCoordinator.calculateOutputVolume(
+                master = 0.5f,
+                replayGain = 0.5f,
+                crossfade = 1f,
+                transition = 1f
+            ),
+            0.0001f
+        )
+        assertEquals(
+            0f,
+            PlayerVolumeCoordinator.calculateOutputVolume(1f, 0.8f, 0f, 0.4f),
+            0.0001f
+        )
+        assertEquals(
+            1f,
+            PlayerVolumeCoordinator.calculateOutputVolume(2f, Float.NaN, 1f, 1f),
+            0.0001f
+        )
+    }
+
+    @Test
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)
     }
@@ -18,7 +43,7 @@ class ExampleUnitTest {
     @Test
     fun `test crossfade controller trigger conditions`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val controller = CrossfadeController(scope)
+        val controller = CrossfadeController(scope, PlayerVolumeCoordinator())
 
         assertEquals(true, controller.isEnabled)
         assertEquals(4, controller.durationSeconds)
