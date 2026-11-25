@@ -18,7 +18,8 @@ import kotlin.math.sin
  * while seamlessly blending the end of one track into the beginning of the next.
  */
 class CrossfadeController(
-    private val coroutineScope: CoroutineScope
+    private val coroutineScope: CoroutineScope,
+    private val volumeCoordinator: PlayerVolumeCoordinator
 ) {
     companion object {
         private const val TAG = "CrossfadeController"
@@ -74,7 +75,7 @@ class CrossfadeController(
     ) {
         if (outgoingPlayer === incomingPlayer) {
             Log.w(TAG, "Outgoing and incoming players are identical! Aborting crossfade.")
-            outgoingPlayer.volume = 1f
+            volumeCoordinator.setCrossfadeGain(outgoingPlayer, 1f)
             onCrossfadeComplete()
             return
         }
@@ -86,7 +87,7 @@ class CrossfadeController(
         completionCallback = onCrossfadeComplete
 
         // Incoming player starts at silence
-        incomingPlayer.volume = 0f
+        volumeCoordinator.setCrossfadeGain(incomingPlayer, 0f)
 
         val totalMs = durationMs
         val totalSteps = (totalMs / STEP_INTERVAL_MS).toInt().coerceAtLeast(10)
@@ -102,8 +103,8 @@ class CrossfadeController(
                     val outVol = cos(progress * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
                     val inVol = sin(progress * (PI / 2.0)).toFloat().coerceIn(0f, 1f)
 
-                    outgoingPlayer.volume = outVol
-                    incomingPlayer.volume = inVol
+                    volumeCoordinator.setCrossfadeGain(outgoingPlayer, outVol)
+                    volumeCoordinator.setCrossfadeGain(incomingPlayer, inVol)
                 }
             } catch (e: Exception) {
                 Log.d(TAG, "Crossfade interrupted: ${e.message}")
@@ -111,12 +112,12 @@ class CrossfadeController(
                 // Only clean up if this was still the active crossfade job
                 if (crossfadeJob === coroutineContext[Job]) {
                     try {
-                        outgoingPlayer.volume = 1f
+                        volumeCoordinator.setCrossfadeGain(outgoingPlayer, 0f)
                         outgoingPlayer.stop()
                         outgoingPlayer.clearMediaItems()
                     } catch (_: Exception) {}
                     try {
-                        incomingPlayer.volume = 1f
+                        volumeCoordinator.setCrossfadeGain(incomingPlayer, 1f)
                     } catch (_: Exception) {}
 
                     fadingOutPlayer = null
@@ -143,12 +144,12 @@ class CrossfadeController(
         completionCallback = null
         job.cancel()
         try {
-            fadingOutPlayer?.volume = 1f
+            fadingOutPlayer?.let { volumeCoordinator.setCrossfadeGain(it, 0f) }
             fadingOutPlayer?.stop()
             fadingOutPlayer?.clearMediaItems()
         } catch (_: Exception) {}
         try {
-            fadingInPlayer?.volume = 1f
+            fadingInPlayer?.let { volumeCoordinator.setCrossfadeGain(it, 1f) }
         } catch (_: Exception) {}
         fadingOutPlayer = null
         fadingInPlayer = null
