@@ -17,6 +17,20 @@ class PlayerVolumeCoordinatorTest {
             0.25f,
             PlayerVolumeCoordinator.calculateOutputVolume(
                 replayGain = 0.5f,
+                crossfade = 0.5f,
+                transition = 1f
+            ),
+            0.0001f
+        )
+    }
+
+    @Test
+    fun `a single gain is not doubled`() {
+        // The master factor is gone: one gain of 0.5 gives 0.5, not 0.25.
+        assertEquals(
+            0.5f,
+            PlayerVolumeCoordinator.calculateOutputVolume(
+                replayGain = 0.5f,
                 crossfade = 1f,
                 transition = 1f
             ),
