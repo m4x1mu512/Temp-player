@@ -25,7 +25,10 @@ import kotlin.math.pow
  * - Does not fight with user-configured Equalizer, Preamp, or Loudness Enhancer.
  */
 @OptIn(UnstableApi::class)
-class ReplayGainController(private val context: Context) {
+class ReplayGainController(
+    private val context: Context,
+    private val volumeCoordinator: PlayerVolumeCoordinator
+) {
 
     companion object {
         private const val TAG = "ReplayGainController"
@@ -53,9 +56,11 @@ class ReplayGainController(private val context: Context) {
     private var smoothedRms: Float = TARGET_RMS
     private var bufferCount: Int = 0
     private var currentAppliedGainDb: Float = 0f
+    private var currentAppliedGainFactor: Float = 1f
 
     fun attachPlayer(player: ExoPlayer) {
         this.exoPlayer = player
+        volumeCoordinator.attach(player)
         applyCurrentGain(smooth = false)
     }
 
@@ -83,6 +88,7 @@ class ReplayGainController(private val context: Context) {
         bufferCount = 0
         isGainLocked = false
         currentAppliedGainDb = 0f
+        currentAppliedGainFactor = 1f
 
         if (isEnabled) {
             applyCurrentGain(smooth = false)
@@ -164,10 +170,7 @@ class ReplayGainController(private val context: Context) {
         }
     }
 
-    var isInternalVolumeAdjustment: Boolean = false
-
     private fun applyCurrentGainInternal(smooth: Boolean) {
-        if (isInternalVolumeAdjustment) return
         if (!isEnabled) {
             setUnityGainInternal(smooth)
             return
@@ -199,18 +202,18 @@ class ReplayGainController(private val context: Context) {
     }
 
     private fun setUnityGainInternal(smooth: Boolean) {
-        if (isInternalVolumeAdjustment) return
         currentAppliedGainDb = 0f
         setPlayerVolume(1.0f, smooth)
     }
 
     private fun setPlayerVolume(targetVolume: Float, smooth: Boolean) {
         val player = exoPlayer ?: return
-        val currentVolume = player.volume
+        val currentVolume = volumeCoordinator.getReplayGain(player)
 
         if (!smooth || kotlin.math.abs(currentVolume - targetVolume) < 0.01f) {
             volumeAnimator?.cancel()
-            player.volume = targetVolume
+            currentAppliedGainFactor = targetVolume
+            volumeCoordinator.setReplayGain(player, targetVolume)
             return
         }
 
@@ -221,7 +224,9 @@ class ReplayGainController(private val context: Context) {
             interpolator = LinearInterpolator()
             addUpdateListener { anim ->
                 try {
-                    player.volume = anim.animatedValue as Float
+                    val gain = anim.animatedValue as Float
+                    currentAppliedGainFactor = gain
+                    volumeCoordinator.setReplayGain(player, gain)
                 } catch (_: Exception) {}
             }
             start()
@@ -231,6 +236,7 @@ class ReplayGainController(private val context: Context) {
     fun release() {
         volumeAnimator?.cancel()
         volumeAnimator = null
+        exoPlayer?.let { volumeCoordinator.release(it) }
         exoPlayer = null
     }
 }
