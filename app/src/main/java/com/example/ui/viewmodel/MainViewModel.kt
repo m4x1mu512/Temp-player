@@ -722,8 +722,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         playbackManager.removeTrackFromQueueAt(index)
     }
 
-    fun removeFromQueueEntry(entryId: Long) {
-        playbackManager.removeTrackFromQueueEntry(entryId)
+    fun removeFromQueueEntry(entryId: Long, trackId: Long) {
+        playbackManager.removeTrackFromQueueEntry(entryId, trackId)
     }
 
     fun clearQueue() {
