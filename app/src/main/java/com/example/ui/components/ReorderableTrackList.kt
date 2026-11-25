@@ -116,24 +116,26 @@ fun ReorderableTrackList(
         lazyListState = listState,
         scrollThresholdPadding = contentPadding
     ) { from, to ->
-        TrackMoveLogger.log(
-            context,
-            "REORDER_CALLBACK_BEFORE",
-            "fromIndex=${from.index} toIndex=${to.index} currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} rows=" +
-                currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
-        )
+        val rowsBeforeMove = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+        val beforeCurrentTrackId = currentTrack?.id
+        val beforeCurrentTrackIndex = currentTrackIndex
+        TrackMoveLogger.log(context, "REORDER_CALLBACK_BEFORE") {
+            "fromIndex=${from.index} toIndex=${to.index} currentTrackId=$beforeCurrentTrackId currentTrackIndex=$beforeCurrentTrackIndex rows=" +
+                rowsBeforeMove.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+        }
         currentList.apply {
             add(to.index, removeAt(from.index))
         }
         entryKeys.apply {
             add(to.index, removeAt(from.index))
         }
-        TrackMoveLogger.log(
-            context,
-            "REORDER_CALLBACK_AFTER",
-            "currentTrackId=${currentTrack?.id} currentTrackIndex=${currentTrackIndex} rows=" +
-                currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
-        )
+        val rowsAfterMove = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+        val afterCurrentTrackId = currentTrack?.id
+        val afterCurrentTrackIndex = currentTrackIndex
+        TrackMoveLogger.log(context, "REORDER_CALLBACK_AFTER") {
+            "currentTrackId=$afterCurrentTrackId currentTrackIndex=$afterCurrentTrackIndex rows=" +
+                rowsAfterMove.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+        }
         try {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         } catch (_: Exception) {}
@@ -281,28 +283,37 @@ fun ReorderableTrackList(
                                 }
                             } ?: -1
                             dragCurrentTrackEntryKey = entryKeys.getOrNull(liveCurrentIndex)
-                            TrackMoveLogger.log(
-                                context,
-                                "DRAG_START",
-                                "draggedIndex=$liveDraggedIndex draggedTrackId=${currentList.getOrNull(liveDraggedIndex)?.id} draggedEntryKey=$itemKey " +
-                                    "currentTrackId=${liveTrack?.id} currentTrackIndex=${liveQueueIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
-                                    "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$latestIsPlaying rows=" +
-                                    currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
-                            )
+                            val dragStartRows = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+                            val draggedTrackId = currentList.getOrNull(liveDraggedIndex)?.id
+                            val currentTrackIdAtStart = liveTrack?.id
+                            val pinnedCurrentKey = dragCurrentTrackEntryKey
+                            val resolvedIndexAtStart = resolvedCurrentTrackIndex
+                            val isPlayingAtStart = latestIsPlaying
+                            TrackMoveLogger.log(context, "DRAG_START") {
+                                "draggedIndex=$liveDraggedIndex draggedTrackId=$draggedTrackId draggedEntryKey=$itemKey " +
+                                    "currentTrackId=$currentTrackIdAtStart currentTrackIndex=$liveQueueIndex resolvedCurrentIndex=$resolvedIndexAtStart " +
+                                    "liveCurrentIndex=$liveCurrentIndex pinnedCurrentKey=$pinnedCurrentKey isPlaying=$isPlayingAtStart rows=" +
+                                    dragStartRows.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                            }
                         },
                         onDragStopped = {
                             val startKey = dragStartEntryKey
                             val from = dragStartIndex ?: -1
                             val to = startKey?.let { key -> entryKeys.indexOf(key) } ?: -1
-                            TrackMoveLogger.log(
-                                context,
-                                "DRAG_STOP",
+                            val dragStopRows = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
+                            val draggedTrackIdAtStop = currentList.getOrNull(to)?.id
+                            val currentTrackIdAtStop = latestCurrentTrack?.id
+                            val currentTrackIndexAtStop = latestCurrentTrackIndex
+                            val resolvedIndexAtStop = resolvedCurrentTrackIndex
+                            val pinnedKeyAtStop = dragCurrentTrackEntryKey
+                            val isPlayingAtStop = latestIsPlaying
+                            TrackMoveLogger.log(context, "DRAG_STOP") {
                                 "fromOriginalIndex=$from resolvedToIndex=$to draggedEntryKey=$startKey " +
-                                    "draggedTrackId=${currentList.getOrNull(to)?.id} currentTrackId=${latestCurrentTrack?.id} " +
-                                    "currentTrackIndex=${latestCurrentTrackIndex} resolvedCurrentIndex=$resolvedCurrentTrackIndex " +
-                                    "pinnedCurrentKey=$dragCurrentTrackEntryKey isPlaying=$latestIsPlaying rows=" +
-                                    currentList.indices.joinToString(";") { i -> "$i:id=${currentList[i].id},key=${entryKeys.getOrNull(i)}" }
-                            )
+                                    "draggedTrackId=$draggedTrackIdAtStop currentTrackId=$currentTrackIdAtStop " +
+                                    "currentTrackIndex=$currentTrackIndexAtStop resolvedCurrentIndex=$resolvedIndexAtStop " +
+                                    "pinnedCurrentKey=$pinnedKeyAtStop isPlaying=$isPlayingAtStop rows=" +
+                                    dragStopRows.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
+                            }
                             if (from >= 0 && to >= 0 && from != to) {
                                 // 'from' is the index in the unchanged parent snapshot at
                                 // drag start; 'to' is the final index in the locally reordered
