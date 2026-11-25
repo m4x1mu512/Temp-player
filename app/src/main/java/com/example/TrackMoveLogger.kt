@@ -6,6 +6,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Small, bounded diagnostic log dedicated to reorder/highlight investigation.
@@ -15,24 +20,41 @@ object TrackMoveLogger {
     private const val FILE_NAME = "track_movement_logs.txt"
     private const val MAX_BYTES = 1_500_000L
     private val lock = Any()
+    private val threadNumber = AtomicInteger()
+    private val writer = ThreadPoolExecutor(
+        1, 1, 0L, TimeUnit.MILLISECONDS, ArrayBlockingQueue(256),
+        ThreadFactory { task ->
+            Thread(task, "TrackMoveLogger-" + threadNumber.incrementAndGet()).apply { isDaemon = true }
+        },
+        ThreadPoolExecutor.DiscardOldestPolicy()
+    )
     @Volatile var enabled: Boolean = true
 
     private fun file(context: Context) = File(context.filesDir, FILE_NAME)
 
-    fun log(context: Context, event: String, details: String) {
+    fun log(context: Context, event: String, details: () -> String) {
         if (!enabled) return
-        synchronized(lock) {
-            try {
-                val target = file(context)
-                if (target.exists() && target.length() > MAX_BYTES) {
-                    val old = target.readText()
-                    target.writeText("=== LOG ROTATED ===\n" + old.takeLast((MAX_BYTES / 2).toInt()))
+        val appContext = context.applicationContext
+        try {
+            writer.execute {
+                if (!enabled) return@execute
+                val message = try { details() } catch (_: Exception) { "details unavailable" }
+                synchronized(lock) {
+                    try {
+                        val target = file(appContext)
+                        if (target.exists() && target.length() > MAX_BYTES) {
+                            val old = target.readText()
+                            target.writeText("=== LOG ROTATED ===\\n" + old.takeLast((MAX_BYTES / 2).toInt()))
+                        }
+                        val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
+                        target.appendText("$timestamp | $event | $message\\n")
+                    } catch (_: Exception) {
+                        // Diagnostics must never interrupt playback or reordering.
+                    }
                 }
-                val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
-                target.appendText("$timestamp | $event | $details\n")
-            } catch (_: Exception) {
-                // Diagnostics must never interrupt playback or reordering.
             }
+        } catch (_: Exception) {
+            // A saturated diagnostic queue must never affect playback or reordering.
         }
     }
 
