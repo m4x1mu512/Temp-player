@@ -83,6 +83,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.CrashLogger
 import com.example.data.model.MiniPlayerBgMode
@@ -91,6 +92,9 @@ import com.example.ui.components.EqualizerDialog
 import com.example.ui.components.MiniPlayer
 import com.example.ui.components.SleepTimerDialog
 import com.example.ui.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 @Composable
@@ -151,16 +155,23 @@ fun SettingsScreen(
         }
     }
 
+    val exportScope = rememberCoroutineScope()
     val movementLogExporter = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/plain")
     ) { uri: Uri? ->
         if (uri != null) {
-            val exported = TrackMoveLogger.exportTo(context, uri)
-            Toast.makeText(
-                context,
-                if (exported) "Логи перемещения сохранены" else "Не удалось сохранить логи",
-                Toast.LENGTH_LONG
-            ).show()
+            // The log file can grow to 1.5 MB: reading and writing it must not happen on
+            // the UI thread, it would stall the frame and can trigger an ANR.
+            exportScope.launch(Dispatchers.IO) {
+                val exported = TrackMoveLogger.exportTo(context, uri)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        if (exported) "Логи перемещения сохранены" else "Не удалось сохранить логи",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 

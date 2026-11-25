@@ -278,7 +278,10 @@ fun ExpandablePlayerSheet(
     val selectedAccentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val trackAudioSpecs by viewModel.trackAudioSpecs.collectAsStateWithLifecycle()
 
-    val audioSpecs = trackAudioSpecs ?: remember(track.path, track.uriString, track.size, track.duration) {
+    // The fallback is remembered unconditionally: putting the remember() inside the elvis
+    // made the number of remember slots in this scope depend on whether the asynchronously
+    // parsed specs had arrived yet, which shifts Compose's slot table between recompositions.
+    val fallbackAudioSpecs = remember(track.path, track.uriString, track.size, track.duration) {
         val ext = (if (track.path.isNotBlank()) track.path else track.uriString)
             .substringBefore('?')
             .substringAfterLast('.', "")
@@ -296,6 +299,7 @@ fun ExpandablePlayerSheet(
             isLossless = ext in listOf("FLAC", "WAV", "ALAC", "AIFF")
         )
     }
+    val audioSpecs = trackAudioSpecs ?: fallbackAudioSpecs
 
     val colorScheme = rememberPlayerColors(
         bgMode = miniPlayerBgMode,

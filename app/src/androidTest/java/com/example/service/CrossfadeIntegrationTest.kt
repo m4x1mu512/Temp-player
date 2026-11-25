@@ -46,7 +46,9 @@ class CrossfadeIntegrationTest {
         instrumentation.runOnMainSync {
             outgoing = ExoPlayer.Builder(context).build()
             incoming = ExoPlayer.Builder(context).build()
-            controller = CrossfadeController(scope).apply { durationSeconds = 1 }
+            // The controller needs the shared volume owner: it no longer writes
+            // ExoPlayer.volume directly.
+            controller = CrossfadeController(scope, PlayerVolumeCoordinator()).apply { durationSeconds = 1 }
         }
     }
 

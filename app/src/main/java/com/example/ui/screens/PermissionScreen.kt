@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,10 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 
 @Composable
 fun PermissionScreen(
@@ -42,11 +45,33 @@ fun PermissionScreen(
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
 
+    val context = LocalContext.current
+    val continueToApp: () -> Unit = { onPermissionGranted() }
+
+    // Android 13+ hides the foreground-service notification unless the app holds
+    // POST_NOTIFICATIONS. The media notification is the only way to control playback from
+    // the shade or the lock screen, so it is requested right after the audio permission.
+    // A denial must not block the app: the player works without the notification.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {
+        continueToApp()
+    }
+
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            onPermissionGranted()
+            val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            if (needsNotificationPermission) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                continueToApp()
+            }
         }
     }
 

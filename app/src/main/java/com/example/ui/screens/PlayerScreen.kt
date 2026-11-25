@@ -305,7 +305,10 @@ fun PlayerScreen(
     val miniPlayerBgMode by viewModel.miniPlayerBgMode.collectAsStateWithLifecycle()
     val miniPlayerCustomColor by viewModel.miniPlayerCustomColor.collectAsStateWithLifecycle()
 
-    val audioSpecs = trackAudioSpecs ?: remember(currentTrack) {
+    // The fallback is remembered unconditionally: a remember() inside the elvis made the
+    // number of remember slots in this scope depend on whether the asynchronously parsed
+    // specs had arrived yet, which shifts Compose's slot table between recompositions.
+    val fallbackAudioSpecs = remember(currentTrack) {
         currentTrack?.let { t ->
             val ext = (if (t.path.isNotBlank()) t.path else t.uriString).substringBefore('?').substringAfterLast('.', "").uppercase().ifEmpty { "MP3" }
             val calcBitrate = if (t.size > 0 && t.duration > 0) ((t.size * 8L) / t.duration).toInt().coerceIn(32, 9216) else 320
@@ -319,6 +322,7 @@ fun PlayerScreen(
             )
         }
     }
+    val audioSpecs = trackAudioSpecs ?: fallbackAudioSpecs
 
     val colorScheme = rememberPlayerColors(
         bgMode = miniPlayerBgMode,

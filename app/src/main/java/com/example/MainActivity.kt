@@ -83,19 +83,20 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            isServiceBound = false
+            // The service process died. The binding itself stays registered and the system
+            // re-connects it, but the service has to be started again: otherwise playback
+            // stays dead until the activity is backgrounded and foregrounded again.
+            startPlaybackService()
         }
     }
 
     private var serviceStartPosted = false
-    private var serviceStartPending = false
 
     override fun onStart() {
         super.onStart()
         viewModel.ensureVisualizerStarted()
         if (!serviceStartPosted) {
             serviceStartPosted = true
-            serviceStartPending = true
             // Create the service after the first frame. Its onCreate builds ExoPlayer and the
             // media session, and both used to sit on the launch path between onCreate and the
             // first draw. MediaSessionService promotes itself to the foreground once playback
@@ -104,18 +105,17 @@ class MainActivity : ComponentActivity() {
             Choreographer.getInstance().postFrameCallback {
                 window.decorView.post {
                     if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@post
-                    serviceStartPending = false
                     startPlaybackService()
                     bindPlaybackService()
                 }
             }
         } else {
             // Covers a start that was skipped because the activity left the foreground before
-            // the deferred callback ran.
-            if (serviceStartPending) {
-                serviceStartPending = false
-                startPlaybackService()
-            }
+            // the deferred callback ran, and restarts a service that was stopped meanwhile.
+            // Always make sure the service is running: it may have been stopped while the
+            // activity was in the background (onTaskRemoved -> stopSelf), and the players it
+            // owns are released with it.
+            startPlaybackService()
             bindPlaybackService()
         }
     }
@@ -130,12 +130,16 @@ class MainActivity : ComponentActivity() {
 
     private fun bindPlaybackService() {
         try {
-            bindService(
+            // bindService() reports whether the binding was established. Relying on
+            // onServiceConnected alone meant that a service that never connected was never
+            // unbound, which leaks the ServiceConnection with the activity.
+            isServiceBound = bindService(
                 Intent(this, PlaybackService::class.java),
                 serviceConnection,
                 Context.BIND_AUTO_CREATE
             )
         } catch (e: Exception) {
+            isServiceBound = false
             e.printStackTrace()
         }
     }

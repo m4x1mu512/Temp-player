@@ -743,7 +743,7 @@ fun LibraryScreen(
                                             onAddToPlaylist = onAddToPlaylistCallback,
                                             onEditTrackInfo = onEditTrackInfoCallback,
                                             onMoveTrack = { from, to -> viewModel.moveQueueTrack(from, to) },
-                                            onRemoveFromQueue = { entryId -> viewModel.removeFromQueueEntry(entryId) }
+                                            onRemoveFromQueue = { entryId, track -> viewModel.removeFromQueueEntry(entryId, track.id) }
                                         )
 
                                         ScrollToCurrentTrackFab(
