@@ -90,6 +90,19 @@ interface FavoriteDao {
 
     @Query("DELETE FROM favorites WHERE trackId = :trackId")
     suspend fun removeFavorite(trackId: Long)
+
+    /**
+     * Read-modify-write must be one Room transaction. Separate repository calls can
+     * interleave when the user taps the favorite control repeatedly or from two lists.
+     */
+    @Transaction
+    suspend fun toggleFavorite(trackId: Long) {
+        if (isFavoriteDirect(trackId)) {
+            removeFavorite(trackId)
+        } else {
+            addFavorite(FavoriteEntity(trackId = trackId))
+        }
+    }
 }
 
 @Dao
