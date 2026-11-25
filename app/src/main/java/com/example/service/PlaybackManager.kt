@@ -322,7 +322,7 @@ class PlaybackManager private constructor(private val context: Context) {
         }
     }
 
-    private data class PendingPlay(val track: Track, val startPaused: Boolean)
+    private data class PendingPlay(val track: Track, val startPaused: Boolean, val positionMs: Long)
     private var pendingPlayTrack: PendingPlay? = null
 
     private fun createPlayerListener(isPlayerA: Boolean) = object : Player.Listener {
@@ -483,13 +483,13 @@ class PlaybackManager private constructor(private val context: Context) {
         if (pending != null) {
             pendingPlayTrack = null
             executePlay(player1, pending.track, startPaused = pending.startPaused)
-            serviceScope.launch {
-                val lastPos = settingsDataStore.lastPositionFlow.first()
-                if (lastPos > 0) {
-                    player1.seekTo(lastPos)
-                    _playbackPosition.value = lastPos
-                }
+            // Carry the position together with the pending track. Reading a separately
+            // persisted "last position" here can apply the previous track's position if
+            // asynchronous DataStore writes have not caught up with the track change.
+            if (pending.positionMs > 0L) {
+                player1.seekTo(pending.positionMs)
             }
+            _playbackPosition.value = pending.positionMs
         } else if (player1.currentMediaItem == null && _currentTrack.value != null) {
             val track = _currentTrack.value!!
             executePlay(player1, track, startPaused = !_isPlaying.value)
@@ -688,7 +688,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
             val player = activePlayer
             if (player == null) {
-                pendingPlayTrack = PendingPlay(track, startPaused)
+                pendingPlayTrack = PendingPlay(track, startPaused, _playbackPosition.value)
                 saveCurrentState()
                 startServiceIfNeeded()
                 return
@@ -800,7 +800,7 @@ class PlaybackManager private constructor(private val context: Context) {
         val track = _currentTrack.value
         if (player == null) {
             if (track != null) {
-                pendingPlayTrack = PendingPlay(track, startPaused = false)
+                pendingPlayTrack = PendingPlay(track, startPaused = false, positionMs = _playbackPosition.value)
             }
             startServiceIfNeeded()
             return
@@ -1680,7 +1680,7 @@ class PlaybackManager private constructor(private val context: Context) {
             executePlay(player, track, startPaused = true)
             if (positionMs > 0L) player.seekTo(positionMs)
         } else {
-            pendingPlayTrack = PendingPlay(track, startPaused = true)
+            pendingPlayTrack = PendingPlay(track, startPaused = true, positionMs = positionMs)
         }
     }
 
