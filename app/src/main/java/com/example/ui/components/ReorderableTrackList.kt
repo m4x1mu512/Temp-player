@@ -50,7 +50,8 @@ fun ReorderableTrackList(
     onEditTrackInfo: ((Track) -> Unit)? = null,
     onPlayNext: ((Track) -> Unit)? = null,
     onAddToQueue: ((Track) -> Unit)? = null,
-    onRemoveFromQueue: ((Track, Int) -> Unit)? = null,
+    onRemoveFromQueue: ((Long) -> Unit)? = null,
+    entryIds: List<Long>? = null,
     onRemoveFromPlaylist: ((Track) -> Unit)? = null,
     highlightedTrackId: Long? = null,
     currentTrackIndex: Int? = null,
@@ -91,7 +92,9 @@ fun ReorderableTrackList(
 
     val currentList = remember { mutableStateListOf<Track>().apply { addAll(tracks) } }
     // Stable per-row keys: unlike Track.id, these identify an occurrence in the list.
-    val entryKeys = remember { mutableStateListOf<Long>().apply { tracks.indices.forEach { add(it.toLong()) } } }
+    val entryKeys = remember { mutableStateListOf<Long>().apply {
+        addAll(entryIds?.takeIf { it.size == tracks.size } ?: tracks.indices.map { it.toLong() })
+    } }
     var nextEntryKey by remember { mutableLongStateOf(tracks.size.toLong()) }
     var dragStartEntryKey by remember { mutableStateOf<Long?>(null) }
     var dragStartIndex by remember { mutableStateOf<Int?>(null) }
@@ -139,7 +142,7 @@ fun ReorderableTrackList(
     // Synchronize without allocating temporary ID lists. Also refresh Track objects
     // when their IDs/order stay the same but metadata (title, artist, art URI) changes.
     // The effect runs only when the source list changes, never on drag animation frames.
-    LaunchedEffect(tracks, dragInProgress, pendingParentOrder) {
+    LaunchedEffect(tracks, entryIds, dragInProgress, pendingParentOrder) {
         if (!dragInProgress && !reorderableLazyListState.isAnyItemDragging) {
             val pending = pendingParentOrder
             if (pending != null && tracks != pending) {
@@ -155,16 +158,15 @@ fun ReorderableTrackList(
             val oldTracks = currentList.toList()
             val oldKeys = entryKeys.toList()
             val used = BooleanArray(oldTracks.size)
-            val reconciledKeys = tracks.mapIndexed { index, track ->
+            val suppliedEntryIds = entryIds?.takeIf { it.size == tracks.size }
+            val reconciledKeys = suppliedEntryIds ?: tracks.map { track ->
                 val match = oldTracks.indices.firstOrNull { oldIndex ->
                     !used[oldIndex] && oldTracks[oldIndex] == track
                 }
                 if (match != null) {
                     used[match] = true
                     oldKeys[match]
-                } else {
-                    nextEntryKey++
-                }
+                } else nextEntryKey++
             }
 
             currentList.clear()
@@ -247,7 +249,7 @@ fun ReorderableTrackList(
                     onEditTrackInfo = { onEditTrackInfo?.invoke(track) },
                     onPlayNext = onPlayNext?.let { callback -> { callback(track) } },
                     onAddToQueue = onAddToQueue?.let { callback -> { callback(track) } },
-                    onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(track, index) } },
+                    onRemoveFromQueue = onRemoveFromQueue?.let { callback -> { callback(itemKey) } },
                     onRemoveFromPlaylist = onRemoveFromPlaylist?.let { callback -> { callback(track) } },
                     showReorderHandle = reorderEnabled,
                     isDragging = isDragging,
