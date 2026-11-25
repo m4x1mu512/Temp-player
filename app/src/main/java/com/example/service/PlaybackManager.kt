@@ -626,6 +626,7 @@ class PlaybackManager private constructor(private val context: Context) {
             newPlayer.addListener(playerAListener)
         }
         volumeCoordinator.attach(newPlayer)
+        volumeCoordinator.setTransitionGain(newPlayer, equalizerTransitionGain)
         return newPlayer
     }
 
@@ -1266,6 +1267,7 @@ class PlaybackManager private constructor(private val context: Context) {
 
     private var equalizerVolumeTransitionJob: Job? = null
     private var equalizerVolumeTransitionGeneration: Long = 0L
+    private var equalizerTransitionGain: Float = 1f
 
     fun setEqualizerEnabled(enabled: Boolean) {
         _isEqualizerEnabled.value = enabled
@@ -1275,6 +1277,12 @@ class PlaybackManager private constructor(private val context: Context) {
 
         val player = activePlayer
         if (player == null || (!player.isPlaying && !player.playWhenReady)) {
+            ++equalizerVolumeTransitionGeneration
+            equalizerVolumeTransitionJob?.cancel()
+            equalizerVolumeTransitionJob = null
+            equalizerTransitionGain = 1f
+            playerA?.let { volumeCoordinator.setTransitionGain(it, 1f) }
+            playerB?.let { volumeCoordinator.setTransitionGain(it, 1f) }
             if (!enabled) {
                 // When disabling without active playback: zero bands first as in Rhythm
                 equalizerController.equalizerProcessor.setLevels(List(5) { 0 })
@@ -1283,11 +1291,12 @@ class PlaybackManager private constructor(private val context: Context) {
             return
         }
 
-        equalizerVolumeTransitionJob?.cancel()
         val generation = ++equalizerVolumeTransitionGeneration
+        equalizerVolumeTransitionJob?.cancel()
 
         // Duck only the temporary transition factor. ReplayGain and crossfade factors remain
         // intact and are multiplied back in by PlayerVolumeCoordinator on every update.
+        equalizerTransitionGain = 0f
         playerA?.let { volumeCoordinator.setTransitionGain(it, 0f) }
         playerB?.let { volumeCoordinator.setTransitionGain(it, 0f) }
 
@@ -1308,6 +1317,7 @@ class PlaybackManager private constructor(private val context: Context) {
                 val rampStepDelayMs = 20L
                 repeat(rampSteps) { step ->
                     val fraction = (step + 1).toFloat() / rampSteps.toFloat()
+                    equalizerTransitionGain = fraction
                     playerA?.let { volumeCoordinator.setTransitionGain(it, fraction) }
                     playerB?.let { volumeCoordinator.setTransitionGain(it, fraction) }
                     delay(rampStepDelayMs)
@@ -1315,6 +1325,7 @@ class PlaybackManager private constructor(private val context: Context) {
             } finally {
                 // A cancelled older transition must not un-duck a newer one.
                 if (equalizerVolumeTransitionGeneration == generation) {
+                    equalizerTransitionGain = 1f
                     playerA?.let { volumeCoordinator.setTransitionGain(it, 1f) }
                     playerB?.let { volumeCoordinator.setTransitionGain(it, 1f) }
                     equalizerVolumeTransitionJob = null
