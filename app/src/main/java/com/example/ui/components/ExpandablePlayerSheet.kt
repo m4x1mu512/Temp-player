@@ -1886,12 +1886,13 @@ private fun LiquidGlassExpandedPlayer(
         // The overlays of the glass control card. They are drawn on top of the blurred
         // background, whichever way that background was produced.
         val controlCardSurface: DrawScope.() -> Unit = {
-            drawRect(Color.White.copy(alpha = 0.16f))
+            // A slightly darker neutral tint keeps white controls readable over pale artwork.
+            drawRect(Color.White.copy(alpha = 0.10f))
             drawRect(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.Black.copy(alpha = 0.10f),
-                        Color.Black.copy(alpha = 0.035f)
+                        Color.Black.copy(alpha = 0.20f),
+                        Color.Black.copy(alpha = 0.14f)
                     )
                 )
             )
@@ -2255,12 +2256,13 @@ private fun LiquidGlassLandscapeContent(
     // The overlays of the glass column. They are drawn on top of the blurred background,
     // whichever way that background was produced.
     val landscapeSurface: DrawScope.() -> Unit = {
-        drawRect(Color.White.copy(alpha = 0.13f))
+        // Match the portrait card's darker glass tint for consistent control contrast.
+        drawRect(Color.White.copy(alpha = 0.08f))
         drawRect(
             Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = 0.07f),
-                    Color.Black.copy(alpha = 0.10f)
+                    Color.Black.copy(alpha = 0.18f),
+                    Color.Black.copy(alpha = 0.12f)
                 )
             )
         )
