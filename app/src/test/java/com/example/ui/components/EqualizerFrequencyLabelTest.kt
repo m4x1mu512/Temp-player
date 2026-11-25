@@ -13,7 +13,7 @@ import org.junit.Test
 class EqualizerFrequencyLabelTest {
 
     @Test
-    fun `the 3600 Hz band is labelled 3.6 kHz`() {
+    fun `the 3600 Hz band keeps one decimal`() {
         assertEquals("3.6 кГц", formatFrequencyLabel(3600))
     }
 
