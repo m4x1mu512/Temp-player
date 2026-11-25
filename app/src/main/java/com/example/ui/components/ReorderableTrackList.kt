@@ -116,11 +116,13 @@ fun ReorderableTrackList(
         lazyListState = listState,
         scrollThresholdPadding = contentPadding
     ) { from, to ->
+        val fromIndex = from.index
+        val toIndex = to.index
         val rowsBeforeMove = currentList.mapIndexed { i, track -> track.id to entryKeys.getOrNull(i) }
         val beforeCurrentTrackId = currentTrack?.id
         val beforeCurrentTrackIndex = currentTrackIndex
         TrackMoveLogger.log(context, "REORDER_CALLBACK_BEFORE") {
-            "fromIndex=${from.index} toIndex=${to.index} currentTrackId=$beforeCurrentTrackId currentTrackIndex=$beforeCurrentTrackIndex rows=" +
+            "fromIndex=${fromIndex} toIndex=${toIndex} currentTrackId=$beforeCurrentTrackId currentTrackIndex=$beforeCurrentTrackIndex rows=" +
                 rowsBeforeMove.mapIndexed { i, row -> "$i:id=${row.first},key=${row.second}" }.joinToString(";")
         }
         currentList.apply {
