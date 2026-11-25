@@ -524,6 +524,7 @@ fun PlayerScreen(
                 if (liquidGlassPlayerEnabled) {
                     LiquidGlassPlayerContent(
                         track = track,
+                        timeColor = playerTimeColor,
                         isPlaying = isPlaying,
                         isShuffle = isShuffle,
                         repeatMode = repeatMode,
@@ -1375,6 +1376,7 @@ fun PlayerScreen(
 @Composable
 private fun LiquidGlassPlayerContent(
     track: Track,
+    timeColor: Color,
     isPlaying: Boolean,
     isShuffle: Boolean,
     repeatMode: RepeatMode,
