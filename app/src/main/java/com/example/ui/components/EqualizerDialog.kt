@@ -92,7 +92,24 @@ import com.example.data.model.EqualizerBand
 import com.example.data.model.EqualizerPreset
 import com.example.data.model.ReverbPreset
 import com.example.ui.viewmodel.MainViewModel
+import java.util.Locale
 import kotlin.math.roundToInt
+
+/**
+ * Formats a band frequency for the UI: 3600 Hz -> "3.6 кГц", 14000 Hz -> "14 кГц".
+ *
+ * The old code used integer division and printed "3 кГц" for the 3600 Hz band.
+ */
+internal fun formatFrequencyLabel(hz: Int): String {
+    if (hz < 1000) return "$hz Гц"
+    val khz = hz / 1000f
+    val text = if (khz % 1f == 0f) {
+        khz.toInt().toString()
+    } else {
+        String.format(Locale.US, "%.1f", khz)
+    }
+    return "$text кГц"
+}
 
 @Composable
 fun EqualizerDialog(
@@ -423,11 +440,7 @@ private fun EqualizerTabContent(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         bands.forEach { band ->
-                            val frequencyLabel = if (band.centerFreqHz >= 1000) {
-                                "${band.centerFreqHz / 1000} кГц"
-                            } else {
-                                "${band.centerFreqHz} Гц"
-                            }
+                            val frequencyLabel = formatFrequencyLabel(band.centerFreqHz)
                             Text(
                                 frequencyLabel,
                                 style = MaterialTheme.typography.labelSmall,
@@ -460,13 +473,13 @@ private fun EqualizerTabContent(
                         verticalAlignment = Alignment.Top
                     ) {
                         bands.forEach { band ->
-                            val freqText = if (band.centerFreqHz >= 1000) {
-                                "${band.centerFreqHz / 1000} кГц"
-                            } else {
-                                "${band.centerFreqHz} Гц"
-                            }
+                            val freqText = formatFrequencyLabel(band.centerFreqHz)
                             val dbValue = band.levelMilliBels.toFloat() / 100f
-                            val dbText = if (dbValue > 0) "+%.1f".format(dbValue) else "%.1f".format(dbValue)
+                            val dbText = if (dbValue > 0) {
+                                String.format(Locale.US, "+%.1f", dbValue)
+                            } else {
+                                String.format(Locale.US, "%.1f", dbValue)
+                            }
 
                             Column(
                                 modifier = Modifier.weight(1f),
@@ -535,7 +548,11 @@ private fun EqualizerTabContent(
                         Text("Общий уровень громкости", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     val preampDb = eqPreamp / 100f
-                    val preampFormatted = if (preampDb > 0) "+%.1f дБ".format(preampDb) else "%.1f дБ".format(preampDb)
+                    val preampFormatted = if (preampDb > 0) {
+                        String.format(Locale.US, "+%.1f дБ", preampDb)
+                    } else {
+                        String.format(Locale.US, "%.1f дБ", preampDb)
+                    }
                     Text(preampFormatted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 DotSlider(
@@ -752,7 +769,7 @@ private fun AudioEffectsTabContent(
             isEnabled = isLoudnessEnabled,
             onEnabledChange = onLoudnessEnabledChanged,
             sliderValue = loudnessGain,
-            sliderValueText = "+%.1f дБ".format(loudnessDb),
+            sliderValueText = String.format(Locale.US, "+%.1f дБ", loudnessDb),
             onSliderChange = { onLoudnessGainChanged(((it / 25f).roundToInt() * 25).coerceIn(0, 800)) },
             valueRange = 0f..800f,
             compact = true
@@ -813,7 +830,7 @@ private fun PlaybackSpeedPitchTabContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Скорость воспроизведения", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("%.2fx".format(speed), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(String.format(Locale.US, "%.2fx", speed), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
                 DotSlider(
@@ -863,7 +880,7 @@ private fun PlaybackSpeedPitchTabContent(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Тональность (Pitch)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text("%.2fx".format(pitch), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(String.format(Locale.US, "%.2fx", pitch), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
                 DotSlider(
