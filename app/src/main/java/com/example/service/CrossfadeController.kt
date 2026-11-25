@@ -43,6 +43,7 @@ class CrossfadeController(
     private var crossfadeJob: Job? = null
     private var fadingOutPlayer: ExoPlayer? = null
     private var fadingInPlayer: ExoPlayer? = null
+    private var completionCallback: (() -> Unit)? = null
 
     /**
      * Determines whether crossfade should trigger for current track and position.
@@ -82,6 +83,7 @@ class CrossfadeController(
 
         fadingOutPlayer = outgoingPlayer
         fadingInPlayer = incomingPlayer
+        completionCallback = onCrossfadeComplete
 
         // Incoming player starts at silence
         incomingPlayer.volume = 0f
@@ -120,7 +122,9 @@ class CrossfadeController(
                     fadingOutPlayer = null
                     fadingInPlayer = null
                     crossfadeJob = null
-                    onCrossfadeComplete()
+                    val callback = completionCallback
+                    completionCallback = null
+                    callback?.invoke()
                 }
             }
         }
@@ -131,7 +135,12 @@ class CrossfadeController(
      */
     fun cancelCrossfade() {
         val job = crossfadeJob ?: return
+        // Clear the active job before cancellation so its finally block cannot also
+        // complete the transition. The callback still needs to run once: PlaybackManager
+        // uses it to restore the active track's ReplayGain after the fade is interrupted.
         crossfadeJob = null
+        val callback = completionCallback
+        completionCallback = null
         job.cancel()
         try {
             fadingOutPlayer?.volume = 1f
@@ -143,6 +152,7 @@ class CrossfadeController(
         } catch (_: Exception) {}
         fadingOutPlayer = null
         fadingInPlayer = null
+        callback?.invoke()
     }
 
     fun release() {
