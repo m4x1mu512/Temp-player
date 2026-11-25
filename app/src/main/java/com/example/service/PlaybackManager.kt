@@ -58,6 +58,34 @@ import java.io.File
 import java.io.DataInputStream
 import java.util.ArrayDeque
 
+/**
+ * Matches every queue occurrence to its stable entry id.
+ *
+ * The fast path (same media ids in the same order) is allocation free; a full rebuild only
+ * happens when the queue identity really changed. Occurrences of the same media id keep
+ * their own id, so a queue may contain the same track twice.
+ */
+internal fun computeQueueEntryIds(
+    previousTracks: List<Track>,
+    previousIds: List<Long>,
+    tracks: List<Track>,
+    nextEntryId: () -> Long
+): List<Long> {
+    if (previousIds.size == previousTracks.size && previousTracks.size == tracks.size &&
+        previousTracks.indices.all { previousTracks[it].id == tracks[it].id }
+    ) {
+        return previousIds
+    }
+    val idsByMediaId = HashMap<Long, ArrayDeque<Long>>()
+    previousTracks.forEachIndexed { index, track ->
+        val entryId = previousIds.getOrNull(index) ?: nextEntryId()
+        idsByMediaId.getOrPut(track.id) { ArrayDeque() }.addLast(entryId)
+    }
+    return tracks.map { track ->
+        idsByMediaId[track.id]?.pollFirst() ?: nextEntryId()
+    }
+}
+
 data class PlaybackQueueState(
     val tracks: List<Track> = emptyList(),
     val currentIndex: Int = -1,
@@ -169,26 +197,16 @@ class PlaybackManager private constructor(private val context: Context) {
      *
      * Entry ids are matched by media id, not by the whole Track object: editing a track's
      * metadata replaces the object but must not change the row's identity, otherwise a
-     * pending "remove this row" action would silently target nothing. The fast path (same
-     * media ids in the same order) is allocation free; a full rebuild only happens when the
-     * queue identity really changed.
+     * pending "remove this row" action would silently target nothing.
      */
     private fun reconcileQueueEntryIds(tracks: List<Track>): List<Long> {
         val previous = _queueState.value
-        val previousIds = previous.entryIds
-        if (previousIds.size == previous.tracks.size && previous.tracks.size == tracks.size &&
-            previous.tracks.indices.all { previous.tracks[it].id == tracks[it].id }
-        ) {
-            return previousIds
-        }
-        val idsByMediaId = HashMap<Long, ArrayDeque<Long>>()
-        previous.tracks.forEachIndexed { index, track ->
-            val entryId = previousIds.getOrNull(index) ?: nextQueueEntryId++
-            idsByMediaId.getOrPut(track.id) { ArrayDeque() }.addLast(entryId)
-        }
-        return tracks.map { track ->
-            idsByMediaId[track.id]?.pollFirst() ?: nextQueueEntryId++
-        }
+        return computeQueueEntryIds(
+            previousTracks = previous.tracks,
+            previousIds = previous.entryIds,
+            tracks = tracks,
+            nextEntryId = { nextQueueEntryId++ }
+        )
     }
 
     private fun publishQueue(tracks: List<Track>, index: Int, entryIds: List<Long>? = null) {
@@ -1185,7 +1203,10 @@ class PlaybackManager private constructor(private val context: Context) {
             }
 
             val shouldWrap = nextIndex == null && _repeatMode.value == RepeatMode.ALL && updated.isNotEmpty()
-            val targetIndex = nextIndex ?: if (shouldWrap) 0 else 0
+            // Without a next occurrence the first queue item stays visible in the mini-player;
+            // Repeat All additionally keeps playing. Both branches used to be `0`, which made
+            // `shouldWrap` look meaningful while it decided nothing.
+            val targetIndex = nextIndex ?: 0
 
             publishQueue(updated, targetIndex.takeIf { updated.isNotEmpty() } ?: -1)
             if (_isShuffle.value) rebuildShuffleOrder(targetIndex)
@@ -1743,7 +1764,20 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var lastSavedQueueIds: List<Long>? = null
-    private val playbackStateSaveMutex = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * A single writer keeps the persisted state in the same order as the events that
+     * produced it. A mutex alone did not: the snapshot was read before the writing
+     * coroutine was scheduled, so an older track/position could land on disk last.
+     */
+    private val playbackStateWriter = PlaybackStateWriter(serviceScope) { trackId, position, queueIds, queueIndex ->
+        settingsDataStore.savePlaybackState(
+            trackId = trackId,
+            position = position,
+            queueIds = queueIds,
+            queueIndex = queueIndex
+        )
+    }
 
     /**
      * MediaStore/ID3 durations routinely differ from ExoPlayer's by tens of milliseconds.
@@ -1771,23 +1805,14 @@ class PlaybackManager private constructor(private val context: Context) {
         if (track == null && q.isEmpty() && !queueChanged) return
         if (queueChanged) lastSavedQueueIds = ids
 
-        val trackId = track?.id ?: -1L
-        val queueIndex = idx
         // Never write on the main thread: this runs on every track change and periodically
         // during playback, and the disk flush used to land inside the frame budget.
-        serviceScope.launch(Dispatchers.IO) {
-            playbackStateSaveMutex.lock()
-            try {
-                settingsDataStore.savePlaybackState(
-                    trackId = trackId,
-                    position = pos,
-                    queueIds = if (queueChanged) ids else null,
-                    queueIndex = queueIndex
-                )
-            } finally {
-                playbackStateSaveMutex.unlock()
-            }
-        }
+        playbackStateWriter.submit(
+            trackId = track?.id ?: -1L,
+            position = pos,
+            queueIds = if (queueChanged) ids else null,
+            queueIndex = idx
+        )
     }
 
     private fun updateAudioSpecsFromPlayer(player: ExoPlayer?) {
