@@ -707,11 +707,7 @@ class MusicRepository(
     }
 
     suspend fun toggleFavorite(trackId: Long) = withContext(Dispatchers.IO) {
-        if (favoriteDao.isFavoriteDirect(trackId)) {
-            favoriteDao.removeFavorite(trackId)
-        } else {
-            favoriteDao.addFavorite(FavoriteEntity(trackId = trackId))
-        }
+        favoriteDao.toggleFavorite(trackId)
     }
 
     suspend fun createPlaylist(name: String): Long = withContext(Dispatchers.IO) {
