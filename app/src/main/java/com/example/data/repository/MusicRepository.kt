@@ -33,6 +33,20 @@ import java.io.File
  */
 private const val SQL_VARIABLE_LIMIT = 900
 
+/**
+ * MediaMetadataRetriever implements AutoCloseable only on API 29+.
+ * Calling close() through Kotlin's use() therefore crashes on Android 8-9.
+ * release() is available on every supported Android version.
+ */
+private inline fun <T> withMediaMetadataRetriever(block: (MediaMetadataRetriever) -> T): T {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        block(retriever)
+    } finally {
+        retriever.release()
+    }
+}
+
 class MusicRepository(
     private val context: Context,
     private val database: AppDatabase
@@ -333,7 +347,7 @@ class MusicRepository(
 
                     if (needsMetadata) {
                         try {
-                            MediaMetadataRetriever().use { mmr ->
+                            withMediaMetadataRetriever { mmr ->
                                 mmr.setDataSource(context, contentUri)
                                 if (duration <= 0) {
                                     val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -355,7 +369,7 @@ class MusicRepository(
                         } catch (_: Exception) {
                             if (path.isNotBlank()) {
                                 try {
-                                    MediaMetadataRetriever().use { mmr ->
+                                    withMediaMetadataRetriever { mmr ->
                                         mmr.setDataSource(path)
                                         if (duration <= 0) {
                                             val durStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
@@ -539,7 +553,7 @@ class MusicRepository(
                             var albumArtUri: String? = existing?.albumArtUriString
 
                             try {
-                                MediaMetadataRetriever().use { retriever ->
+                                withMediaMetadataRetriever { retriever ->
                                     retriever.setDataSource(context, documentUri)
                                     retriever.extractMetadata(
                                         MediaMetadataRetriever.METADATA_KEY_TITLE
@@ -782,7 +796,7 @@ class MusicRepository(
         var albumArtUriString: String? = null
 
         try {
-            MediaMetadataRetriever().use { mmr ->
+            withMediaMetadataRetriever { mmr ->
                 mmr.setDataSource(context, uri)
                 val metaTitle = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
                 val metaArtist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
