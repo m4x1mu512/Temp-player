@@ -315,7 +315,10 @@ fun AppNavigation(viewModel: MainViewModel) {
     // Record only the destination content. The mini-player is a sibling reader above it,
     // never part of the recorded layer, preventing recursive capture and self-blur.
     val appBackdrop = rememberLayerBackdrop()
-    val backdropSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    // The Backdrop library draws the glass surfaces through RenderEffect, which arrived in
+    // Android 12 (API 31). The gate used to be Android 13, which left Android 12 without the
+    // blur as well.
+    val backdropSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val navController = rememberNavController()
     var openingQueueFromPlayer by remember { mutableStateOf(false) }
 
