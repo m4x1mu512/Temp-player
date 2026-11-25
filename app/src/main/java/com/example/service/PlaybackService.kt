@@ -297,6 +297,11 @@ class PlaybackService : MediaSessionService() {
             unregisterReceiver(noisyReceiver)
         } catch (_: Exception) {}
         abandonSystemAudioFocus()
+        // PlaybackManager is a process singleton. Clear callbacks that capture this
+        // service before releasing its players/session, otherwise a later playback event
+        // can retain or call a destroyed Service instance.
+        playbackManager.onRequestAudioFocus = null
+        playbackManager.onActivePlayerChanged = null
         serviceScope.cancel()
         mediaSession?.run {
             release()
