@@ -1685,6 +1685,7 @@ class PlaybackManager private constructor(private val context: Context) {
     }
 
     private var lastSavedQueueIds: List<Long>? = null
+    private val playbackStateSaveMutex = kotlinx.coroutines.sync.Mutex()
 
     /**
      * MediaStore/ID3 durations routinely differ from ExoPlayer's by tens of milliseconds.
@@ -1717,12 +1718,17 @@ class PlaybackManager private constructor(private val context: Context) {
         // Never write on the main thread: this runs on every track change and periodically
         // during playback, and the disk flush used to land inside the frame budget.
         serviceScope.launch(Dispatchers.IO) {
-            settingsDataStore.savePlaybackState(
-                trackId = trackId,
-                position = pos,
-                queueIds = if (queueChanged) ids else null,
-                queueIndex = queueIndex
-            )
+            playbackStateSaveMutex.lock()
+            try {
+                settingsDataStore.savePlaybackState(
+                    trackId = trackId,
+                    position = pos,
+                    queueIds = if (queueChanged) ids else null,
+                    queueIndex = queueIndex
+                )
+            } finally {
+                playbackStateSaveMutex.unlock()
+            }
         }
     }
 
