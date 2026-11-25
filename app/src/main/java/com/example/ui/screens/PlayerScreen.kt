@@ -331,6 +331,15 @@ fun PlayerScreen(
         trackKey = "${currentTrack?.id}_${currentTrack?.title}_${currentTrack?.albumArtUriString}"
     )
 
+    val playerTimeColor = if (
+        miniPlayerBgMode == MiniPlayerBgMode.LIGHT ||
+        (miniPlayerBgMode == MiniPlayerBgMode.SYSTEM && appUsesLightTheme)
+    ) {
+        Color.Black
+    } else {
+        colorScheme.onSurfaceVariantColor
+    }
+
     val playerMaterialColorScheme = remember(colorScheme) {
         if (colorScheme.isDark) {
             darkColorScheme(
@@ -688,6 +697,7 @@ fun PlayerScreen(
                                 isCompact = isCompact,
                                 onSeek = { viewModel.seekTo(it) },
                                 sliderTestTag = "player_progress_slider_landscape",
+                                timeColor = playerTimeColor,
                                 modifier = Modifier
                                     .padding(horizontal = 8.dp)
                                     .graphicsLayer { alpha = getPlayerControlsAlpha() }
@@ -1072,6 +1082,7 @@ fun PlayerScreen(
                         isCompact = isCompact,
                         onSeek = { viewModel.seekTo(it) },
                         sliderTestTag = "player_progress_slider",
+                        timeColor = playerTimeColor,
                         modifier = Modifier.graphicsLayer { alpha = getPlayerControlsAlpha() }
                     )
 
@@ -1510,6 +1521,7 @@ private fun LiquidGlassPlayerContent(
                         isCompact = isCompact,
                         onSeek = onSeek,
                         sliderTestTag = "liquid_glass_progress_slider",
+                        timeColor = playerTimeColor,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1853,6 +1865,7 @@ private fun PlayerProgressSection(
     isCompact: Boolean,
     onSeek: (Long) -> Unit,
     sliderTestTag: String,
+    timeColor: Color,
     modifier: Modifier = Modifier
 ) {
     val rawPosition by positionFlow.collectAsStateWithLifecycle()
@@ -1928,12 +1941,12 @@ private fun PlayerProgressSection(
             Text(
                 text = formattedCurrent,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = timeColor
             )
             Text(
                 text = formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = timeColor
             )
         }
     }
