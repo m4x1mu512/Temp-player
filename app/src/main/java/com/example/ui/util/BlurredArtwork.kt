@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
@@ -82,8 +83,8 @@ internal fun DrawScope.drawCroppedImage(image: ImageBitmap) {
     drawImage(
         image = image,
         srcOffset = IntOffset(
-            ((image.width - srcWidth) / 2).roundToInt(),
-            ((image.height - srcHeight) / 2).roundToInt()
+            ((image.width - srcWidth) / 2f).roundToInt(),
+            ((image.height - srcHeight) / 2f).roundToInt()
         ),
         srcSize = IntSize(srcWidth, srcHeight),
         dstSize = IntSize(targetWidth.roundToInt(), targetHeight.roundToInt())
@@ -114,17 +115,18 @@ internal fun Modifier.blurredGlassBackground(
  * The previous result stays visible while the next one is computed, so a track change does not
  * flash an empty background.
  */
-private fun blurArtwork(painter: Painter, size: Int, radius: Int): ImageBitmap? {
+private fun blurArtwork(painter: Painter, bitmapSize: Int, radius: Int): ImageBitmap? {
     return try {
-        val image = ImageBitmap(size, size)
+        val targetSize = Size(bitmapSize.toFloat(), bitmapSize.toFloat())
+        val image = ImageBitmap(bitmapSize, bitmapSize)
         val canvas = Canvas(image)
         CanvasDrawScope().draw(
             density = Density(1f),
             layoutDirection = LayoutDirection.Ltr,
             canvas = canvas,
-            size = Size(size.toFloat(), size.toFloat())
+            size = targetSize
         ) {
-            with(painter) { draw(size) }
+            with(painter) { draw(targetSize) }
         }
         val bitmap = image.asAndroidBitmap()
         val pixels = IntArray(bitmap.width * bitmap.height)
