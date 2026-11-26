@@ -309,9 +309,10 @@ fun ExpandablePlayerSheet(
     )
 
     // The expanded mini-player uses this legacy sheet when Liquid Glass is disabled.
-    // Its timestamps are black only for a light player background or light app theme.
+    // Artwork-derived backgrounds always use black timestamps, regardless of app theme.
     val expandedPlayerTimeColor = if (
         miniPlayerBgMode == MiniPlayerBgMode.LIGHT ||
+        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART ||
         (miniPlayerBgMode == MiniPlayerBgMode.SYSTEM && appUsesLightTheme)
     ) {
         Color.Black
