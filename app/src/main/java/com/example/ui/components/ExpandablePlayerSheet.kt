@@ -1089,7 +1089,11 @@ fun ExpandablePlayerSheet(
                                 Icon(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = if (!isExpanded) {
+                                        if (appUsesLightTheme) Color.Black else Color.White
+                                    } else {
+                                        colorScheme.onSurfaceColor
+                                    },
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -1097,8 +1101,16 @@ fun ExpandablePlayerSheet(
                             FilledIconButton(
                                 onClick = { viewModel.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = playerControlsAccentColor,
-                                    contentColor = playerControlsOnAccentColor
+                                    containerColor = if (!isExpanded) {
+                                        if (appUsesLightTheme) Color.Black else Color.White
+                                    } else {
+                                        playerControlsAccentColor
+                                    },
+                                    contentColor = if (!isExpanded) {
+                                        if (appUsesLightTheme) Color.White else Color.Black
+                                    } else {
+                                        playerControlsOnAccentColor
+                                    }
                                 ),
                                 modifier = Modifier
                                     .size(44.dp)
