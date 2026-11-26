@@ -308,6 +308,17 @@ fun ExpandablePlayerSheet(
         trackKey = "${track.id}_${track.title}_${track.albumArtUriString}"
     )
 
+    // The expanded mini-player uses this legacy sheet when Liquid Glass is disabled.
+    // Its timestamps are black only for a light player background or light app theme.
+    val expandedPlayerTimeColor = if (
+        miniPlayerBgMode == MiniPlayerBgMode.LIGHT ||
+        (miniPlayerBgMode == MiniPlayerBgMode.SYSTEM && appUsesLightTheme)
+    ) {
+        Color.Black
+    } else {
+        Color.White
+    }
+
     // Match control contrast to the generated album-art palette: light-theme
     // pastel gradients use dark controls, while dark-theme gradients use light controls.
     val useWhiteAlbumModeControls =
@@ -1324,6 +1335,7 @@ fun ExpandablePlayerSheet(
                                         isPlaying = isPlaying,
                                         onSeek = { viewModel.seekTo(it) },
                                         playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
+                                        timeColor = expandedPlayerTimeColor,
                                         inactiveTrackColor = when (miniPlayerBgMode) {
                                             // Use explicit opaque shades: alpha blending made the difference
                                             // barely visible against the player background.
@@ -1510,6 +1522,7 @@ fun ExpandablePlayerSheet(
                                     isPlaying = isPlaying,
                                     onSeek = { viewModel.seekTo(it) },
                                     playedTrackColor = if (useWhiteAccentOnLightPlayer) Color(0xFFD0D0D8) else null,
+                                    timeColor = expandedPlayerTimeColor,
                                     inactiveTrackColor = when (miniPlayerBgMode) {
                                         // Use explicit opaque shades: alpha blending made the difference
                                         // barely visible against the player background.
@@ -2507,6 +2520,7 @@ private fun SheetProgressSection(
     onSeek: (Long) -> Unit,
     playedTrackColor: Color? = null,
     inactiveTrackColor: Color,
+    timeColor: Color = Color.White,
     progressTrackHeight: Dp = 4.dp,
     progressThumbRadius: Dp = 5.dp,
     progressGlowRadius: Dp = 14.dp,
@@ -2567,7 +2581,7 @@ private fun SheetProgressSection(
             Text(
                 text = formattedCurrent,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = timeColor,
                 maxLines = 1,
                 modifier = Modifier.width(42.dp)
             )
@@ -2595,7 +2609,7 @@ private fun SheetProgressSection(
             Text(
                 text = formattedDuration,
                 style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
+                color = timeColor,
                 textAlign = TextAlign.End,
                 maxLines = 1,
                 modifier = Modifier.width(42.dp)
