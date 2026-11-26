@@ -1143,7 +1143,11 @@ fun ExpandablePlayerSheet(
                                 Icon(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
-                                    tint = colorScheme.onSurfaceColor,
+                                    tint = if (!isExpanded) {
+                                        if (appUsesLightTheme) Color.Black else Color.White
+                                    } else {
+                                        colorScheme.onSurfaceColor
+                                    },
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
