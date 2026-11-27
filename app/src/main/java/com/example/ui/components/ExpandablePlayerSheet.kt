@@ -385,6 +385,19 @@ fun ExpandablePlayerSheet(
         else -> colorScheme.onAccentColor
     }
 
+    // In the legacy expanded player, dark-theme album-art mode needs a
+    // slightly brighter play button with a black play/pause glyph.
+    val useDarkAlbumArtExpandedPlayStyle =
+        !liquidGlassPlayerEnabled &&
+            !appUsesLightTheme &&
+            miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+    val darkAlbumArtExpandedPlayButtonColor = Color(
+        red = playerControlsAccentColor.red + (1f - playerControlsAccentColor.red) * 0.15f,
+        green = playerControlsAccentColor.green + (1f - playerControlsAccentColor.green) * 0.15f,
+        blue = playerControlsAccentColor.blue + (1f - playerControlsAccentColor.blue) * 0.15f,
+        alpha = playerControlsAccentColor.alpha
+    )
+
     val playerMaterialColorScheme = remember(
         colorScheme,
         playerControlsAccentColor,
@@ -1108,11 +1121,15 @@ fun ExpandablePlayerSheet(
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = if (!isExpanded) {
                                         appTopBarActiveButtonColor
+                                    } else if (useDarkAlbumArtExpandedPlayStyle) {
+                                        darkAlbumArtExpandedPlayButtonColor
                                     } else {
                                         playerControlsAccentColor
                                     },
                                     contentColor = if (!isExpanded) {
                                         appTopBarActiveButtonContentColor
+                                    } else if (useDarkAlbumArtExpandedPlayStyle) {
+                                        Color.Black
                                     } else {
                                         playerControlsOnAccentColor
                                     }
