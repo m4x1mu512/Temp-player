@@ -349,7 +349,9 @@ class SettingsDataStore(private val context: Context) {
     val miniPlayerBgModeFlow: Flow<MiniPlayerBgMode> = context.dataStore.data.map { preferences ->
         val name = preferences[KEY_MINI_PLAYER_BG_MODE] ?: MiniPlayerBgMode.ALBUM_ART.name
         try {
-            MiniPlayerBgMode.valueOf(name)
+            MiniPlayerBgMode.valueOf(name).let { mode ->
+                if (mode == MiniPlayerBgMode.SYSTEM) MiniPlayerBgMode.ALBUM_ART else mode
+            }
         } catch (_: Exception) {
             MiniPlayerBgMode.ALBUM_ART
         }
@@ -696,7 +698,8 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setMiniPlayerBgMode(mode: MiniPlayerBgMode) {
         context.dataStore.edit { preferences ->
-            preferences[KEY_MINI_PLAYER_BG_MODE] = mode.name
+            val supportedMode = if (mode == MiniPlayerBgMode.SYSTEM) MiniPlayerBgMode.ALBUM_ART else mode
+            preferences[KEY_MINI_PLAYER_BG_MODE] = supportedMode.name
         }
     }
 
