@@ -199,6 +199,10 @@ fun ExpandablePlayerSheet(
         com.example.data.model.ThemeMode.SYSTEM -> !androidx.compose.foundation.isSystemInDarkTheme()
     }
 
+    // Capture the app-level top-bar icon color before the player installs its
+    // album-art-derived MaterialTheme below.
+    val appTopBarButtonColor = MaterialTheme.colorScheme.onSurface
+
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
 
@@ -1090,7 +1094,7 @@ fun ExpandablePlayerSheet(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
                                     tint = if (!isExpanded) {
-                                        if (appUsesLightTheme) Color.Black else Color.White
+                                        appTopBarButtonColor
                                     } else {
                                         colorScheme.onSurfaceColor
                                     },
@@ -1144,7 +1148,7 @@ fun ExpandablePlayerSheet(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
                                     tint = if (!isExpanded) {
-                                        if (appUsesLightTheme) Color.Black else Color.White
+                                        appTopBarButtonColor
                                     } else {
                                         colorScheme.onSurfaceColor
                                     },
