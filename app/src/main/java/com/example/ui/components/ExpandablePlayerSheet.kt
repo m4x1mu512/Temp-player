@@ -1726,7 +1726,7 @@ fun ExpandablePlayerSheet(
                                                 else -> MaterialTheme.colorScheme.primary
                                             },
                                             contentColor = when {
-                                                useWhiteSwatchLightGrayPlayButton -> Color(0xFF333333)
+                                                useWhiteSwatchLightGrayPlayButton -> Color.White
                                                 useDarkAlbumArtExpandedPlayStyle ||
                                                     useLightAlbumArtExpandedPlayBlackGlyph ||
                                                     useLightMonochromeExpandedPlayBlackGlyph -> Color.Black
