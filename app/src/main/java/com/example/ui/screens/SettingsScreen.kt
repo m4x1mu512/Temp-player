@@ -493,17 +493,6 @@ fun SettingsScreen(
                             )
                         )
 
-                        FilterChip(
-                            selected = miniPlayerBgMode == MiniPlayerBgMode.SYSTEM,
-                            onClick = { viewModel.setMiniPlayerBgMode(MiniPlayerBgMode.SYSTEM) },
-                            label = { Text("По умолчанию") },
-                            modifier = Modifier.testTag("mini_player_bg_system"),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                selectedLabelColor = if (yellowAccentOnLightTheme) Color.White else MaterialTheme.colorScheme.onPrimary
-                            )
-                        )
-
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -632,31 +621,7 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        MiniPlayerBgMode.SYSTEM -> {
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Tune,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = "Мини-плеер использует стандартную цветовую гамму системной темы приложения",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
+                        MiniPlayerBgMode.SYSTEM -> Unit // Legacy value; normalized by SettingsDataStore.
                         MiniPlayerBgMode.CUSTOM -> Unit
                     }
                 }
