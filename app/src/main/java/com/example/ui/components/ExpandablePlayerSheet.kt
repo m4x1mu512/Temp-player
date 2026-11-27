@@ -317,8 +317,7 @@ fun ExpandablePlayerSheet(
     // Artwork-derived backgrounds always use black timestamps, regardless of app theme.
     val expandedPlayerTimeColor = if (
         miniPlayerBgMode == MiniPlayerBgMode.LIGHT ||
-        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART ||
-        (miniPlayerBgMode == MiniPlayerBgMode.SYSTEM && appUsesLightTheme)
+        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
     ) {
         Color.Black
     } else {
