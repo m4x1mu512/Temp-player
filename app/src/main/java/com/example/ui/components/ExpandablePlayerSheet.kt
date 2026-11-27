@@ -201,7 +201,7 @@ fun ExpandablePlayerSheet(
 
     // Capture the app-level top-bar icon color before the player installs its
     // album-art-derived MaterialTheme below.
-    val appTopBarButtonColor = MaterialTheme.colorScheme.onSurface
+    val appTopBarButtonColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
