@@ -201,7 +201,8 @@ fun ExpandablePlayerSheet(
 
     // Capture the app-level top-bar icon color before the player installs its
     // album-art-derived MaterialTheme below.
-    val appTopBarButtonColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val appTopBarActiveButtonColor = MaterialTheme.colorScheme.primary
+    val appTopBarActiveButtonContentColor = MaterialTheme.colorScheme.onPrimary
 
     val currentTrack by viewModel.currentTrack.collectAsStateWithLifecycle()
     if (currentTrack == null) return
@@ -1094,7 +1095,7 @@ fun ExpandablePlayerSheet(
                                     imageVector = Icons.Default.SkipPrevious,
                                     contentDescription = "Предыдущий трек",
                                     tint = if (!isExpanded) {
-                                        appTopBarButtonColor
+                                        appTopBarActiveButtonColor
                                     } else {
                                         colorScheme.onSurfaceColor
                                     },
@@ -1106,12 +1107,12 @@ fun ExpandablePlayerSheet(
                                 onClick = { viewModel.togglePlayPause() },
                                 colors = IconButtonDefaults.filledIconButtonColors(
                                     containerColor = if (!isExpanded) {
-                                        if (appUsesLightTheme) Color.Black else Color.White
+                                        appTopBarActiveButtonColor
                                     } else {
                                         playerControlsAccentColor
                                     },
                                     contentColor = if (!isExpanded) {
-                                        if (appUsesLightTheme) Color.White else Color.Black
+                                        appTopBarActiveButtonContentColor
                                     } else {
                                         playerControlsOnAccentColor
                                     }
@@ -1148,7 +1149,7 @@ fun ExpandablePlayerSheet(
                                     imageVector = Icons.Default.SkipNext,
                                     contentDescription = "Следующий трек",
                                     tint = if (!isExpanded) {
-                                        appTopBarButtonColor
+                                        appTopBarActiveButtonColor
                                     } else {
                                         colorScheme.onSurfaceColor
                                     },
