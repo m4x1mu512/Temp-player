@@ -391,6 +391,10 @@ fun ExpandablePlayerSheet(
         !liquidGlassPlayerEnabled &&
             !appUsesLightTheme &&
             miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+    val useLightAlbumArtExpandedPlayBlackGlyph =
+        !liquidGlassPlayerEnabled &&
+            appUsesLightTheme &&
+            miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
     val darkAlbumArtExpandedPlayButtonColor = Color(
         red = playerControlsAccentColor.red + (1f - playerControlsAccentColor.red) * 0.15f,
         green = playerControlsAccentColor.green + (1f - playerControlsAccentColor.green) * 0.15f,
@@ -1695,7 +1699,8 @@ fun ExpandablePlayerSheet(
                                                 else -> MaterialTheme.colorScheme.primary
                                             },
                                             contentColor = when {
-                                                useDarkAlbumArtExpandedPlayStyle -> Color.Black
+                                                useDarkAlbumArtExpandedPlayStyle ||
+                                                    useLightAlbumArtExpandedPlayBlackGlyph -> Color.Black
                                                 useWhiteAccentOnLightPlayer -> Color(0xFF555660)
                                                 else -> MaterialTheme.colorScheme.onPrimary
                                             }
