@@ -370,6 +370,13 @@ fun ExpandablePlayerSheet(
             miniPlayerCustomColor == 0xFFFFFFFFL &&
             selectedMonochromeAccent == AccentColor.WHITE
 
+    // Light monochrome swatches use a black play/pause glyph in the legacy
+    // expanded mini-player, independently of the app's selected theme.
+    val useLightMonochromeExpandedPlayBlackGlyph =
+        !liquidGlassPlayerEnabled &&
+            miniPlayerBgMode == MiniPlayerBgMode.LIGHT &&
+            selectedMonochromeAccent != null
+
     val playerControlsAccentColor = when (miniPlayerBgMode) {
         MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
             selectedMonochromeAccent?.let {
@@ -1700,7 +1707,8 @@ fun ExpandablePlayerSheet(
                                             },
                                             contentColor = when {
                                                 useDarkAlbumArtExpandedPlayStyle ||
-                                                    useLightAlbumArtExpandedPlayBlackGlyph -> Color.Black
+                                                    useLightAlbumArtExpandedPlayBlackGlyph ||
+                                                    useLightMonochromeExpandedPlayBlackGlyph -> Color.Black
                                                 useWhiteAccentOnLightPlayer -> Color(0xFF555660)
                                                 else -> MaterialTheme.colorScheme.onPrimary
                                             }
