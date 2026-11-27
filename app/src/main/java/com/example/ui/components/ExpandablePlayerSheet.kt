@@ -377,6 +377,12 @@ fun ExpandablePlayerSheet(
             miniPlayerBgMode == MiniPlayerBgMode.LIGHT &&
             selectedMonochromeAccent != null
 
+    // Dark monochrome swatches use a white play/pause glyph, regardless of app theme.
+    val useDarkMonochromeExpandedPlayWhiteGlyph =
+        !liquidGlassPlayerEnabled &&
+            miniPlayerBgMode == MiniPlayerBgMode.DARK &&
+            selectedMonochromeAccent != null
+
     val playerControlsAccentColor = when (miniPlayerBgMode) {
         MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
             selectedMonochromeAccent?.let {
@@ -1709,6 +1715,7 @@ fun ExpandablePlayerSheet(
                                                 useDarkAlbumArtExpandedPlayStyle ||
                                                     useLightAlbumArtExpandedPlayBlackGlyph ||
                                                     useLightMonochromeExpandedPlayBlackGlyph -> Color.Black
+                                                useDarkMonochromeExpandedPlayWhiteGlyph -> Color.White
                                                 useWhiteAccentOnLightPlayer -> Color(0xFF555660)
                                                 else -> MaterialTheme.colorScheme.onPrimary
                                             }
