@@ -382,6 +382,13 @@ fun ExpandablePlayerSheet(
             miniPlayerBgMode == MiniPlayerBgMode.DARK &&
             selectedMonochromeAccent != null
 
+    // The penultimate dark monochrome swatch (#242424) uses a dark-gray
+    // Play button in the legacy expanded mini-player.
+    val useBlackSwatchDarkGrayPlayButton =
+        !liquidGlassPlayerEnabled &&
+            miniPlayerBgMode == MiniPlayerBgMode.DARK &&
+            miniPlayerCustomColor == 0xFF242424L
+
     val playerControlsAccentColor = when (miniPlayerBgMode) {
         MiniPlayerBgMode.LIGHT, MiniPlayerBgMode.DARK ->
             selectedMonochromeAccent?.let {
@@ -1706,6 +1713,7 @@ fun ExpandablePlayerSheet(
                                         onClick = { viewModel.togglePlayPause() },
                                         colors = IconButtonDefaults.filledIconButtonColors(
                                             containerColor = when {
+                                                useBlackSwatchDarkGrayPlayButton -> Color(0xFF454545)
                                                 useDarkAlbumArtExpandedPlayStyle -> darkAlbumArtExpandedPlayButtonColor
                                                 useWhiteAccentOnLightPlayer -> Color(0xFFE5E5EB)
                                                 else -> MaterialTheme.colorScheme.primary
