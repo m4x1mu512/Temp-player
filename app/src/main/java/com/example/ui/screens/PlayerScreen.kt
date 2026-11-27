@@ -332,8 +332,7 @@ fun PlayerScreen(
     )
 
     val playerTimeColor = if (
-        miniPlayerBgMode == MiniPlayerBgMode.LIGHT ||
-        (miniPlayerBgMode == MiniPlayerBgMode.SYSTEM && appUsesLightTheme)
+        miniPlayerBgMode == MiniPlayerBgMode.LIGHT
     ) {
         Color.Black
     } else {
