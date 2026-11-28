@@ -1425,7 +1425,6 @@ fun ExpandablePlayerSheet(
                                                 contentDescription = "Предыдущий",
                                                 tint = if (
                                                     !liquidGlassPlayerEnabled &&
-                                                        !appUsesLightTheme &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
                                                 ) Color.Black else LocalContentColor.current,
                                                 modifier = Modifier.size(30.dp)
@@ -1457,7 +1456,6 @@ fun ExpandablePlayerSheet(
                                                 contentDescription = "Следующий",
                                                 tint = if (
                                                     !liquidGlassPlayerEnabled &&
-                                                        !appUsesLightTheme &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
                                                 ) Color.Black else LocalContentColor.current,
                                                 modifier = Modifier.size(30.dp)
