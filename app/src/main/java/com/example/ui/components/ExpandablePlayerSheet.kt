@@ -1424,10 +1424,14 @@ fun ExpandablePlayerSheet(
                                             Icon(
                                                 Icons.Default.SkipPrevious,
                                                 contentDescription = "Предыдущий",
-                                                tint = if (
+                                                tint = when {
                                                     !liquidGlassPlayerEnabled &&
-                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
-                                                ) Color.Black else LocalContentColor.current,
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
+                                                    !liquidGlassPlayerEnabled &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK &&
+                                                        selectedMonochromeAccent == null -> Color.White
+                                                    else -> LocalContentColor.current
+                                                },
                                                 modifier = Modifier.size(30.dp)
                                             )
                                         }
@@ -1458,10 +1462,14 @@ fun ExpandablePlayerSheet(
                                             Icon(
                                                 Icons.Default.SkipNext,
                                                 contentDescription = "Следующий",
-                                                tint = if (
+                                                tint = when {
                                                     !liquidGlassPlayerEnabled &&
-                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
-                                                ) Color.Black else LocalContentColor.current,
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
+                                                    !liquidGlassPlayerEnabled &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK &&
+                                                        selectedMonochromeAccent == null -> Color.White
+                                                    else -> LocalContentColor.current
+                                                },
                                                 modifier = Modifier.size(30.dp)
                                             )
                                         }
