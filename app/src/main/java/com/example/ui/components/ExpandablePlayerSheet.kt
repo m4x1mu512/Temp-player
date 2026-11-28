@@ -1424,6 +1424,16 @@ fun ExpandablePlayerSheet(
                                         }
                                         FilledIconButton(
                                             onClick = { viewModel.togglePlayPause() },
+                                            colors = IconButtonDefaults.filledIconButtonColors(
+                                                contentColor = if (
+                                                    !liquidGlassPlayerEnabled &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+                                                ) {
+                                                    Color.Black
+                                                } else {
+                                                    MaterialTheme.colorScheme.onPrimary
+                                                }
+                                            ),
                                             modifier = Modifier.size(56.dp).testTag("player_play_pause_button")
                                         ) {
                                             Icon(
