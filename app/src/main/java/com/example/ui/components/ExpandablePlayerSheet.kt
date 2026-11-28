@@ -1429,6 +1429,8 @@ fun ExpandablePlayerSheet(
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
                                                     !liquidGlassPlayerEnabled &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.DARK -> Color.White
+                                                    !liquidGlassPlayerEnabled &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.LIGHT -> Color.Black
                                                     else -> LocalContentColor.current
                                                 },
                                                 modifier = Modifier.size(30.dp)
@@ -1466,6 +1468,8 @@ fun ExpandablePlayerSheet(
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
                                                     !liquidGlassPlayerEnabled &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.DARK -> Color.White
+                                                    !liquidGlassPlayerEnabled &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.LIGHT -> Color.Black
                                                     else -> LocalContentColor.current
                                                 },
                                                 modifier = Modifier.size(30.dp)
