@@ -1420,7 +1420,16 @@ fun ExpandablePlayerSheet(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         IconButton(onClick = onButtonPreviousTrack, modifier = Modifier.testTag("player_prev_button")) {
-                                            Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий", modifier = Modifier.size(30.dp))
+                                            Icon(
+                                                Icons.Default.SkipPrevious,
+                                                contentDescription = "Предыдущий",
+                                                tint = if (
+                                                    !liquidGlassPlayerEnabled &&
+                                                        !appUsesLightTheme &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+                                                ) Color.Black else LocalContentColor.current,
+                                                modifier = Modifier.size(30.dp)
+                                            )
                                         }
                                         FilledIconButton(
                                             onClick = { viewModel.togglePlayPause() },
@@ -1443,7 +1452,16 @@ fun ExpandablePlayerSheet(
                                             )
                                         }
                                         IconButton(onClick = onSwipeNextTrack, modifier = Modifier.testTag("player_next_button")) {
-                                            Icon(Icons.Default.SkipNext, contentDescription = "Следующий", modifier = Modifier.size(30.dp))
+                                            Icon(
+                                                Icons.Default.SkipNext,
+                                                contentDescription = "Следующий",
+                                                tint = if (
+                                                    !liquidGlassPlayerEnabled &&
+                                                        !appUsesLightTheme &&
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+                                                ) Color.Black else LocalContentColor.current,
+                                                modifier = Modifier.size(30.dp)
+                                            )
                                         }
                                     }
                                 }
