@@ -1435,8 +1435,11 @@ fun ExpandablePlayerSheet(
                                             onClick = { viewModel.togglePlayPause() },
                                             colors = IconButtonDefaults.filledIconButtonColors(
                                                 contentColor = if (
-                                                    !liquidGlassPlayerEnabled &&
-                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART
+                                                    !liquidGlassPlayerEnabled && (
+                                                        miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART ||
+                                                            (miniPlayerBgMode == MiniPlayerBgMode.LIGHT &&
+                                                                selectedMonochromeAccent != null)
+                                                        )
                                                 ) {
                                                     Color.Black
                                                 } else {
