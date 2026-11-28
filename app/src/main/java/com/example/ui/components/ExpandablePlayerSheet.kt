@@ -1428,8 +1428,7 @@ fun ExpandablePlayerSheet(
                                                     !liquidGlassPlayerEnabled &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
                                                     !liquidGlassPlayerEnabled &&
-                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK &&
-                                                        selectedMonochromeAccent == null -> Color.White
+                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK -> Color.White
                                                     else -> LocalContentColor.current
                                                 },
                                                 modifier = Modifier.size(30.dp)
@@ -1466,8 +1465,7 @@ fun ExpandablePlayerSheet(
                                                     !liquidGlassPlayerEnabled &&
                                                         miniPlayerBgMode == MiniPlayerBgMode.ALBUM_ART -> Color.Black
                                                     !liquidGlassPlayerEnabled &&
-                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK &&
-                                                        selectedMonochromeAccent == null -> Color.White
+                                                        miniPlayerBgMode == MiniPlayerBgMode.DARK -> Color.White
                                                     else -> LocalContentColor.current
                                                 },
                                                 modifier = Modifier.size(30.dp)
